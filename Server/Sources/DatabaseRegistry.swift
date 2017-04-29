@@ -33,9 +33,4 @@ struct DatabaseRegistry {
 		let database = couchDBClient.database(name)
 		return database
 	}
-	
-	func database() -> Database {
-		let database = self.database(name: "ground_control")
-		return database
-	}
 }
