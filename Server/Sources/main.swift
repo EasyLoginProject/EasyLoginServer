@@ -9,10 +9,11 @@ dbRegistry.createDatabase(name: "ground_control")
 
 let router = Router()
 
-router.get("/") {
+router.get("*/db/users/*") {
 	request, response, next in
 	defer { next() }
 	let database = dbRegistry.database()
+	Log.info("Request = \(request.matchedPath)")
 	response.send("Hello World")
 }
 
