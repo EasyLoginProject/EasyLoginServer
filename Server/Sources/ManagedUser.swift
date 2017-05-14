@@ -49,23 +49,23 @@ extension ManagedUser { // PersistentRecord
     }
  */
     
-    init?(databaseRecord:[String:Any]) {
-        guard let uuid = databaseRecord["_id"] as? String else { return nil }
-        guard let numericID = databaseRecord[Key.numericID.rawValue] as? Int else { return nil }
-        guard let shortName = databaseRecord[Key.shortname.rawValue] as? String else { return nil }
-        guard let principalName = databaseRecord[Key.principalName.rawValue] as? String else { return nil }
-        guard let email = databaseRecord[Key.email.rawValue] as? String else { return nil }
-        guard let fullName = databaseRecord[Key.fullName.rawValue] as? String else { return nil }
-        guard let authMethods = databaseRecord[Key.authMethods.rawValue] as? [String:String] else { return nil }
+    init?(databaseRecord:JSON) {
+        guard let uuid = databaseRecord["_id"].string else { return nil }
+        guard let numericID = databaseRecord[Key.numericID.rawValue].int else { return nil }
+        guard let shortName = databaseRecord[Key.shortname.rawValue].string else { return nil }
+        guard let principalName = databaseRecord[Key.principalName.rawValue].string else { return nil }
+        guard let email = databaseRecord[Key.email.rawValue].string else { return nil }
+        guard let fullName = databaseRecord[Key.fullName.rawValue].string else { return nil }
+        guard let authMethods = databaseRecord[Key.authMethods.rawValue].dictionary else { return nil }
         self.uuid = uuid
         self.numericID = numericID
         self.shortName = shortName
         self.principalName = principalName
         self.email = email
-        self.givenName = databaseRecord[Key.givenName.rawValue] as? String
-        self.surname = databaseRecord[Key.surname.rawValue] as? String
+        self.givenName = databaseRecord[Key.givenName.rawValue].string
+        self.surname = databaseRecord[Key.surname.rawValue].string
         self.fullName = fullName
-        self.authMethods = authMethods
+        self.authMethods = [:] // authMethods
     }
     
     func databaseRecord() -> [String:Any] {

@@ -55,11 +55,15 @@ router.post("*/db/users") {
         let database = context.database
         let document = JSON(user.databaseRecord())
         database.create(document, callback: { (id: String?, rev: String?, document: JSON?, error: NSError?) in
-            if let error = error {
-                response.send("Error: \(error)")
-            } else {
-                response.send(json: user.responseElement())
+            guard let document = document else {
+                sendError(to: response)
+                return
             }
+            guard let createdUser = ManagedUser(databaseRecord:document) else {
+                sendError(to: response)
+                return
+            }
+            response.send(json: createdUser.responseElement())
         })
     default:
         sendError(to: response)
