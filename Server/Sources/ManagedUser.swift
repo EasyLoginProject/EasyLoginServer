@@ -1,0 +1,137 @@
+//
+//  ManagedUser.swift
+//  GroundControl
+//
+//  Created by Frank on 30/04/17.
+//
+//
+
+import Foundation
+import CouchDB
+import SwiftyJSON
+import LoggerAPI
+
+struct ManagedUser { // PersistentRecord, Serializable
+    enum Key: String {
+        case type
+        case uuid
+        case numericID
+        case shortname
+        case principalName
+        case email
+        case givenName
+        case surname
+        case fullName
+        case authMethods
+    }
+    
+    let uuid: String
+    let numericID: Int
+    let shortName: String
+    let principalName: String
+    let email: String
+    let givenName: String?
+    let surname: String?
+    let fullName: String
+    let authMethods: [String: String]
+
+    let type = "user"
+}
+
+extension ManagedUser { // PersistentRecord
+    /*
+    init(database:Database, uuid:UUID) {
+        // move to caller
+    }
+    
+    func persist(to database:Database) {
+        // move to caller
+    }
+ */
+    
+    init?(databaseRecord:[String:Any]) {
+        guard let uuid = databaseRecord["_id"] as? String else { return nil }
+        guard let numericID = databaseRecord[Key.numericID.rawValue] as? Int else { return nil }
+        guard let shortName = databaseRecord[Key.shortname.rawValue] as? String else { return nil }
+        guard let principalName = databaseRecord[Key.principalName.rawValue] as? String else { return nil }
+        guard let email = databaseRecord[Key.email.rawValue] as? String else { return nil }
+        guard let fullName = databaseRecord[Key.fullName.rawValue] as? String else { return nil }
+        guard let authMethods = databaseRecord[Key.authMethods.rawValue] as? [String:String] else { return nil }
+        self.uuid = uuid
+        self.numericID = numericID
+        self.shortName = shortName
+        self.principalName = principalName
+        self.email = email
+        self.givenName = databaseRecord[Key.givenName.rawValue] as? String
+        self.surname = databaseRecord[Key.surname.rawValue] as? String
+        self.fullName = fullName
+        self.authMethods = authMethods
+    }
+    
+    func databaseRecord() -> [String:Any] {
+        var record: [String:Any] = [
+            "_id": uuid,
+            Key.type.rawValue: type,
+            Key.numericID.rawValue: numericID,
+            Key.shortname.rawValue: shortName,
+            Key.principalName.rawValue: principalName,
+            Key.email.rawValue: email,
+            Key.fullName.rawValue: fullName,
+            Key.authMethods.rawValue: authMethods
+        ]
+        if let givenName = givenName {
+            record["givenName"] = givenName
+        }
+        if let surname = surname {
+            record["surname"] = surname
+        }
+        return record
+    }
+}
+
+extension ManagedUser { // ServerAPI
+    init?(requestElement:JSON) {
+        //guard let numericID = requestElement[Key.numericID.rawValue].int else { return nil }
+        guard let shortName = requestElement[Key.shortname.rawValue].string else { return nil }
+        Log.debug("short name = \(shortName)")
+        guard let principalName = requestElement[Key.principalName.rawValue].string else { return nil }
+        Log.debug("principal name = \(principalName)")
+        guard let email = requestElement[Key.email.rawValue].string else { return nil }
+        guard let fullName = requestElement[Key.fullName.rawValue].string else { return nil }
+        //guard let requestAuthMethodsJSON = requestElement[Key.authMethods.rawValue].dictionary else { return nil }
+        //let requestAuthMethods: [String:String] = requestAuthMethodsJSON.flatMap { (key: String, value: JSON) -> (String, String)? in
+        //    (key, value.string)
+        //}
+        let uuid = UUID().hexString()
+        let numericID = 123 // TODO: generate
+        self.uuid = uuid
+        self.numericID = numericID
+        self.shortName = shortName
+        self.principalName = principalName
+        self.email = email
+        self.givenName = requestElement[Key.givenName.rawValue].string
+        self.surname = requestElement[Key.givenName.rawValue].string
+        self.fullName = fullName
+    self.authMethods = [:] // TODO: generate
+    }
+    
+    func responseElement() -> JSON {
+        var record: [String:Any] = [
+            Key.uuid.rawValue: uuid,
+            Key.type.rawValue: type,
+            Key.numericID.rawValue: numericID,
+            Key.shortname.rawValue: shortName,
+            Key.principalName.rawValue: principalName,
+            Key.email.rawValue: email,
+            Key.fullName.rawValue: fullName,
+            Key.authMethods.rawValue: authMethods
+        ]
+        if let givenName = givenName {
+            record["givenName"] = givenName
+        }
+        if let surname = surname {
+            record["surname"] = surname
+        }
+        return JSON(record)
+    }
+}
