@@ -18,17 +18,29 @@ router.all(middleware:ContextLoader(databaseRegistry: dbRegistry))
 router.post(middleware:BodyParser())
 router.put(middleware:BodyParser())
 
-router.get("*/db/users/:id") {
+router.get("/whatever/v1/db/users/:uuid") { // can't get uuid with wildcard -- Kitura bug?
 	request, response, next in
 	defer { next() }
-    if let context = request.userInfo["GroundControlContext"] as? DirectoryContext {
-        let database = context.database
-        // send query to database here...
-        response.send("Connected to database.")
+    guard let context = request.userInfo["GroundControlContext"] as? DirectoryContext else {
+        sendError(to:response)
+        return
     }
-    else {
-        response.send("This is unexpected.")
+    guard let uuid = request.parameters["uuid"] else {
+        sendError(to:response)
+        return
     }
+    let database = context.database
+    database.retrieve(uuid, callback: { (document: JSON?, error: NSError?) in
+        guard let document = document else {
+            sendError(to: response)
+            return
+        }
+        guard let retrievedUser = ManagedUser(databaseRecord:document) else {
+            sendError(to: response)
+            return
+        }
+        response.send(json: retrievedUser.responseElement())
+    })
 }
 
 router.post("*/db/users") {
