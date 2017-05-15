@@ -65,7 +65,14 @@ extension ManagedUser { // PersistentRecord
         self.givenName = databaseRecord[Key.givenName.rawValue].string
         self.surname = databaseRecord[Key.surname.rawValue].string
         self.fullName = fullName
-        self.authMethods = [:] // authMethods
+        let filteredAuthMethodsPairs = authMethods.flatMap {
+            (key: String, value: JSON) -> (String,String)? in
+            if let value = value.string {
+                return (key, value)
+            }
+            return nil
+        }
+        self.authMethods = Dictionary(filteredAuthMethodsPairs)
     }
     
     func databaseRecord() -> [String:Any] {
@@ -98,10 +105,15 @@ extension ManagedUser { // ServerAPI
         Log.debug("principal name = \(principalName)")
         guard let email = requestElement[Key.email.rawValue].string else { return nil }
         guard let fullName = requestElement[Key.fullName.rawValue].string else { return nil }
-        //guard let requestAuthMethodsJSON = requestElement[Key.authMethods.rawValue].dictionary else { return nil }
-        //let requestAuthMethods: [String:String] = requestAuthMethodsJSON.flatMap { (key: String, value: JSON) -> (String, String)? in
-        //    (key, value.string)
-        //}
+        guard let requestAuthMethods = requestElement[Key.authMethods.rawValue].dictionary else { return nil }
+        let filteredAuthMethodsPairs = requestAuthMethods.flatMap {
+            (key: String, value: JSON) -> (String,String)? in
+            if let value = value.string {
+                return (key, value)
+            }
+            return nil
+        }
+        guard let generatedAuthMethods = AuthMethods.generate(Dictionary(filteredAuthMethodsPairs)) else { return nil }
         let uuid = UUID().hexString()
         let numericID = 123 // TODO: generate
         self.uuid = uuid
@@ -112,7 +124,7 @@ extension ManagedUser { // ServerAPI
         self.givenName = requestElement[Key.givenName.rawValue].string
         self.surname = requestElement[Key.givenName.rawValue].string
         self.fullName = fullName
-    self.authMethods = [:] // TODO: generate
+        self.authMethods = generatedAuthMethods
     }
     
     func responseElement() -> JSON {
@@ -133,5 +145,18 @@ extension ManagedUser { // ServerAPI
             record["surname"] = surname
         }
         return JSON(record)
+    }
+}
+
+enum AuthMethods {
+    static func generate(_ authMethods: [String:String]) -> [String:String]? {
+        guard authMethods.count != 0 else { return nil }
+        if let cleartext = authMethods["cleartext"] {
+            var generated = authMethods
+            generated["cleartext"] = nil
+            // TODO: generate other auth methods
+            return generated
+        }
+        return authMethods
     }
 }
