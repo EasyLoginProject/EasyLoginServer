@@ -1,6 +1,6 @@
 //
 //  DictionaryInitExtension.swift
-//  GroundControl
+//  EasyLogin
 //
 //  Created by Frank on 15/05/17.
 //

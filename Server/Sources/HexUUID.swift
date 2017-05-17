@@ -1,6 +1,6 @@
 //
 //  HexUUID.swift
-//  GroundControl
+//  EasyLogin
 //
 //  Created by Frank on 14/05/17.
 //

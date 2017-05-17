@@ -1,6 +1,6 @@
 //
 //  DatabaseRegistry.swift
-//  GroundControl
+//  EasyLogin
 //
 //  Created by Frank on 27/04/2017.
 //

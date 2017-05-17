@@ -1,6 +1,6 @@
 //
 //  ContextLoader.swift
-//  GroundControl
+//  EasyLogin
 //
 //  Created by Frank on 30/04/17.
 //
@@ -17,6 +17,6 @@ struct ContextLoader : RouterMiddleware {
         Log.info("Request = \(request.urlURL) for route \(request.route)")
         // extract prefix (-> directory -> database name) and suffix (-> query) from URL and headers
         let context = DirectoryContext(database: databaseRegistry.database(name: "ground_control"))
-        request.userInfo["GroundControlContext"] = context
+        request.userInfo["EasyLoginContext"] = context
     }
 }
