@@ -16,7 +16,7 @@ struct ContextLoader : RouterMiddleware {
         defer { next() }
         Log.info("Request = \(request.urlURL) for route \(request.route)")
         // extract prefix (-> directory -> database name) and suffix (-> query) from URL and headers
-        let context = DirectoryContext(database: databaseRegistry.database(name: "ground_control"))
+        let context = EasyLoginContext(database: databaseRegistry.database(name: "ground_control"))
         request.userInfo["EasyLoginContext"] = context
     }
 }

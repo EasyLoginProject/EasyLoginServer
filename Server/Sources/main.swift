@@ -21,7 +21,7 @@ router.put(middleware:BodyParser())
 router.get("/whatever/v1/db/users/:uuid") { // can't get uuid with wildcard -- Kitura bug?
 	request, response, next in
 	defer { next() }
-    guard let context = request.userInfo["EasyLoginContext"] as? DirectoryContext else {
+    guard let context = request.userInfo["EasyLoginContext"] as? EasyLoginContext else {
         sendError(to:response)
         return
     }
@@ -47,7 +47,7 @@ router.post("*/db/users") {
     request, response, next in
     defer { next() }
     Log.debug("handling POST")
-    guard let context = request.userInfo["EasyLoginContext"] as? DirectoryContext else {
+    guard let context = request.userInfo["EasyLoginContext"] as? EasyLoginContext else {
         Log.error("no context")
         sendError(to:response)
         return
