@@ -130,7 +130,6 @@ extension ManagedUser { // ServerAPI
     func responseElement() -> JSON {
         var record: [String:Any] = [
             Key.uuid.rawValue: uuid,
-            Key.type.rawValue: type,
             Key.numericID.rawValue: numericID,
             Key.shortname.rawValue: shortName,
             Key.principalName.rawValue: principalName,
