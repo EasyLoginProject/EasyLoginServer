@@ -14,33 +14,57 @@ import Configuration
 import CloudFoundryConfig
 import CouchDB
 
+public enum ConfigError: Error {
+    case missingDatabaseInfo
+    case missingDatabaseName
+}
+
 func sendError(to response: RouterResponse) {
     response.send("This is unexpected.")
 }
 
+public let manager = ConfigurationManager()
 public let router = Router()
 
+internal var database: Database?
+
 public func initialize() throws {
-    let dbRegistry = DatabaseRegistry()
-    //dbRegistry.createDatabase(name: "ground_control")
+    manager.load(.commandLineArguments)
+    if let configFile = manager["config"] as? String {
+        manager.load(file:configFile)
+    }
+    manager.load(.environmentVariables)
+           .load(.commandLineArguments) // always give precedence to CLI args
+    if let databaseDictionary = manager["database"] as? [String:Any] {
+        guard let databaseName = databaseDictionary["name"] as? String else { throw ConfigError.missingDatabaseName }
+        let couchDBClient = CouchDBClient(dictionary: databaseDictionary)
+        Log.info("Connected to CouchDB, client = \(couchDBClient), database name = \(databaseName)")
+        database = couchDBClient.database(databaseName)
+    }
+    else if let cloudantService = try? manager.getCloudantService(name: "EasyLogin-Cloudant") {
+        let databaseName = "easy_login"
+        let couchDBClient = CouchDBClient(service: cloudantService)
+        Log.info("Connected to Cloudant, client = \(couchDBClient), database name = \(databaseName)")
+        database = couchDBClient.database(databaseName)
+    }
+    else {
+        throw ConfigError.missingDatabaseInfo
+    }
     
-    let router = Router()
-    router.all(middleware:ContextLoader(databaseRegistry: dbRegistry))
     router.post(middleware:BodyParser())
     router.put(middleware:BodyParser())
     
     router.get("/whatever/v1/db/users/:uuid") { // can't get uuid with wildcard -- Kitura bug?
         request, response, next in
         defer { next() }
-        guard let context = request.userInfo["EasyLoginContext"] as? EasyLoginContext else {
-            sendError(to:response)
-            return
-        }
         guard let uuid = request.parameters["uuid"] else {
             sendError(to:response)
             return
         }
-        let database = context.database
+        guard let database = database else {
+            sendError(to: response)
+            return
+        }
         database.retrieve(uuid, callback: { (document: JSON?, error: NSError?) in
             guard let document = document else {
                 sendError(to: response)
@@ -58,11 +82,6 @@ public func initialize() throws {
         request, response, next in
         defer { next() }
         Log.debug("handling POST")
-        guard let context = request.userInfo["EasyLoginContext"] as? EasyLoginContext else {
-            Log.error("no context")
-            sendError(to:response)
-            return
-        }
         guard let parsedBody = request.body else {
             Log.error("body parsing failure")
             sendError(to:response)
@@ -75,7 +94,10 @@ public func initialize() throws {
                 sendError(to: response)
                 return
             }
-            let database = context.database
+            guard let database = database else {
+                sendError(to: response)
+                return
+            }
             let document = JSON(user.databaseRecord())
             database.create(document, callback: { (id: String?, rev: String?, createdDocument: JSON?, error: NSError?) in
                 guard let createdDocument = createdDocument else {
