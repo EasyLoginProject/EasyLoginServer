@@ -4,7 +4,7 @@ import LoggerAPI
 import HeliumLogger // move to setup
 import Application
 
-Log.logger = HeliumLogger()
+HeliumLogger.use(LoggerMessageType.debug)
 
 do {
     try initialize()
