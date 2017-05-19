@@ -13,6 +13,7 @@ import SwiftyJSON
 
 extension Router {
     public func installDatabaseUsersHandlers() {
+        self.get("/db/users", handler: listUsersHandler)
         self.get("/db/users/:uuid", handler: getUserHandler)
         self.post("/db/users", handler: createUserHandler)
     }
@@ -76,3 +77,28 @@ fileprivate func createUserHandler(request: RouterRequest, response: RouterRespo
         sendError(to: response)
     }
 }
+
+fileprivate func listUsersHandler(request: RouterRequest, response: RouterResponse, next: ()->Void) -> Void {
+    defer { next() }
+    guard let database = database else {
+        sendError(to: response)
+        return
+    }
+    database.queryByView("all_users", ofDesign: "main_design", usingParameters: []) { (databaseResponse, error) in
+        guard let databaseResponse = databaseResponse else {
+            sendError(to: response)
+            return
+        }
+        let userList = databaseResponse["rows"].array?.flatMap { user -> [String:Any]? in
+            if let uuid = user["value"]["uuid"].string,
+               let numericID = user["value"]["numericID"].int,
+               let shortname = user["value"]["shortname"].string {
+                return ["uuid":uuid, "numericID":numericID, "shortname":shortname]
+            }
+            return nil
+        }
+        let result = ["users": userList ?? []]
+        response.send(json: JSON(result))
+    }
+}
+
