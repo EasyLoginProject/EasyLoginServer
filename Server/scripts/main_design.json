@@ -1,0 +1,9 @@
+{
+  "id": "_design/main_design",
+  "views": {
+    "all_users": {
+      "map" : "function(doc) {  if (doc.type == 'user') { emit([doc.numericID, doc._id], {\"uuid\":doc._id, \"numericID\":doc.numericID, \"shortname\":doc.shortname}); } }"
+    }
+  },
+  "language": "javascript"
+}
