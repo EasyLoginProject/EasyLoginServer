@@ -54,7 +54,7 @@ public func initialize() throws {
     router.post(middleware:BodyParser())
     router.put(middleware:BodyParser())
     
-    router.get("/whatever/v1/db/users/:uuid") { // can't get uuid with wildcard -- Kitura bug?
+    router.get("/db/users/:uuid") {
         request, response, next in
         defer { next() }
         guard let uuid = request.parameters["uuid"] else {
@@ -78,7 +78,7 @@ public func initialize() throws {
         })
     }
     
-    router.post("*/db/users") {
+    router.post("/db/users") {
         request, response, next in
         defer { next() }
         Log.debug("handling POST")
