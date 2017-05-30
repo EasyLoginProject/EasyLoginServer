@@ -10,6 +10,9 @@ do {
     try initialize()
     try run()
 }
+catch ConfigError.missingDatabaseInfo {
+    installInitErrorRoute()
+}
 catch let error {
     Log.error(error.localizedDescription)
 }

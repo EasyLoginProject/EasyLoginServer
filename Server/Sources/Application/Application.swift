@@ -57,6 +57,14 @@ public func initialize() throws {
     router.installDatabaseUsersHandlers()
 }
 
+public func installInitErrorRoute() {
+    router.installInitErrorHandlers()
+}
+
+public func createDatabase() throws {
+    
+}
+
 public func run() throws {
     Kitura.addHTTPServer(onPort: 8080, with: router)
     Kitura.run()
