@@ -39,13 +39,13 @@ public func initialize() throws {
         guard let databaseName = databaseDictionary["name"] as? String else { throw ConfigError.missingDatabaseName }
         let couchDBClient = CouchDBClient(dictionary: databaseDictionary)
         Log.info("Connected to CouchDB, client = \(couchDBClient), database name = \(databaseName)")
-        database = couchDBClient.database(databaseName)
+        database = couchDBClient.createOrOpenDatabase(name: databaseName, designFile: "../../Resources/main_design.json")
     }
     else if let cloudantService = try? manager.getCloudantService(name: "EasyLogin-Cloudant") {
         let databaseName = "easy_login"
         let couchDBClient = CouchDBClient(service: cloudantService)
         Log.info("Connected to Cloudant, client = \(couchDBClient), database name = \(databaseName)")
-        database = couchDBClient.database(databaseName)
+        database = couchDBClient.createOrOpenDatabase(name: databaseName, designFile: "app/Resources/main_design.json")
     }
     else {
         throw ConfigError.missingDatabaseInfo
@@ -59,10 +59,6 @@ public func initialize() throws {
 
 public func installInitErrorRoute() {
     router.installInitErrorHandlers()
-}
-
-public func createDatabase() throws {
-    
 }
 
 public func run() throws {

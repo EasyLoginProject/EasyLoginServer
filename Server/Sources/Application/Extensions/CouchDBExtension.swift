@@ -1,6 +1,13 @@
 import Foundation
 import CouchDB
 import CloudFoundryConfig
+import SwiftyJSON
+import LoggerAPI
+
+public enum RuntimeError: Error {
+    case databaseNotFound
+    case resourceNotFound
+}
 
 extension CouchDBClient {
 
@@ -31,4 +38,27 @@ extension CouchDBClient {
         self.init(connectionProperties: connProperties)
     }
     
+    public func createOrOpenDatabase(name: String, designFile: String) -> Database {
+        self.dbExists(name) {
+            exists, error in
+            if !exists {
+                self.createDB(name) {
+                    database, error in
+                    guard let database = database else {
+                        Log.error("cannot create database")
+                        return
+                    }
+                    guard let json = try? String(contentsOfFile: designFile, encoding:.utf8) else {
+                        Log.error("cannot load file \(designFile)")
+                        return
+                    }
+                    let document = JSON.parse(string: json)
+                    database.createDesign("main_design", document: document) { (result, error) in
+                        Log.info("database index creation: \(result)")
+                    }
+                }
+            }
+        }
+        return self.database(name)
+    }
 }
