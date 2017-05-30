@@ -7,9 +7,14 @@
 //
 
 import Foundation
+import CouchDB
 import Kitura
 import LoggerAPI
 import SwiftyJSON
+
+enum UsersError: Error {
+    case databaseFailure
+}
 
 extension Router {
     public func installDatabaseUsersHandlers() {
@@ -61,18 +66,16 @@ fileprivate func createUserHandler(request: RouterRequest, response: RouterRespo
             sendError(to: response)
             return
         }
-        let document = JSON(user.databaseRecord())
-        database.create(document, callback: { (id: String?, rev: String?, createdDocument: JSON?, error: NSError?) in
-            guard let createdDocument = createdDocument else {
+        insert(user, into: database) {
+            createdUser in
+            guard let createdUser = createdUser else {
                 sendError(to: response)
                 return
             }
-            guard let createdUser = ManagedUser(databaseRecord:document) else {
-                sendError(to: response)
-                return
-            }
+            response.statusCode = .created
+            response.headers.setLocation("/db/users/\(createdUser.uuid)")
             response.send(json: createdUser.responseElement())
-        })
+        }
     default:
         sendError(to: response)
     }
@@ -99,6 +102,35 @@ fileprivate func listUsersHandler(request: RouterRequest, response: RouterRespon
         }
         let result = ["users": userList ?? []]
         response.send(json: JSON(result))
+    }
+}
+
+fileprivate func insert(_ user: ManagedUser, into database: Database, completion: @escaping (ManagedUser?) -> Void) -> Void {
+    nextNumericID(database: database) {
+        numericID in
+        Log.debug("next numeric id = \(numericID)")
+        var userWithID = user
+        userWithID.numericID = numericID
+        let document = JSON(userWithID.databaseRecord())
+        database.create(document, callback: { (id: String?, rev: String?, createdDocument: JSON?, error: NSError?) in
+            guard createdDocument != nil else {
+                completion(nil)
+                return
+            }
+            let createdUser = ManagedUser(databaseRecord:document)
+            completion(createdUser)
+        })
+    }
+}
+
+fileprivate func nextNumericID(database: Database, _ block: @escaping (Int)->Void) -> Void {
+    database.queryByView("users_numeric_id", ofDesign: "main_design", usingParameters: []) { (databaseResponse, error) in
+        if let lastNumericID = databaseResponse?["rows"][0]["value"]["max"].int {
+            block(lastNumericID + 1)
+        }
+        else {
+            block(1)
+        }
     }
 }
 

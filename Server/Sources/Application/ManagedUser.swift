@@ -26,7 +26,7 @@ struct ManagedUser { // PersistentRecord, Serializable
     }
     
     let uuid: String
-    let numericID: Int
+    var numericID: Int
     let shortName: String
     let principalName: String
     let email: String
