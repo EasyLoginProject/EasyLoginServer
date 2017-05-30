@@ -45,7 +45,7 @@ public func initialize() throws {
         let databaseName = "easy_login"
         let couchDBClient = CouchDBClient(service: cloudantService)
         Log.info("Connected to Cloudant, client = \(couchDBClient), database name = \(databaseName)")
-        database = couchDBClient.createOrOpenDatabase(name: databaseName, designFile: "app/Resources/main_design.json")
+        database = couchDBClient.createOrOpenDatabase(name: databaseName, designFile: "Resources/main_design.json")
     }
     else {
         throw ConfigError.missingDatabaseInfo
