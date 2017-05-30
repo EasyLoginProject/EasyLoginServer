@@ -6,4 +6,6 @@ applications:
   disk_quota: 1024M
   command: EasyLogin
   buildpack: swift_buildpack
+  services:
+  - EasyLogin-Cloudant
 
