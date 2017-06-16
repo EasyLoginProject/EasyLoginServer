@@ -122,7 +122,7 @@ extension ManagedUser { // ServerAPI
         self.principalName = principalName
         self.email = email
         self.givenName = requestElement[Key.givenName.rawValue].string
-        self.surname = requestElement[Key.givenName.rawValue].string
+        self.surname = requestElement[Key.surname.rawValue].string
         self.fullName = fullName
         self.authMethods = generatedAuthMethods
     }
