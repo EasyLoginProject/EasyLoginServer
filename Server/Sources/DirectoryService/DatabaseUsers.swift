@@ -11,6 +11,7 @@ import CouchDB
 import Kitura
 import LoggerAPI
 import SwiftyJSON
+import Extensions
 
 enum UsersError: Error {
     case databaseFailure

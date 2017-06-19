@@ -13,20 +13,16 @@ import SwiftyJSON
 import Configuration
 import CloudFoundryConfig
 import CouchDB
+import Extensions
+import DirectoryService
 
 public enum ConfigError: Error {
     case missingDatabaseInfo
     case missingDatabaseName
 }
 
-public func sendError(to response: RouterResponse) {
-    response.send("This is unexpected.")
-}
-
 public let manager = ConfigurationManager()
 public let router = Router()
-
-public var database: Database?
 
 public func initialize() throws {
     manager.load(.commandLineArguments)

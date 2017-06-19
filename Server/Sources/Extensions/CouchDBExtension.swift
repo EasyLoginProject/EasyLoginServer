@@ -9,7 +9,7 @@ public enum RuntimeError: Error {
     case resourceNotFound
 }
 
-extension CouchDBClient {
+public extension CouchDBClient {
 
     public convenience init(service: CloudantService) {
         

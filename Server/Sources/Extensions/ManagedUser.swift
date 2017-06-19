@@ -11,7 +11,7 @@ import CouchDB
 import SwiftyJSON
 import LoggerAPI
 
-struct ManagedUser { // PersistentRecord, Serializable
+public struct ManagedUser { // PersistentRecord, Serializable
     enum Key: String {
         case type
         case uuid
@@ -25,20 +25,20 @@ struct ManagedUser { // PersistentRecord, Serializable
         case authMethods
     }
     
-    let uuid: String
-    var numericID: Int
-    let shortName: String
-    let principalName: String
-    let email: String
-    let givenName: String?
-    let surname: String?
-    let fullName: String
-    let authMethods: [String: String]
+    public let uuid: String
+    public var numericID: Int
+    public let shortName: String
+    public let principalName: String
+    public let email: String
+    public let givenName: String?
+    public let surname: String?
+    public let fullName: String
+    public let authMethods: [String: String]
 
     let type = "user"
 }
 
-extension ManagedUser { // PersistentRecord
+public extension ManagedUser { // PersistentRecord
     /*
     init(database:Database, uuid:UUID) {
         // move to caller
@@ -96,7 +96,7 @@ extension ManagedUser { // PersistentRecord
     }
 }
 
-extension ManagedUser { // ServerAPI
+public extension ManagedUser { // ServerAPI
     init?(requestElement:JSON) {
         //guard let numericID = requestElement[Key.numericID.rawValue].int else { return nil }
         guard let shortName = requestElement[Key.shortname.rawValue].string else { return nil }
