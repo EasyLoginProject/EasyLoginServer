@@ -11,15 +11,15 @@ import CouchDB
 import Kitura
 
 public class DirectoryService {
-    let database: Database
+    let users: Users
     
     public init(database: Database) {
-        self.database = database
+        users = Users(database: database)
     }
     
     public func router() -> Router {
         let router = Router()
-        router.installDatabaseUsersHandlers()
+        users.installHandlers(to: router)
         return router
     }
 }
