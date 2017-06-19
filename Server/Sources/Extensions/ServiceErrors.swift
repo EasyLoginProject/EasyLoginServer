@@ -9,7 +9,7 @@ public enum EasyLoginError {
     case missingField(String)
     case validation(String)
     case databaseNotAvailable
-    case debug(String)
+    case debug(String?)
 }
 
 extension EasyLoginError {
@@ -38,6 +38,8 @@ extension EasyLoginError {
             return "Validation error on \(fieldName)"
         case .databaseNotAvailable:
             return "Database not available"
+        case .debug(let message):
+            return message ?? "Internal error"
         default:
             return nil
         }
