@@ -67,9 +67,10 @@ class Users {
                 return
             }
             insert(user, into: database) {
-                createdUser in
+                createdUser, error in
                 guard let createdUser = createdUser else {
-                    sendError(.debug("Response creation failed"), to: response)
+                    let errorMessage = error?.localizedDescription ?? "error is nil"
+                    sendError(.debug("Response creation failed: \(errorMessage)"), to: response)
                     return
                 }
                 response.statusCode = .created
@@ -85,7 +86,8 @@ class Users {
         defer { next() }
         database.queryByView("all_users", ofDesign: "main_design", usingParameters: []) { (databaseResponse, error) in
             guard let databaseResponse = databaseResponse else {
-                sendError(.debug("Database request failed: \(error)"), to: response)
+                let errorMessage = error?.localizedDescription ?? "error is nil"
+                sendError(.debug("Database request failed: \(errorMessage)"), to: response)
                 return
             }
             let userList = databaseResponse["rows"].array?.flatMap { user -> [String:Any]? in
@@ -102,7 +104,7 @@ class Users {
     }
 }
 
-fileprivate func insert(_ user: ManagedUser, into database: Database, completion: @escaping (ManagedUser?) -> Void) -> Void {
+fileprivate func insert(_ user: ManagedUser, into database: Database, completion: @escaping (ManagedUser?, NSError?) -> Void) -> Void {
     // TODO: ensure shortName and principalName are unique
     nextNumericID(database: database) {
         numericID in
@@ -112,12 +114,11 @@ fileprivate func insert(_ user: ManagedUser, into database: Database, completion
         let document = JSON(userWithID.databaseRecord())
         database.create(document, callback: { (id: String?, rev: String?, createdDocument: JSON?, error: NSError?) in
             guard createdDocument != nil else {
-                // TODO: get error
-                completion(nil)
+                completion(nil, error)
                 return
             }
             let createdUser = ManagedUser(databaseRecord:document)
-            completion(createdUser)
+            completion(createdUser, nil)
         })
     }
 }
