@@ -114,7 +114,7 @@ public extension ManagedUser { // ServerAPI
             return nil
         }
         guard let generatedAuthMethods = AuthMethods.generate(Dictionary(filteredAuthMethodsPairs)) else { return nil }
-        let uuid = UUID().hexString()
+        let uuid = UUID().uuidString
         let numericID = 123 // TODO: generate
         self.uuid = uuid
         self.numericID = numericID
