@@ -85,7 +85,7 @@ class Users {
         defer { next() }
         database.queryByView("all_users", ofDesign: "main_design", usingParameters: []) { (databaseResponse, error) in
             guard let databaseResponse = databaseResponse else {
-                sendError(.debug("Database request failed"), to: response)
+                sendError(.debug("Database request failed: \(error)"), to: response)
                 return
             }
             let userList = databaseResponse["rows"].array?.flatMap { user -> [String:Any]? in
@@ -112,6 +112,7 @@ fileprivate func insert(_ user: ManagedUser, into database: Database, completion
         let document = JSON(userWithID.databaseRecord())
         database.create(document, callback: { (id: String?, rev: String?, createdDocument: JSON?, error: NSError?) in
             guard createdDocument != nil else {
+                // TODO: get error
                 completion(nil)
                 return
             }
