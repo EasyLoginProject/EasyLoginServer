@@ -13,20 +13,16 @@ import SwiftyJSON
 import Configuration
 import CloudFoundryConfig
 import CouchDB
+import Extensions
+import DirectoryService
 
 public enum ConfigError: Error {
     case missingDatabaseInfo
     case missingDatabaseName
 }
 
-public func sendError(to response: RouterResponse) {
-    response.send("This is unexpected.")
-}
-
 public let manager = ConfigurationManager()
 public let router = Router()
-
-public var database: Database?
 
 public func initialize() throws {
     manager.load(.commandLineArguments)
@@ -54,7 +50,10 @@ public func initialize() throws {
     router.post(middleware:BodyParser())
     router.put(middleware:BodyParser())
     
-    router.installDatabaseUsersHandlers()
+    guard let database = database else { return } // TODO: fail earlier if connector to database cannot be obtained
+    
+    let directoryService = DirectoryService(database: database)
+    router.all("/db", middleware: directoryService.router())
 }
 
 public func installInitErrorRoute() {

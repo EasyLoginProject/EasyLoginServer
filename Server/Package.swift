@@ -3,7 +3,20 @@ import PackageDescription
 let package = Package(
     name: "EasyLogin",
     targets: [
-        Target(name: "EasyLogin", dependencies: [ .Target(name: "Application") ])
+        Target(name: "EasyLogin", dependencies: [
+        	.Target(name: "Application"),
+        	.Target(name: "Extensions"),
+        	.Target(name: "DirectoryService"),
+        	.Target(name: "NotificationService")
+        ]),
+        Target(name: "Application", dependencies: [
+        	.Target(name: "Extensions"),
+        	.Target(name: "DirectoryService"),
+        	.Target(name: "NotificationService")
+        ]),
+        Target(name: "DirectoryService", dependencies: [
+        	.Target(name: "Extensions")
+        ])
     ],
     dependencies: [
     	.Package(url: "https://github.com/IBM-Swift/Kitura.git", majorVersion: 1, minor: 7),

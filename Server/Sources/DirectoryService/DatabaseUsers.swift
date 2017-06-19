@@ -11,16 +11,17 @@ import CouchDB
 import Kitura
 import LoggerAPI
 import SwiftyJSON
+import Extensions
 
 enum UsersError: Error {
     case databaseFailure
 }
 
 extension Router {
-    public func installDatabaseUsersHandlers() {
-        self.get("/db/users", handler: listUsersHandler)
-        self.get("/db/users/:uuid", handler: getUserHandler)
-        self.post("/db/users", handler: createUserHandler)
+    func installDatabaseUsersHandlers() {
+        self.get("/users", handler: listUsersHandler)
+        self.get("/users/:uuid", handler: getUserHandler)
+        self.post("/users", handler: createUserHandler)
     }
 }
 
