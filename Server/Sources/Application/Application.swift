@@ -31,6 +31,8 @@ public func initialize() throws {
     }
     manager.load(.environmentVariables)
            .load(.commandLineArguments) // always give precedence to CLI args
+    
+    var database: Database? = nil
     if let databaseDictionary = manager["database"] as? [String:Any] {
         guard let databaseName = databaseDictionary["name"] as? String else { throw ConfigError.missingDatabaseName }
         let couchDBClient = CouchDBClient(dictionary: databaseDictionary)
@@ -50,10 +52,11 @@ public func initialize() throws {
     router.post(middleware:BodyParser())
     router.put(middleware:BodyParser())
     
-    guard let database = database else { return } // TODO: fail earlier if connector to database cannot be obtained
-    
-    let directoryService = DirectoryService(database: database)
-    router.all("/db", middleware: directoryService.router())
+    if let database = database {
+        let directoryService = DirectoryService(database: database)
+        router.all("/db", middleware: directoryService.router())
+    }
+    // TODO: else install diagnostic handler
 }
 
 public func installInitErrorRoute() {

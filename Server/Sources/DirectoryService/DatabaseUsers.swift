@@ -17,94 +17,88 @@ enum UsersError: Error {
     case databaseFailure
 }
 
-extension Router {
-    func installDatabaseUsersHandlers() {
-        self.get("/users", handler: listUsersHandler)
-        self.get("/users/:uuid", handler: getUserHandler)
-        self.post("/users", handler: createUserHandler)
+class Users {
+    let database: Database
+    
+    init(database: Database) {
+        self.database = database
     }
-}
-
-fileprivate func getUserHandler(request: RouterRequest, response: RouterResponse, next: ()->Void) -> Void {
-    defer { next() }
-    guard let uuid = request.parameters["uuid"] else {
-        sendError(.missingField("uuid"), to:response)
-        return
+    
+    func installHandlers(to router: Router) {
+        router.get("/users", handler: listUsersHandler)
+        router.get("/users/:uuid", handler: getUserHandler)
+        router.post("/users", handler: createUserHandler)
     }
-    guard let database = database else {
-        sendError(.databaseNotAvailable, to: response) // TODO: fail earlier
-        return
-    }
-    database.retrieve(uuid, callback: { (document: JSON?, error: NSError?) in
-        guard let document = document else {
-            sendError(.notFound, to: response)
+    
+    func getUserHandler(request: RouterRequest, response: RouterResponse, next: ()->Void) -> Void {
+        defer { next() }
+        guard let uuid = request.parameters["uuid"] else {
+            sendError(.missingField("uuid"), to:response)
             return
         }
-        // TODO: verify type == "user"
-        // TODO: verify not deleted
-        guard let retrievedUser = ManagedUser(databaseRecord:document) else {
-            sendError(.debug("Response creation failed"), to: response)
-            return
-        }
-        response.send(json: retrievedUser.responseElement())
-    })
-}
-
-fileprivate func createUserHandler(request: RouterRequest, response: RouterResponse, next: ()->Void) -> Void {
-    defer { next() }
-    Log.debug("handling POST")
-    guard let parsedBody = request.body else {
-        Log.error("body parsing failure")
-        sendError(.malformedBody, to:response)
-        return
-    }
-    Log.debug("handling body")
-    switch(parsedBody) {
-    case .json(let jsonBody):
-        guard let user = ManagedUser(requestElement:jsonBody) else {
-            sendError(.debug("User creation failed"), to: response)
-            return
-        }
-        guard let database = database else {
-            sendError(.databaseNotAvailable, to: response) // TODO: fail earlier
-            return
-        }
-        insert(user, into: database) {
-            createdUser in
-            guard let createdUser = createdUser else {
+        database.retrieve(uuid, callback: { (document: JSON?, error: NSError?) in
+            guard let document = document else {
+                sendError(.notFound, to: response)
+                return
+            }
+            // TODO: verify type == "user"
+            // TODO: verify not deleted
+            guard let retrievedUser = ManagedUser(databaseRecord:document) else {
                 sendError(.debug("Response creation failed"), to: response)
                 return
             }
-            response.statusCode = .created
-            response.headers.setLocation("/db/users/\(createdUser.uuid)")
-            response.send(json: createdUser.responseElement())
-        }
-    default:
-        sendError(.malformedBody, to: response)
+            response.send(json: retrievedUser.responseElement())
+        })
     }
-}
-
-fileprivate func listUsersHandler(request: RouterRequest, response: RouterResponse, next: ()->Void) -> Void {
-    defer { next() }
-    guard let database = database else {
-        sendError(.databaseNotAvailable, to: response) // TODO: fail earlier
-        return
-    }
-    database.queryByView("all_users", ofDesign: "main_design", usingParameters: []) { (databaseResponse, error) in
-        guard let databaseResponse = databaseResponse else {
-            sendError(.debug("Database request failed"), to: response)
+    
+    func createUserHandler(request: RouterRequest, response: RouterResponse, next: ()->Void) -> Void {
+        defer { next() }
+        Log.debug("handling POST")
+        guard let parsedBody = request.body else {
+            Log.error("body parsing failure")
+            sendError(.malformedBody, to:response)
             return
         }
-        let userList = databaseResponse["rows"].array?.flatMap { user -> [String:Any]? in
-            if let uuid = user["value"]["uuid"].string,
-               let numericID = user["value"]["numericID"].int,
-               let shortname = user["value"]["shortname"].string {
-                return ["uuid":uuid, "numericID":numericID, "shortname":shortname]
+        Log.debug("handling body")
+        switch(parsedBody) {
+        case .json(let jsonBody):
+            guard let user = ManagedUser(requestElement:jsonBody) else {
+                sendError(.debug("User creation failed"), to: response)
+                return
             }
-            return nil
+            insert(user, into: database) {
+                createdUser in
+                guard let createdUser = createdUser else {
+                    sendError(.debug("Response creation failed"), to: response)
+                    return
+                }
+                response.statusCode = .created
+                response.headers.setLocation("/db/users/\(createdUser.uuid)")
+                response.send(json: createdUser.responseElement())
+            }
+        default:
+            sendError(.malformedBody, to: response)
         }
-        let result = ["users": userList ?? []]
-        response.send(json: JSON(result))
+    }
+    
+    func listUsersHandler(request: RouterRequest, response: RouterResponse, next: ()->Void) -> Void {
+        defer { next() }
+        database.queryByView("all_users", ofDesign: "main_design", usingParameters: []) { (databaseResponse, error) in
+            guard let databaseResponse = databaseResponse else {
+                sendError(.debug("Database request failed"), to: response)
+                return
+            }
+            let userList = databaseResponse["rows"].array?.flatMap { user -> [String:Any]? in
+                if let uuid = user["value"]["uuid"].string,
+                    let numericID = user["value"]["numericID"].int,
+                    let shortname = user["value"]["shortname"].string {
+                    return ["uuid":uuid, "numericID":numericID, "shortname":shortname]
+                }
+                return nil
+            }
+            let result = ["users": userList ?? []]
+            response.send(json: JSON(result))
+        }
     }
 }
 
