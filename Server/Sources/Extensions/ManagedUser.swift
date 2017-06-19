@@ -51,6 +51,8 @@ public extension ManagedUser { // PersistentRecord
  */
     
     init?(databaseRecord:JSON) {
+        // TODO: assert type == "user"
+        // TODO: assert not deleted
         guard let uuid = databaseRecord["_id"].string else { return nil }
         guard let numericID = databaseRecord[Key.numericID.rawValue].int else { return nil }
         guard let shortName = databaseRecord[Key.shortname.rawValue].string else { return nil }

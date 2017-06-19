@@ -28,20 +28,22 @@ extension Router {
 fileprivate func getUserHandler(request: RouterRequest, response: RouterResponse, next: ()->Void) -> Void {
     defer { next() }
     guard let uuid = request.parameters["uuid"] else {
-        sendError(to:response)
+        sendError(.missingField("uuid"), to:response)
         return
     }
     guard let database = database else {
-        sendError(to: response)
+        sendError(.databaseNotAvailable, to: response) // TODO: fail earlier
         return
     }
     database.retrieve(uuid, callback: { (document: JSON?, error: NSError?) in
         guard let document = document else {
-            sendError(to: response)
+            sendError(.notFound, to: response)
             return
         }
+        // TODO: verify type == "user"
+        // TODO: verify not deleted
         guard let retrievedUser = ManagedUser(databaseRecord:document) else {
-            sendError(to: response)
+            sendError(.debug("Response creation failed"), to: response)
             return
         }
         response.send(json: retrievedUser.responseElement())
@@ -53,24 +55,24 @@ fileprivate func createUserHandler(request: RouterRequest, response: RouterRespo
     Log.debug("handling POST")
     guard let parsedBody = request.body else {
         Log.error("body parsing failure")
-        sendError(to:response)
+        sendError(.malformedBody, to:response)
         return
     }
     Log.debug("handling body")
     switch(parsedBody) {
     case .json(let jsonBody):
         guard let user = ManagedUser(requestElement:jsonBody) else {
-            sendError(to: response)
+            sendError(.debug("User creation failed"), to: response)
             return
         }
         guard let database = database else {
-            sendError(to: response)
+            sendError(.databaseNotAvailable, to: response) // TODO: fail earlier
             return
         }
         insert(user, into: database) {
             createdUser in
             guard let createdUser = createdUser else {
-                sendError(to: response)
+                sendError(.debug("Response creation failed"), to: response)
                 return
             }
             response.statusCode = .created
@@ -78,19 +80,19 @@ fileprivate func createUserHandler(request: RouterRequest, response: RouterRespo
             response.send(json: createdUser.responseElement())
         }
     default:
-        sendError(to: response)
+        sendError(.malformedBody, to: response)
     }
 }
 
 fileprivate func listUsersHandler(request: RouterRequest, response: RouterResponse, next: ()->Void) -> Void {
     defer { next() }
     guard let database = database else {
-        sendError(to: response)
+        sendError(.databaseNotAvailable, to: response) // TODO: fail earlier
         return
     }
     database.queryByView("all_users", ofDesign: "main_design", usingParameters: []) { (databaseResponse, error) in
         guard let databaseResponse = databaseResponse else {
-            sendError(to: response)
+            sendError(.debug("Database request failed"), to: response)
             return
         }
         let userList = databaseResponse["rows"].array?.flatMap { user -> [String:Any]? in
@@ -107,6 +109,7 @@ fileprivate func listUsersHandler(request: RouterRequest, response: RouterRespon
 }
 
 fileprivate func insert(_ user: ManagedUser, into database: Database, completion: @escaping (ManagedUser?) -> Void) -> Void {
+    // TODO: ensure shortName and principalName are unique
     nextNumericID(database: database) {
         numericID in
         Log.debug("next numeric id = \(numericID)")
