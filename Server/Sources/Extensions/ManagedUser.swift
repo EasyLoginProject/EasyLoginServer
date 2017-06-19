@@ -10,6 +10,7 @@ import Foundation
 import CouchDB
 import SwiftyJSON
 import LoggerAPI
+import Cryptor
 
 public struct ManagedUser { // PersistentRecord, Serializable
     enum Key: String {
@@ -153,7 +154,10 @@ enum AuthMethods {
         if let cleartext = authMethods["cleartext"] {
             var generated = authMethods
             generated["cleartext"] = nil
-            // TODO: generate other auth methods
+            generated["sha1"] = cleartext.sha1
+            generated["sha256"] = cleartext.sha256
+            generated["sha512"] = cleartext.sha512
+            // TODO: PBKDF2
             return generated
         }
         return authMethods
