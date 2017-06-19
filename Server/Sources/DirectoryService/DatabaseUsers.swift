@@ -18,10 +18,10 @@ enum UsersError: Error {
 }
 
 extension Router {
-    public func installDatabaseUsersHandlers() {
-        self.get("/db/users", handler: listUsersHandler)
-        self.get("/db/users/:uuid", handler: getUserHandler)
-        self.post("/db/users", handler: createUserHandler)
+    func installDatabaseUsersHandlers() {
+        self.get("/users", handler: listUsersHandler)
+        self.get("/users/:uuid", handler: getUserHandler)
+        self.post("/users", handler: createUserHandler)
     }
 }
 

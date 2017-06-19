@@ -50,7 +50,10 @@ public func initialize() throws {
     router.post(middleware:BodyParser())
     router.put(middleware:BodyParser())
     
-    router.installDatabaseUsersHandlers()
+    guard let database = database else { return } // TODO: fail earlier if connector to database cannot be obtained
+    
+    let directoryService = DirectoryService(database: database)
+    router.all("/db", middleware: directoryService.router())
 }
 
 public func installInitErrorRoute() {
