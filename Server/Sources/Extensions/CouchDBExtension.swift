@@ -42,10 +42,14 @@ public extension CouchDBClient {
         self.dbExists(name) {
             exists, error in
             if !exists {
+                if let error = error {
+                    Log.error("error on dbExists: \(error.localizedDescription)")
+                }
                 self.createDB(name) {
                     database, error in
                     guard let database = database else {
-                        Log.error("cannot create database")
+                        let errorMessage = error?.localizedDescription ?? "error == nil"
+                        Log.error("cannot create database: \(errorMessage)")
                         return
                     }
                     guard let json = try? String(contentsOfFile: designFile, encoding:.utf8) else {
