@@ -10,6 +10,7 @@ import Foundation
 import CouchDB
 import SwiftyJSON
 import LoggerAPI
+import Cryptor
 
 struct ManagedUser { // PersistentRecord, Serializable
     enum Key: String {
@@ -98,7 +99,6 @@ extension ManagedUser { // PersistentRecord
 
 extension ManagedUser { // ServerAPI
     init?(requestElement:JSON) {
-        //guard let numericID = requestElement[Key.numericID.rawValue].int else { return nil }
         guard let shortName = requestElement[Key.shortname.rawValue].string else { return nil }
         Log.debug("short name = \(shortName)")
         guard let principalName = requestElement[Key.principalName.rawValue].string else { return nil }
@@ -114,10 +114,8 @@ extension ManagedUser { // ServerAPI
             return nil
         }
         guard let generatedAuthMethods = AuthMethods.generate(Dictionary(filteredAuthMethodsPairs)) else { return nil }
-        let uuid = UUID().hexString()
-        let numericID = 123 // TODO: generate
+        let uuid = UUID().uuidString
         self.uuid = uuid
-        self.numericID = numericID
         self.shortName = shortName
         self.principalName = principalName
         self.email = email
@@ -125,6 +123,7 @@ extension ManagedUser { // ServerAPI
         self.surname = requestElement[Key.surname.rawValue].string
         self.fullName = fullName
         self.authMethods = generatedAuthMethods
+        self.numericID = 0 // FIXME: temporary, psu_demo branch only
     }
     
     func responseElement() -> JSON {
@@ -153,7 +152,10 @@ enum AuthMethods {
         if let cleartext = authMethods["cleartext"] {
             var generated = authMethods
             generated["cleartext"] = nil
-            // TODO: generate other auth methods
+            generated["sha1"] = cleartext.sha1
+            generated["sha256"] = cleartext.sha256
+            generated["sha512"] = cleartext.sha512
+            // TODO: PBKDF2
             return generated
         }
         return authMethods

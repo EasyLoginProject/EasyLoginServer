@@ -19,10 +19,6 @@ public enum ConfigError: Error {
     case missingDatabaseName
 }
 
-public func sendError(to response: RouterResponse) {
-    response.send("This is unexpected.")
-}
-
 public let manager = ConfigurationManager()
 public let router = Router()
 
