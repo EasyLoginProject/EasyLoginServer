@@ -45,6 +45,7 @@ public func initialize() throws {
         database = couchDBClient.createOrOpenDatabase(name: databaseName, designFile: "../../Resources/main_design.json")
     }
     else if let cloudantService = try? manager.getCloudantService(name: "EasyLogin-Cloudant") {
+        Log.debug("Trying to connect to Cloudant service \(cloudantService)")
         let databaseName = "easy_login"
         let couchDBClient = CouchDBClient(service: cloudantService)
         Log.info("Connected to Cloudant, client = \(couchDBClient), database name = \(databaseName)")
