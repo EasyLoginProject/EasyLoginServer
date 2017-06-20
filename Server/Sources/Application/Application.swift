@@ -51,6 +51,7 @@ public func initialize() throws {
     router.put(middleware:BodyParser())
     
     router.installDatabaseUsersHandlers()
+    router.installDatabaseDevicesHandlers()
 }
 
 public func installInitErrorRoute() {
