@@ -9,6 +9,7 @@
 import Foundation
 import Kitura
 import LoggerAPI
+import HeliumLogger
 import SwiftyJSON
 import Configuration
 import CloudFoundryConfig
@@ -23,8 +24,12 @@ public enum ConfigError: Error {
 
 public let manager = ConfigurationManager()
 public let router = Router()
+public let httpLogger = HTTPLogger()
 
 public func initialize() throws {
+    HeliumStreamLogger.use(.debug, outputStream: httpLogger)
+    httpLogger.installHandler(to: router)
+    
     manager.load(.commandLineArguments)
     if let configFile = manager["config"] as? String {
         manager.load(file:configFile)
