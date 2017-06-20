@@ -18,6 +18,7 @@ public extension CouchDBClient {
                                                   secured: true,
                                                   username: service.username,
                                                   password: service.password)
+        Log.debug("Initializing CouchDBClient with connection properties \(connProperties)")
         
         self.init(connectionProperties: connProperties)
     }
