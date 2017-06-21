@@ -12,7 +12,7 @@ import SwiftyJSON
 import LoggerAPI
 import Cryptor
 
-enum CDSSyncMode: String {
+enum SyncMode: String {
     case strict
     case online
     case auto
@@ -34,9 +34,9 @@ struct ManagedDevice { // PersistentRecord, Serializable
         case deviceName
         case lockedTime
         case tags
-        case cdsSyncedSets
-        case cdsSelectionMode
-        case cdsAutoSyncSet
+        case syncedSets
+        case syncSetSelectionMode
+        case autoSyncSet
         case mdmProfileSets
         case mdmFeedback
         case mdmPushToken
@@ -51,8 +51,8 @@ struct ManagedDevice { // PersistentRecord, Serializable
     let serialNumber: String
     let deviceName: String
     let tags: [String]
-    let cdsSyncedSets: [String]
-    let cdsSelectionMode: CDSSyncMode
+    let syncedSets: [String]
+    let syncSetSelectionMode: SyncMode
     
     let type = "device"
 }
@@ -64,18 +64,18 @@ extension ManagedDevice { // PersistentRecord
         guard let deviceName = databaseRecord[Key.deviceName.rawValue].string else { return nil }
         let hardwareUUID = databaseRecord[Key.hardwareUUID.rawValue].string
         let tags = databaseRecord[Key.tags.rawValue].array
-        let cdsSyncedSets = databaseRecord[Key.cdsSyncedSets.rawValue].array
-        guard let cdsSelectionModeName = databaseRecord[Key.cdsSelectionMode.rawValue].string else { return nil }
-        guard let cdsSelectionMode = CDSSyncMode(rawValue: cdsSelectionModeName) else { return nil }
+        let syncedSets = databaseRecord[Key.syncedSets.rawValue].array
+        guard let selectionModeName = databaseRecord[Key.syncSetSelectionMode.rawValue].string else { return nil }
+        guard let syncSetSelectionMode = SyncMode(rawValue: selectionModeName) else { return nil }
         self.uuid = uuid
         self.serialNumber = serialNumber
         self.deviceName = deviceName
         self.hardwareUUID = hardwareUUID
         let filteredTags: [String] = tags?.flatMap { $0.string } ?? []
         self.tags = filteredTags
-        let filteredSyncedSets: [String] = cdsSyncedSets?.flatMap { $0.string } ?? []
-        self.cdsSyncedSets = filteredSyncedSets
-        self.cdsSelectionMode = cdsSelectionMode
+        let filteredSyncedSets: [String] = syncedSets?.flatMap { $0.string } ?? []
+        self.syncedSets = filteredSyncedSets
+        self.syncSetSelectionMode = syncSetSelectionMode
     }
     
     func databaseRecord() -> [String:Any] {
@@ -85,8 +85,8 @@ extension ManagedDevice { // PersistentRecord
             Key.serialNumber.rawValue: serialNumber,
             Key.deviceName.rawValue: deviceName,
             Key.tags.rawValue: tags,
-            Key.cdsSyncedSets.rawValue: cdsSyncedSets,
-            Key.cdsSelectionMode.rawValue: cdsSelectionMode.rawValue
+            Key.syncedSets.rawValue: syncedSets,
+            Key.syncSetSelectionMode.rawValue: syncSetSelectionMode.rawValue
         ]
         if let hardwareUUID = hardwareUUID {
             record[Key.hardwareUUID.rawValue] = hardwareUUID
@@ -102,16 +102,16 @@ extension ManagedDevice { // ServerAPI
         let uuid = UUID().uuidString
         let hardwareUUID = requestElement[Key.hardwareUUID.rawValue].string
         let tags = requestElement[Key.tags.rawValue].array?.flatMap { $0.string } ?? []
-        let cdsSyncedSets = requestElement[Key.cdsSyncedSets.rawValue].array?.flatMap { $0.string } ?? [uuid]
-        let cdsSelectionModeName = requestElement[Key.cdsSelectionMode.rawValue].string
-        let cdsSelectionMode = CDSSyncMode(optionalRawValue: cdsSelectionModeName) ?? .auto
+        let syncedSets = requestElement[Key.syncedSets.rawValue].array?.flatMap { $0.string } ?? [uuid]
+        let selectionModeName = requestElement[Key.syncSetSelectionMode.rawValue].string
+        let syncSetSelectionMode = SyncMode(optionalRawValue: selectionModeName) ?? .auto
         self.uuid = uuid
         self.serialNumber = serialNumber
         self.deviceName = deviceName
         self.hardwareUUID = hardwareUUID
         self.tags = tags
-        self.cdsSyncedSets = cdsSyncedSets
-        self.cdsSelectionMode = cdsSelectionMode
+        self.syncedSets = syncedSets
+        self.syncSetSelectionMode = syncSetSelectionMode
     }
     
     func responseElement() -> JSON {
@@ -120,8 +120,8 @@ extension ManagedDevice { // ServerAPI
             Key.serialNumber.rawValue: serialNumber,
             Key.deviceName.rawValue: deviceName,
             Key.tags.rawValue: tags,
-            Key.cdsSyncedSets.rawValue: cdsSyncedSets,
-            Key.cdsSelectionMode.rawValue: cdsSelectionMode.rawValue
+            Key.syncedSets.rawValue: syncedSets,
+            Key.syncSetSelectionMode.rawValue: syncSetSelectionMode.rawValue
         ]
         if let hardwareUUID = hardwareUUID {
             record[Key.hardwareUUID.rawValue] = hardwareUUID
