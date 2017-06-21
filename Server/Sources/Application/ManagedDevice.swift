@@ -16,6 +16,11 @@ enum CDSSyncMode: String {
     case strict
     case online
     case auto
+    
+    init?(optionalRawValue: String?) {
+        guard let optionalRawValue = optionalRawValue else { return nil }
+        self.init(rawValue: optionalRawValue)
+    }
 }
 
 // TODO: most fields may be inherited
@@ -24,6 +29,7 @@ struct ManagedDevice { // PersistentRecord, Serializable
     enum Key: String {
         case type
         case uuid
+        case hardwareUUID
         case serialNumber
         case deviceName
         case lockedTime
@@ -41,9 +47,9 @@ struct ManagedDevice { // PersistentRecord, Serializable
     }
     
     let uuid: String
+    let hardwareUUID: String?
     let serialNumber: String
     let deviceName: String
-    let lockedTime: Date?
     let tags: [String]
     let cdsSyncedSets: [String]
     let cdsSelectionMode: CDSSyncMode
@@ -56,7 +62,7 @@ extension ManagedDevice { // PersistentRecord
         guard let uuid = databaseRecord["_id"].string else { return nil }
         guard let serialNumber = databaseRecord[Key.serialNumber.rawValue].string else { return nil }
         guard let deviceName = databaseRecord[Key.deviceName.rawValue].string else { return nil }
-        //let lockedTime = databaseRecord[Key.lockedTime.rawValue].string
+        let hardwareUUID = databaseRecord[Key.hardwareUUID.rawValue].string
         let tags = databaseRecord[Key.tags.rawValue].array
         let cdsSyncedSets = databaseRecord[Key.cdsSyncedSets.rawValue].array
         guard let cdsSelectionModeName = databaseRecord[Key.cdsSelectionMode.rawValue].string else { return nil }
@@ -64,7 +70,7 @@ extension ManagedDevice { // PersistentRecord
         self.uuid = uuid
         self.serialNumber = serialNumber
         self.deviceName = deviceName
-        self.lockedTime = nil // TODO: decode date
+        self.hardwareUUID = hardwareUUID
         let filteredTags: [String] = tags?.flatMap { $0.string } ?? []
         self.tags = filteredTags
         let filteredSyncedSets: [String] = cdsSyncedSets?.flatMap { $0.string } ?? []
@@ -82,8 +88,8 @@ extension ManagedDevice { // PersistentRecord
             Key.cdsSyncedSets.rawValue: cdsSyncedSets,
             Key.cdsSelectionMode.rawValue: cdsSelectionMode.rawValue
         ]
-        if let lockedTime = lockedTime {
-            record[Key.lockedTime.rawValue] = lockedTime
+        if let hardwareUUID = hardwareUUID {
+            record[Key.hardwareUUID.rawValue] = hardwareUUID
         }
         return record
     }
@@ -93,15 +99,16 @@ extension ManagedDevice { // ServerAPI
     init?(requestElement:JSON) {
         guard let serialNumber = requestElement[Key.serialNumber.rawValue].string else { return nil }
         guard let deviceName = requestElement[Key.deviceName.rawValue].string else { return nil }
-        let tags = requestElement[Key.tags.rawValue].array?.flatMap { $0.string } ?? []
-        let cdsSyncedSets = requestElement[Key.cdsSyncedSets.rawValue].array?.flatMap { $0.string } ?? []
-        guard let cdsSelectionModeName = requestElement[Key.cdsSelectionMode.rawValue].string else { return nil }
-        guard let cdsSelectionMode = CDSSyncMode(rawValue: cdsSelectionModeName) else { return nil }
         let uuid = UUID().uuidString
+        let hardwareUUID = requestElement[Key.hardwareUUID.rawValue].string
+        let tags = requestElement[Key.tags.rawValue].array?.flatMap { $0.string } ?? []
+        let cdsSyncedSets = requestElement[Key.cdsSyncedSets.rawValue].array?.flatMap { $0.string } ?? [uuid]
+        let cdsSelectionModeName = requestElement[Key.cdsSelectionMode.rawValue].string
+        let cdsSelectionMode = CDSSyncMode(optionalRawValue: cdsSelectionModeName) ?? .auto
         self.uuid = uuid
         self.serialNumber = serialNumber
         self.deviceName = deviceName
-        self.lockedTime = nil;
+        self.hardwareUUID = hardwareUUID
         self.tags = tags
         self.cdsSyncedSets = cdsSyncedSets
         self.cdsSelectionMode = cdsSelectionMode
@@ -116,8 +123,8 @@ extension ManagedDevice { // ServerAPI
             Key.cdsSyncedSets.rawValue: cdsSyncedSets,
             Key.cdsSelectionMode.rawValue: cdsSelectionMode.rawValue
         ]
-        if let lockedTime = lockedTime {
-            record[Key.lockedTime.rawValue] = lockedTime
+        if let hardwareUUID = hardwareUUID {
+            record[Key.hardwareUUID.rawValue] = hardwareUUID
         }
         return JSON(record)
     }
