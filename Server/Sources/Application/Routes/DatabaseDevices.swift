@@ -94,7 +94,11 @@ fileprivate func listDevicesHandler(request: RouterRequest, response: RouterResp
             if let uuid = device["value"]["uuid"].string,
                 let serialNumber = device["value"]["serialNumber"].string,
                 let deviceName = device["value"]["deviceName"].string {
-                return ["uuid":uuid, "serialNumber":serialNumber, "deviceName":deviceName]
+                var record = ["uuid":uuid, "serialNumber":serialNumber, "deviceName":deviceName]
+                if let hardwareUUID = device["value"]["hardwareUUID"].string {
+                    record["hardwareUUID"] = hardwareUUID
+                }
+                return record
             }
             return nil
         }
