@@ -70,6 +70,7 @@ fileprivate func createDeviceHandler(request: RouterRequest, response: RouterRes
                 sendError(.debug("Insert"), to: response)
                 return
             }
+            NotificationCenter.default.post(name: directoryDidChangeNotificationName, object: nil)
             response.statusCode = .created
             response.headers.setLocation("/db/devices/\(createdDevice.uuid)")
             response.send(json: createdDevice.responseElement())

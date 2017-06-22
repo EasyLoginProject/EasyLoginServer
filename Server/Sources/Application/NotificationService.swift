@@ -9,6 +9,7 @@
 import Foundation
 import Kitura
 import KituraWebSocket
+import LoggerAPI
 
 private var service: NotificationService?
 
@@ -49,7 +50,9 @@ extension NotificationService: WebSocketService {
 
 extension NotificationService {
     func didReceiveChangeNotification(notification: Notification) {
+        Log.info("Send 'update' message to all websocket connections")
         connections.forEach { (_, connection) in
+            Log.info("--> update")
             connection.send(message: "update")
         }
     }
