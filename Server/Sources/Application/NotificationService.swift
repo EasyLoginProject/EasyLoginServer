@@ -28,7 +28,11 @@ class NotificationService {
     
     init() {
         connections = [String: WebSocketConnection]()
+#if os(Linux)
+        NotificationCenter.default.addObserver(forName: directoryDidChangeNotificationName, object: nil, queue: notificationQueue, usingBlock: self.didReceiveChangeNotification)
+#else
         NotificationCenter.default.addObserver(forName: directoryDidChangeNotificationName, object: nil, queue: notificationQueue, using: self.didReceiveChangeNotification)
+#endif
     }
     
     func lockConnections() {
