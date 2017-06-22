@@ -10,6 +10,7 @@ import Foundation
 import Kitura
 import KituraWebSocket
 import LoggerAPI
+import Dispatch
 
 private var service: NotificationService?
 
