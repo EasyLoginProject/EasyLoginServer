@@ -72,7 +72,7 @@ fileprivate func createUserHandler(request: RouterRequest, response: RouterRespo
                 sendError(to: response)
                 return
             }
-            NotificationCenter.default.post(name: directoryDidChangeNotificationName, object: nil)
+            NotificationService.notifyAllClients()
             response.statusCode = .created
             response.headers.setLocation("/db/users/\(createdUser.uuid)")
             response.send(json: createdUser.responseElement())

@@ -19,20 +19,12 @@ public func installNotificationService() {
     WebSocket.register(service: service!, onPath: "notifications")
 }
 
-public let directoryDidChangeNotificationName = NSNotification.Name(rawValue: "EasyLoginDirectoryDidChange")
-
 class NotificationService {
     var connections: [String: WebSocketConnection]
     let connectionsMutex = DispatchSemaphore(value: 1)
-    let notificationQueue = OperationQueue()
     
     init() {
         connections = [String: WebSocketConnection]()
-#if os(Linux)
-        NotificationCenter.default.addObserver(forName: directoryDidChangeNotificationName, object: nil, queue: notificationQueue, usingBlock: self.didReceiveChangeNotification)
-#else
-        NotificationCenter.default.addObserver(forName: directoryDidChangeNotificationName, object: nil, queue: notificationQueue, using: self.didReceiveChangeNotification)
-#endif
     }
     
     func lockConnections() {
@@ -67,7 +59,7 @@ extension NotificationService: WebSocketService {
 }
 
 extension NotificationService {
-    func didReceiveChangeNotification(notification: Notification) {
+    func sendUpdateMessage() {
         Log.info("Send 'update' message to all websocket connections")
         lockConnections()
         connections.forEach { (_, connection) in
@@ -75,5 +67,9 @@ extension NotificationService {
             connection.send(message: "update")
         }
         unlockConnections()
+    }
+    
+    public static func notifyAllClients() { // temporary, to be replaced with NotificationCenter when available
+        service?.sendUpdateMessage()
     }
 }
