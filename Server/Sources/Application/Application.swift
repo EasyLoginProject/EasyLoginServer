@@ -52,6 +52,7 @@ public func initialize() throws {
     
     router.installDatabaseUsersHandlers()
     router.installDatabaseDevicesHandlers()
+    installNotificationService()
 }
 
 public func installInitErrorRoute() {
