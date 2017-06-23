@@ -3,19 +3,19 @@ import PackageDescription
 let package = Package(
     name: "EasyLogin",
     targets: [
-        Target(name: "EasyLogin", dependencies: [
-        	.Target(name: "Application"),
-        	.Target(name: "Extensions"),
-        	.Target(name: "DirectoryService"),
-        	.Target(name: "NotificationService")
+        Target(name: "DirectoryService", dependencies: [
+            .Target(name: "Extensions")
         ]),
         Target(name: "Application", dependencies: [
         	.Target(name: "Extensions"),
         	.Target(name: "DirectoryService"),
         	.Target(name: "NotificationService")
         ]),
-        Target(name: "DirectoryService", dependencies: [
-        	.Target(name: "Extensions")
+        Target(name: "EasyLogin", dependencies: [
+            .Target(name: "Application"),
+            .Target(name: "Extensions"),
+            .Target(name: "DirectoryService"),
+            .Target(name: "NotificationService")
         ])
     ],
     dependencies: [
