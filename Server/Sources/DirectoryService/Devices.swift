@@ -39,7 +39,7 @@ class Devices {
                 return
             }
             guard let retrievedDevice = ManagedDevice(databaseRecord:document) else {
-                sendError(to: response)
+                sendError(.debug("Response creation failed"), to: response)
                 return
             }
             response.send(json: retrievedDevice.responseElement())
@@ -50,19 +50,19 @@ class Devices {
         defer { next() }
         guard let parsedBody = request.body else {
             Log.error("body parsing failure")
-            sendError(to:response)
+            sendError(.malformedBody, to:response)
             return
         }
         switch(parsedBody) {
         case .json(let jsonBody):
             guard let device = ManagedDevice(requestElement:jsonBody) else {
-                sendError(.debug("ManagedDevice creation"), to: response)
+                sendError(.debug("Device creation failed"), to: response)
                 return
             }
             insert(device, into: database) {
                 createdDevice in
                 guard let createdDevice = createdDevice else {
-                    sendError(.debug("Insert"), to: response)
+                    sendError(.debug("Response creation failed"), to: response)
                     return
                 }
                 NotificationService.notifyAllClients()
@@ -71,7 +71,7 @@ class Devices {
                 response.send(json: createdDevice.responseElement())
             }
         default:
-            sendError(to: response)
+            sendError(.malformedBody, to: response)
         }
     }
     
@@ -79,7 +79,8 @@ class Devices {
         defer { next() }
         database.queryByView("all_devices", ofDesign: "main_design", usingParameters: []) { (databaseResponse, error) in
             guard let databaseResponse = databaseResponse else {
-                sendError(to: response)
+                let errorMessage = error?.localizedDescription ?? "error is nil"
+                sendError(.debug("Database request failed: \(errorMessage)"), to: response)
                 return
             }
             let deviceList = databaseResponse["rows"].array?.flatMap { device -> [String:Any]? in
