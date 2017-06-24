@@ -3,8 +3,12 @@ import PackageDescription
 let package = Package(
     name: "EasyLogin",
     targets: [
-        Target(name: "DirectoryService", dependencies: [
+        Target(name: "NotificationService", dependencies: [
             .Target(name: "Extensions")
+        ]),
+        Target(name: "DirectoryService", dependencies: [
+            .Target(name: "Extensions"),
+            .Target(name: "NotificationService")
         ]),
         Target(name: "Application", dependencies: [
         	.Target(name: "Extensions"),
