@@ -19,7 +19,7 @@ public func installNotificationService() {
     WebSocket.register(service: service!, onPath: "notifications")
 }
 
-class NotificationService {
+public class NotificationService {
     var connections: [String: WebSocketConnection]
     let connectionsMutex = DispatchSemaphore(value: 1)
     

@@ -12,6 +12,7 @@ import Kitura
 import LoggerAPI
 import SwiftyJSON
 import Extensions
+import NotificationService
 
 enum UsersError: Error {
     case databaseFailure
@@ -73,6 +74,7 @@ class Users {
                     sendError(.debug("Response creation failed: \(errorMessage)"), to: response)
                     return
                 }
+                NotificationService.notifyAllClients()
                 response.statusCode = .created
                 response.headers.setLocation("/db/users/\(createdUser.uuid)")
                 response.send(json: createdUser.responseElement())

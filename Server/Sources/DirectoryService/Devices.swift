@@ -65,7 +65,7 @@ class Devices {
                     sendError(.debug("Insert"), to: response)
                     return
                 }
-                //NotificationService.notifyAllClients()
+                NotificationService.notifyAllClients()
                 response.statusCode = .created
                 response.headers.setLocation("/db/devices/\(createdDevice.uuid)")
                 response.send(json: createdDevice.responseElement())
