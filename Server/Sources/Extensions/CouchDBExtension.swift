@@ -63,7 +63,28 @@ public extension CouchDBClient {
                     }
                 }
             }
+            else {
+                let database = self.database(name)
+                guard let json = try? String(contentsOfFile: designFile, encoding:.utf8) else {
+                    Log.error("cannot load file \(designFile)")
+                    return
+                }
+                let document = JSON.parse(string: json)
+                self.updateDesignDocument(database: database, document: document)
+            }
         }
         return self.database(name)
+    }
+    
+    func updateDesignDocument(database: Database, document: JSON) {
+        database.retrieve("_design/main_design") { (oldDocument, error) in
+            guard let oldDocument = oldDocument else { return }
+            guard let rev = oldDocument["_rev"].string else { return }
+            database.update("_design/main_design", rev: rev, document: document, callback: { (_, _, error) in
+                if error == nil {
+                    Log.info("Design document updated")
+                }
+            })
+        }
     }
 }

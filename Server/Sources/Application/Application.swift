@@ -16,6 +16,7 @@ import CloudFoundryConfig
 import CouchDB
 import Extensions
 import DirectoryService
+import NotificationService
 
 public enum ConfigError: Error {
     case missingDatabaseInfo
@@ -61,6 +62,7 @@ public func initialize() throws {
     if let database = database {
         let directoryService = DirectoryService(database: database)
         router.all("/db", middleware: directoryService.router())
+        installNotificationService()
     }
     // TODO: else install diagnostic handler
 }
