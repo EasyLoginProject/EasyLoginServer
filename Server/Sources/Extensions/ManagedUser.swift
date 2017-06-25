@@ -46,6 +46,11 @@ extension JSON {
         return element
     }
     
+    func mandatoryFieldFromRequest<T>(_ key: ManagedUser.Key) throws -> T {
+        guard let field = self[key.rawValue].object as? T else { throw EasyLoginError.missingField(key.rawValue) }
+        return field
+    }
+    
     func optionalElement<T>(_ key: ManagedUser.Key) -> T? {
         return self[key.rawValue].object as? T
     }
@@ -99,15 +104,14 @@ public extension ManagedUser { // PersistentRecord
 }
 
 public extension ManagedUser { // ServerAPI
-    init?(requestElement:JSON) {
-        //guard let numericID = requestElement[Key.numericID.rawValue].int else { return nil }
-        guard let shortName = requestElement[Key.shortname.rawValue].string else { return nil }
-        Log.debug("short name = \(shortName)")
-        guard let principalName = requestElement[Key.principalName.rawValue].string else { return nil }
-        Log.debug("principal name = \(principalName)")
-        guard let email = requestElement[Key.email.rawValue].string else { return nil }
-        guard let fullName = requestElement[Key.fullName.rawValue].string else { return nil }
-        guard let requestAuthMethods = requestElement[Key.authMethods.rawValue].dictionary else { return nil }
+    init(requestElement:JSON) throws {
+        self.shortName = try requestElement.mandatoryFieldFromRequest(.shortname)
+        self.principalName = try requestElement.mandatoryFieldFromRequest(.principalName)
+        self.email = try requestElement.mandatoryFieldFromRequest(.email)
+        self.fullName = try requestElement.mandatoryFieldFromRequest(.fullName)
+        self.givenName = requestElement.optionalElement(.givenName)
+        self.surname = requestElement.optionalElement(.surname)
+        guard let requestAuthMethods = requestElement[Key.authMethods.rawValue].dictionary else { throw EasyLoginError.missingField(Key.authMethods.rawValue) }
         let filteredAuthMethodsPairs = requestAuthMethods.flatMap {
             (key: String, value: JSON) -> (String,String)? in
             if let value = value.string {
@@ -115,18 +119,11 @@ public extension ManagedUser { // ServerAPI
             }
             return nil
         }
-        guard let generatedAuthMethods = AuthMethods.generate(Dictionary(filteredAuthMethodsPairs)) else { return nil }
+        self.authMethods = try AuthMethods.generate(Dictionary(filteredAuthMethodsPairs))
         let uuid = UUID().uuidString
         let numericID = 123 // TODO: generate
         self.uuid = uuid
         self.numericID = numericID
-        self.shortName = shortName
-        self.principalName = principalName
-        self.email = email
-        self.givenName = requestElement[Key.givenName.rawValue].string
-        self.surname = requestElement[Key.surname.rawValue].string
-        self.fullName = fullName
-        self.authMethods = generatedAuthMethods
     }
     
     func responseElement() -> JSON {
@@ -150,8 +147,8 @@ public extension ManagedUser { // ServerAPI
 }
 
 enum AuthMethods {
-    static func generate(_ authMethods: [String:String]) -> [String:String]? {
-        guard authMethods.count != 0 else { return nil }
+    static func generate(_ authMethods: [String:String]) throws -> [String:String] {
+        guard authMethods.count != 0 else { throw EasyLoginError.missingField(ManagedUser.Key.authMethods.rawValue) }
         if let cleartext = authMethods["cleartext"] {
             var generated = authMethods
             generated["cleartext"] = nil

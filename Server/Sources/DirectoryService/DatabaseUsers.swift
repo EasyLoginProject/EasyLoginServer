@@ -68,21 +68,26 @@ class Users {
         Log.debug("handling body")
         switch(parsedBody) {
         case .json(let jsonBody):
-            guard let user = ManagedUser(requestElement:jsonBody) else {
-                sendError(.debug("User creation failed"), to: response)
-                return
-            }
-            insert(user, into: database) {
-                createdUser, error in
-                guard let createdUser = createdUser else {
-                    let errorMessage = error?.localizedDescription ?? "error is nil"
-                    sendError(.debug("Response creation failed: \(errorMessage)"), to: response)
-                    return
+            do {
+                let user = try ManagedUser(requestElement:jsonBody)
+                insert(user, into: database) {
+                    createdUser, error in
+                    guard let createdUser = createdUser else {
+                        let errorMessage = error?.localizedDescription ?? "error is nil"
+                        sendError(.debug("Response creation failed: \(errorMessage)"), to: response)
+                        return
+                    }
+                    NotificationService.notifyAllClients()
+                    response.statusCode = .created
+                    response.headers.setLocation("/db/users/\(createdUser.uuid)")
+                    response.send(json: createdUser.responseElement())
                 }
-                NotificationService.notifyAllClients()
-                response.statusCode = .created
-                response.headers.setLocation("/db/users/\(createdUser.uuid)")
-                response.send(json: createdUser.responseElement())
+            }
+            catch let error as EasyLoginError {
+                sendError(error, to: response)
+            }
+            catch {
+                sendError(.debug("User creation failed"), to: response)
             }
         default:
             sendError(.malformedBody, to: response)
