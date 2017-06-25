@@ -40,9 +40,13 @@ public struct ManagedUser { // PersistentRecord, Serializable
 }
 
 extension JSON {
-    func mandatoryElement<T>(key: ManagedUser.Key) throws -> T {
+    func mandatoryElement<T>(_ key: ManagedUser.Key) throws -> T {
         guard let element = self[key.rawValue].object as? T else { throw EasyLoginError.invalidDocument(key.rawValue) }
         return element
+    }
+    
+    func optionalElement<T>(_ key: ManagedUser.Key) -> T? {
+        return self[key.rawValue].object as? T
     }
 }
 
@@ -54,20 +58,15 @@ public extension ManagedUser { // PersistentRecord
         // TODO: verify not deleted
         // Missing field: document is invalid
         guard let uuid = databaseRecord["_id"].string else { throw EasyLoginError.invalidDocument("_id") }
-        guard let numericID = databaseRecord[Key.numericID.rawValue].int else { throw EasyLoginError.invalidDocument(Key.numericID.rawValue) }
-        guard let shortName = databaseRecord[Key.shortname.rawValue].string else { throw EasyLoginError.invalidDocument(Key.shortname.rawValue) }
-        guard let principalName = databaseRecord[Key.principalName.rawValue].string else { throw EasyLoginError.invalidDocument(Key.principalName.rawValue) }
-        guard let email = databaseRecord[Key.email.rawValue].string else { throw EasyLoginError.invalidDocument(Key.email.rawValue) }
-        guard let fullName = databaseRecord[Key.fullName.rawValue].string else { throw EasyLoginError.invalidDocument(Key.fullName.rawValue) }
+        self.numericID = try databaseRecord.mandatoryElement(.numericID)
+        self.shortName = try databaseRecord.mandatoryElement(.shortname)
+        self.principalName = try databaseRecord.mandatoryElement(.principalName)
+        self.email = try databaseRecord.mandatoryElement(.email)
+        self.fullName = try databaseRecord.mandatoryElement(.fullName)
         guard let authMethods = databaseRecord[Key.authMethods.rawValue].dictionary else { throw EasyLoginError.invalidDocument(Key.authMethods.rawValue) }
         self.uuid = uuid
-        self.numericID = numericID
-        self.shortName = shortName
-        self.principalName = principalName
-        self.email = email
-        self.givenName = databaseRecord[Key.givenName.rawValue].string
-        self.surname = databaseRecord[Key.surname.rawValue].string
-        self.fullName = fullName
+        self.givenName = databaseRecord.optionalElement(.givenName)
+        self.surname = databaseRecord.optionalElement(.surname)
         let filteredAuthMethodsPairs = authMethods.flatMap {
             (key: String, value: JSON) -> (String,String)? in
             if let value = value.string {
