@@ -24,6 +24,7 @@ public struct ManagedUser { // PersistentRecord, Serializable
         case surname
         case fullName
         case authMethods
+        case databaseUUID = "_id"
     }
     
     public let uuid: String
@@ -53,20 +54,19 @@ extension JSON {
 public extension ManagedUser { // PersistentRecord
     init(databaseRecord:JSON) throws {
         // No type or unexpected type: requested document was not found
-        guard let documentType = databaseRecord[Key.type.rawValue].string else { throw EasyLoginError.notFound }
+        guard let documentType: String = databaseRecord.optionalElement(.type) else { throw EasyLoginError.notFound }
         guard documentType == ManagedUser.type else { throw EasyLoginError.notFound }
         // TODO: verify not deleted
         // Missing field: document is invalid
-        guard let uuid = databaseRecord["_id"].string else { throw EasyLoginError.invalidDocument("_id") }
+        self.uuid = try databaseRecord.mandatoryElement(.databaseUUID)
         self.numericID = try databaseRecord.mandatoryElement(.numericID)
         self.shortName = try databaseRecord.mandatoryElement(.shortname)
         self.principalName = try databaseRecord.mandatoryElement(.principalName)
         self.email = try databaseRecord.mandatoryElement(.email)
         self.fullName = try databaseRecord.mandatoryElement(.fullName)
-        guard let authMethods = databaseRecord[Key.authMethods.rawValue].dictionary else { throw EasyLoginError.invalidDocument(Key.authMethods.rawValue) }
-        self.uuid = uuid
         self.givenName = databaseRecord.optionalElement(.givenName)
         self.surname = databaseRecord.optionalElement(.surname)
+        guard let authMethods = databaseRecord[Key.authMethods.rawValue].dictionary else { throw EasyLoginError.invalidDocument(Key.authMethods.rawValue) }
         let filteredAuthMethodsPairs = authMethods.flatMap {
             (key: String, value: JSON) -> (String,String)? in
             if let value = value.string {
@@ -79,7 +79,7 @@ public extension ManagedUser { // PersistentRecord
     
     func databaseRecord() -> [String:Any] {
         var record: [String:Any] = [
-            "_id": uuid,
+            Key.databaseUUID.rawValue: uuid,
             Key.type.rawValue: ManagedUser.type,
             Key.numericID.rawValue: numericID,
             Key.shortname.rawValue: shortName,
@@ -89,10 +89,10 @@ public extension ManagedUser { // PersistentRecord
             Key.authMethods.rawValue: authMethods
         ]
         if let givenName = givenName {
-            record["givenName"] = givenName
+            record[Key.givenName.rawValue] = givenName
         }
         if let surname = surname {
-            record["surname"] = surname
+            record[Key.surname.rawValue] = surname
         }
         return record
     }
@@ -140,10 +140,10 @@ public extension ManagedUser { // ServerAPI
             Key.authMethods.rawValue: authMethods
         ]
         if let givenName = givenName {
-            record["givenName"] = givenName
+            record[Key.givenName.rawValue] = givenName
         }
         if let surname = surname {
-            record["surname"] = surname
+            record[Key.surname.rawValue] = surname
         }
         return JSON(record)
     }
