@@ -36,30 +36,30 @@ public struct ManagedUser { // PersistentRecord, Serializable
     public let fullName: String
     public let authMethods: [String: String]
 
-    let type = "user"
+    static let type = "user"
+}
+
+extension JSON {
+    func mandatoryElement<T>(key: ManagedUser.Key) throws -> T {
+        guard let element = self[key.rawValue].object as? T else { throw EasyLoginError.invalidDocument(key.rawValue) }
+        return element
+    }
 }
 
 public extension ManagedUser { // PersistentRecord
-    /*
-    init(database:Database, uuid:UUID) {
-        // move to caller
-    }
-    
-    func persist(to database:Database) {
-        // move to caller
-    }
- */
-    
-    init?(databaseRecord:JSON) {
-        // TODO: assert type == "user"
-        // TODO: assert not deleted
-        guard let uuid = databaseRecord["_id"].string else { return nil }
-        guard let numericID = databaseRecord[Key.numericID.rawValue].int else { return nil }
-        guard let shortName = databaseRecord[Key.shortname.rawValue].string else { return nil }
-        guard let principalName = databaseRecord[Key.principalName.rawValue].string else { return nil }
-        guard let email = databaseRecord[Key.email.rawValue].string else { return nil }
-        guard let fullName = databaseRecord[Key.fullName.rawValue].string else { return nil }
-        guard let authMethods = databaseRecord[Key.authMethods.rawValue].dictionary else { return nil }
+    init(databaseRecord:JSON) throws {
+        // No type or unexpected type: requested document was not found
+        guard let documentType = databaseRecord[Key.type.rawValue].string else { throw EasyLoginError.notFound }
+        guard documentType == ManagedUser.type else { throw EasyLoginError.notFound }
+        // TODO: verify not deleted
+        // Missing field: document is invalid
+        guard let uuid = databaseRecord["_id"].string else { throw EasyLoginError.invalidDocument("_id") }
+        guard let numericID = databaseRecord[Key.numericID.rawValue].int else { throw EasyLoginError.invalidDocument(Key.numericID.rawValue) }
+        guard let shortName = databaseRecord[Key.shortname.rawValue].string else { throw EasyLoginError.invalidDocument(Key.shortname.rawValue) }
+        guard let principalName = databaseRecord[Key.principalName.rawValue].string else { throw EasyLoginError.invalidDocument(Key.principalName.rawValue) }
+        guard let email = databaseRecord[Key.email.rawValue].string else { throw EasyLoginError.invalidDocument(Key.email.rawValue) }
+        guard let fullName = databaseRecord[Key.fullName.rawValue].string else { throw EasyLoginError.invalidDocument(Key.fullName.rawValue) }
+        guard let authMethods = databaseRecord[Key.authMethods.rawValue].dictionary else { throw EasyLoginError.invalidDocument(Key.authMethods.rawValue) }
         self.uuid = uuid
         self.numericID = numericID
         self.shortName = shortName
@@ -81,7 +81,7 @@ public extension ManagedUser { // PersistentRecord
     func databaseRecord() -> [String:Any] {
         var record: [String:Any] = [
             "_id": uuid,
-            Key.type.rawValue: type,
+            Key.type.rawValue: ManagedUser.type,
             Key.numericID.rawValue: numericID,
             Key.shortname.rawValue: shortName,
             Key.principalName.rawValue: principalName,

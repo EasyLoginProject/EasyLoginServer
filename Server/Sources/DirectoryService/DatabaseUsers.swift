@@ -44,11 +44,16 @@ class Users {
             }
             // TODO: verify type == "user"
             // TODO: verify not deleted
-            guard let retrievedUser = ManagedUser(databaseRecord:document) else {
-                sendError(.debug("Response creation failed"), to: response)
-                return
+            do {
+                let retrievedUser = try ManagedUser(databaseRecord:document)
+                response.send(json: retrievedUser.responseElement())
             }
-            response.send(json: retrievedUser.responseElement())
+            catch let error as EasyLoginError {
+                sendError(error, to: response)
+            }
+            catch {
+                sendError(.debug("Internal error"), to: response)
+            }
         })
     }
     
@@ -119,8 +124,13 @@ fileprivate func insert(_ user: ManagedUser, into database: Database, completion
                 completion(nil, error)
                 return
             }
-            let createdUser = ManagedUser(databaseRecord:document)
-            completion(createdUser, nil)
+            do {
+                let createdUser = try ManagedUser(databaseRecord:document)
+                completion(createdUser, nil)
+            }
+            catch {
+                completion(nil, nil) // TODO: set error
+            }
         })
     }
 }
