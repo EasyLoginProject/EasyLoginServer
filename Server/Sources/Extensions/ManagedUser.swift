@@ -40,7 +40,7 @@ public struct ManagedUser { // PersistentRecord, Serializable
     static let type = "user"
 }
 
-extension JSON {
+fileprivate extension JSON {
     func mandatoryElement<T>(_ key: ManagedUser.Key) throws -> T {
         guard let element = self[key.rawValue].object as? T else { throw EasyLoginError.invalidDocument(key.rawValue) }
         return element

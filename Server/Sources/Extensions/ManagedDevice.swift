@@ -44,6 +44,7 @@ public struct ManagedDevice { // PersistentRecord, Serializable
         case munkiCatalogs
         case munkiApps
         case munkiOptionalApps
+        case databaseUUID = "_id"
     }
     
     public let uuid: String
@@ -54,23 +55,40 @@ public struct ManagedDevice { // PersistentRecord, Serializable
     public let syncedSets: [String]
     public let syncSetSelectionMode: SyncMode
     
-    let type = "device"
+    static let type = "device"
+}
+
+fileprivate extension JSON {
+    func mandatoryFieldFromDocument<T>(_ key: ManagedDevice.Key) throws -> T {
+        guard let element = self[key.rawValue].object as? T else { throw EasyLoginError.invalidDocument(key.rawValue) }
+        return element
+    }
+    
+    func mandatoryFieldFromRequest<T>(_ key: ManagedDevice.Key) throws -> T {
+        guard let field = self[key.rawValue].object as? T else { throw EasyLoginError.missingField(key.rawValue) }
+        return field
+    }
+    
+    func optionalElement<T>(_ key: ManagedDevice.Key) -> T? {
+        return self[key.rawValue].object as? T
+    }
 }
 
 public extension ManagedDevice { // PersistentRecord
-    init?(databaseRecord:JSON) {
-        guard let uuid = databaseRecord["_id"].string else { return nil }
-        guard let serialNumber = databaseRecord[Key.serialNumber.rawValue].string else { return nil }
-        guard let deviceName = databaseRecord[Key.deviceName.rawValue].string else { return nil }
-        let hardwareUUID = databaseRecord[Key.hardwareUUID.rawValue].string
+    init(databaseRecord:JSON) throws {
+        // No type or unexpected type: requested document was not found
+        guard let documentType: String = databaseRecord.optionalElement(.type) else { throw EasyLoginError.notFound }
+        guard documentType == ManagedDevice.type else { throw EasyLoginError.notFound }
+        // TODO: verify not deleted
+        // Missing field: document is invalid
+        self.uuid = try databaseRecord.mandatoryFieldFromDocument(.databaseUUID)
+        self.serialNumber = try databaseRecord.mandatoryFieldFromDocument(.serialNumber)
+        self.deviceName = try databaseRecord.mandatoryFieldFromDocument(.deviceName)
+        self.hardwareUUID = databaseRecord.optionalElement(.hardwareUUID)
         let tags = databaseRecord[Key.tags.rawValue].array
         let syncedSets = databaseRecord[Key.syncedSets.rawValue].array
-        guard let selectionModeName = databaseRecord[Key.syncSetSelectionMode.rawValue].string else { return nil }
-        guard let syncSetSelectionMode = SyncMode(rawValue: selectionModeName) else { return nil }
-        self.uuid = uuid
-        self.serialNumber = serialNumber
-        self.deviceName = deviceName
-        self.hardwareUUID = hardwareUUID
+        let selectionModeName: String = try databaseRecord.mandatoryFieldFromDocument(.syncSetSelectionMode)
+        guard let syncSetSelectionMode = SyncMode(rawValue: selectionModeName) else { throw EasyLoginError.invalidDocument(Key.syncSetSelectionMode.rawValue) }
         let filteredTags: [String] = tags?.flatMap { $0.string } ?? []
         self.tags = filteredTags
         let filteredSyncedSets: [String] = syncedSets?.flatMap { $0.string } ?? []
@@ -81,7 +99,7 @@ public extension ManagedDevice { // PersistentRecord
     func databaseRecord() -> [String:Any] {
         var record: [String:Any] = [
             "_id": uuid,
-            Key.type.rawValue: type,
+            Key.type.rawValue: ManagedDevice.type,
             Key.serialNumber.rawValue: serialNumber,
             Key.deviceName.rawValue: deviceName,
             Key.tags.rawValue: tags,
@@ -96,22 +114,16 @@ public extension ManagedDevice { // PersistentRecord
 }
 
 public extension ManagedDevice { // ServerAPI
-    init?(requestElement:JSON) {
-        guard let serialNumber = requestElement[Key.serialNumber.rawValue].string else { return nil }
-        guard let deviceName = requestElement[Key.deviceName.rawValue].string else { return nil }
+    init(requestElement:JSON) throws {
+        self.serialNumber = try requestElement.mandatoryFieldFromRequest(.serialNumber)
+        self.deviceName = try requestElement.mandatoryFieldFromRequest(.deviceName)
+        self.hardwareUUID = requestElement.optionalElement(.hardwareUUID)
+        self.tags = requestElement[Key.tags.rawValue].array?.flatMap { $0.string } ?? []
         let uuid = UUID().uuidString
-        let hardwareUUID = requestElement[Key.hardwareUUID.rawValue].string
-        let tags = requestElement[Key.tags.rawValue].array?.flatMap { $0.string } ?? []
-        let syncedSets = requestElement[Key.syncedSets.rawValue].array?.flatMap { $0.string } ?? [uuid]
+        self.syncedSets = requestElement[Key.syncedSets.rawValue].array?.flatMap { $0.string } ?? [uuid]
         let selectionModeName = requestElement[Key.syncSetSelectionMode.rawValue].string
-        let syncSetSelectionMode = SyncMode(optionalRawValue: selectionModeName) ?? .auto
+        self.syncSetSelectionMode = SyncMode(optionalRawValue: selectionModeName) ?? .auto
         self.uuid = uuid
-        self.serialNumber = serialNumber
-        self.deviceName = deviceName
-        self.hardwareUUID = hardwareUUID
-        self.tags = tags
-        self.syncedSets = syncedSets
-        self.syncSetSelectionMode = syncSetSelectionMode
     }
     
     func responseElement() -> JSON {

@@ -1,5 +1,5 @@
 //
-//  DatabaseUsers.swift
+//  Users.swift
 //  EasyLogin
 //
 //  Created by Frank on 19/05/17.
