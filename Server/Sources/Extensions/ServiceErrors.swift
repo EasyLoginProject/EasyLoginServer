@@ -2,13 +2,14 @@ import Foundation
 import Kitura
 import KituraNet
 
-public enum EasyLoginError {
+public enum EasyLoginError: Swift.Error {
     case forbidden
     case notFound
     case malformedBody
     case missingField(String)
     case validation(String)
     case databaseNotAvailable
+    case invalidDocument(String)
     case debug(String?)
 }
 
@@ -21,7 +22,7 @@ extension EasyLoginError {
             return .notFound
         case .malformedBody, .missingField, .validation:
             return .preconditionFailed
-        case .databaseNotAvailable:
+        case .databaseNotAvailable, .invalidDocument:
             return .internalServerError
         default:
             return .internalServerError
@@ -38,6 +39,8 @@ extension EasyLoginError {
             return "Validation error on \(fieldName)"
         case .databaseNotAvailable:
             return "Database not available"
+        case .invalidDocument(let fieldName):
+            return "Database returned invalid document, offending field = \(fieldName)."
         case .debug(let message):
             return message ?? "Internal error"
         default:
