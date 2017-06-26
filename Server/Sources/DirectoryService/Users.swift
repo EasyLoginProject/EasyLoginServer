@@ -27,8 +27,9 @@ class Users {
     
     func installHandlers(to router: Router) {
         router.get("/users", handler: listUsersHandler)
-        router.get("/users/:uuid", handler: getUserHandler)
         router.post("/users", handler: createUserHandler)
+        router.get("/users/:uuid", handler: getUserHandler)
+        router.put("/users/:uuid", handler: updateUserHandler)
     }
     
     func getUserHandler(request: RouterRequest, response: RouterResponse, next: ()->Void) -> Void {
@@ -53,6 +54,43 @@ class Users {
             }
             catch {
                 sendError(.debug("Internal error"), to: response)
+            }
+        })
+    }
+    
+    func updateUserHandler(request: RouterRequest, response: RouterResponse, next: ()->Void) -> Void {
+        defer { next() }
+        guard let uuid = request.parameters["uuid"] else {
+            sendError(.missingField("uuid"), to:response)
+            return
+        }
+        database.retrieve(uuid, callback: { (document: JSON?, error: NSError?) in
+            guard let document = document else {
+                sendError(.notFound, to: response)
+                return
+            }
+            // TODO: verify type == "user"
+            // TODO: verify not deleted
+            guard let parsedBody = request.body else {
+                Log.error("body parsing failure")
+                sendError(.malformedBody, to:response)
+                return
+            }
+            switch(parsedBody) {
+            case .json(let jsonBody):
+                do {
+                    let retrievedUser = try ManagedUser(databaseRecord:document)
+                    let updatedUser = try retrievedUser.updated(with: jsonBody)
+                    response.send(json: try updatedUser.responseElement())
+                }
+                catch let error as EasyLoginError {
+                    sendError(error, to: response)
+                }
+                catch {
+                    sendError(.debug("Internal error"), to: response)
+                }
+            default:
+                sendError(.malformedBody, to: response)
             }
         })
     }
