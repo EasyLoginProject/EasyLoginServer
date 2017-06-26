@@ -25,8 +25,10 @@ public struct ManagedUser { // PersistentRecord, Serializable
         case fullName
         case authMethods
         case databaseUUID = "_id"
+        case databaseRevision = "_rev"
     }
     
+    public fileprivate(set) var revision: String?
     public fileprivate(set) var uuid: String?
     public fileprivate(set) var numericID: Int?
     public fileprivate(set) var shortName: String
@@ -68,6 +70,7 @@ public extension ManagedUser { // PersistentRecord
         guard documentType == ManagedUser.type else { throw EasyLoginError.notFound }
         // TODO: verify not deleted
         // Missing field: document is invalid
+        self.revision = databaseRecord.optionalElement(.databaseRevision)
         self.uuid = try databaseRecord.mandatoryElement(.databaseUUID)
         self.numericID = try databaseRecord.mandatoryElement(.numericID)
         self.shortName = try databaseRecord.mandatoryElement(.shortname)
@@ -164,6 +167,12 @@ public extension ManagedUser { // ServerAPI
         var user = self
         if let email: String = requestElement.optionalElement(.email) {
             user.email = email
+        }
+        if let givenName: String = requestElement.optionalElement(.givenName) { // FIXME: handle null
+            user.givenName = givenName
+        }
+        if let surname: String = requestElement.optionalElement(.surname) { // FIXME: handle null
+            user.surname = surname
         }
         if let fullName: String = requestElement.optionalElement(.fullName) {
             user.fullName = fullName

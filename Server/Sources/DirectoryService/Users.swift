@@ -81,7 +81,17 @@ class Users {
                 do {
                     let retrievedUser = try ManagedUser(databaseRecord:document)
                     let updatedUser = try retrievedUser.updated(with: jsonBody)
-                    response.send(json: try updatedUser.responseElement())
+                    update(updatedUser, into: self.database) { (writtenUser, error) in
+                        guard writtenUser != nil else {
+                            let errorMessage = error?.localizedDescription ?? "error is nil"
+                            sendError(.debug("Response creation failed: \(errorMessage)"), to: response)
+                            return
+                        }
+                        NotificationService.notifyAllClients()
+                        response.statusCode = .OK
+                        response.headers.setLocation("/db/users/\(updatedUser.uuid)")
+                        response.send(json: try! updatedUser.responseElement())
+                    }
                 }
                 catch let error as EasyLoginError {
                     sendError(error, to: response)
@@ -191,3 +201,19 @@ fileprivate func nextNumericID(database: Database, _ block: @escaping (Int)->Voi
     }
 }
 
+fileprivate func update(_ user: ManagedUser, into database: Database, completion: @escaping (ManagedUser?, NSError?) -> Void) -> Void {
+    let document = try! JSON(user.databaseRecord())
+    database.update(user.uuid!, rev: user.revision!, document: document, callback: { (rev: String?, updatedDocument: JSON?, error: NSError?) in
+        guard updatedDocument != nil else {
+            completion(nil, error)
+            return
+        }
+        do {
+            let updatedUser = try ManagedUser(databaseRecord:document)
+            completion(updatedUser, nil)
+        }
+        catch {
+            completion(nil, nil) // TODO: set error
+        }
+    })
+}
