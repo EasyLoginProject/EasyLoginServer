@@ -72,7 +72,9 @@ public extension ManagedUser { // PersistentRecord
         // Missing field: document is invalid
         self.revision = databaseRecord.optionalElement(.databaseRevision)
         self.uuid = try databaseRecord.mandatoryElement(.databaseUUID)
-        self.numericID = try databaseRecord.mandatoryElement(.numericID)
+        //self.numericID = try databaseRecord.mandatoryElement(.numericID)
+        guard let numericID = databaseRecord[Key.numericID.rawValue].int else { throw EasyLoginError.invalidDocument(Key.numericID.rawValue) }
+        self.numericID = numericID
         self.shortName = try databaseRecord.mandatoryElement(.shortname)
         self.principalName = try databaseRecord.mandatoryElement(.principalName)
         self.email = try databaseRecord.mandatoryElement(.email)
