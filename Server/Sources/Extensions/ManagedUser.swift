@@ -25,19 +25,26 @@ public struct ManagedUser { // PersistentRecord, Serializable
         case fullName
         case authMethods
         case databaseUUID = "_id"
+        case databaseRevision = "_rev"
     }
     
-    public let uuid: String
-    public var numericID: Int
-    public let shortName: String
-    public let principalName: String
-    public let email: String
-    public let givenName: String?
-    public let surname: String?
-    public let fullName: String
-    public let authMethods: [String: String]
+    public fileprivate(set) var revision: String?
+    public fileprivate(set) var uuid: String?
+    public fileprivate(set) var numericID: Int?
+    public fileprivate(set) var shortName: String
+    public fileprivate(set) var principalName: String
+    public fileprivate(set) var email: String
+    public fileprivate(set) var givenName: String?
+    public fileprivate(set) var surname: String?
+    public fileprivate(set) var fullName: String
+    public fileprivate(set) var authMethods: [String: String]
 
     static let type = "user"
+}
+
+public enum ManagedUserError: Error {
+    case notInserted
+    case alreadyInserted
 }
 
 fileprivate extension JSON {
@@ -63,6 +70,7 @@ public extension ManagedUser { // PersistentRecord
         guard documentType == ManagedUser.type else { throw EasyLoginError.notFound }
         // TODO: verify not deleted
         // Missing field: document is invalid
+        self.revision = databaseRecord.optionalElement(.databaseRevision)
         self.uuid = try databaseRecord.mandatoryElement(.databaseUUID)
         self.numericID = try databaseRecord.mandatoryElement(.numericID)
         self.shortName = try databaseRecord.mandatoryElement(.shortname)
@@ -82,7 +90,9 @@ public extension ManagedUser { // PersistentRecord
         self.authMethods = Dictionary(filteredAuthMethodsPairs)
     }
     
-    func databaseRecord() -> [String:Any] {
+    func databaseRecord() throws -> [String:Any] {
+        guard let uuid = uuid else { throw ManagedUserError.notInserted }
+        guard let numericID = numericID else { throw ManagedUserError.notInserted }
         var record: [String:Any] = [
             Key.databaseUUID.rawValue: uuid,
             Key.type.rawValue: ManagedUser.type,
@@ -112,6 +122,7 @@ public extension ManagedUser { // ServerAPI
         self.givenName = requestElement.optionalElement(.givenName)
         self.surname = requestElement.optionalElement(.surname)
         guard let requestAuthMethods = requestElement[Key.authMethods.rawValue].dictionary else { throw EasyLoginError.missingField(Key.authMethods.rawValue) }
+        // TODO: factorize
         let filteredAuthMethodsPairs = requestAuthMethods.flatMap {
             (key: String, value: JSON) -> (String,String)? in
             if let value = value.string {
@@ -120,13 +131,11 @@ public extension ManagedUser { // ServerAPI
             return nil
         }
         self.authMethods = try AuthMethods.generate(Dictionary(filteredAuthMethodsPairs))
-        let uuid = UUID().uuidString
-        let numericID = 123 // TODO: generate
-        self.uuid = uuid
-        self.numericID = numericID
     }
     
-    func responseElement() -> JSON {
+    func responseElement() throws -> JSON {
+        guard let uuid = uuid else { throw ManagedUserError.notInserted }
+        guard let numericID = numericID else { throw ManagedUserError.notInserted }
         var record: [String:Any] = [
             Key.uuid.rawValue: uuid,
             Key.numericID.rawValue: numericID,
@@ -143,6 +152,43 @@ public extension ManagedUser { // ServerAPI
             record[Key.surname.rawValue] = surname
         }
         return JSON(record)
+    }
+    
+    func inserted(newNumericID: Int) throws -> ManagedUser { // TODO: use NumericIDGenerator
+        if uuid != nil { throw ManagedUserError.alreadyInserted }
+        if numericID != nil { throw ManagedUserError.alreadyInserted }
+        var user = self
+        user.uuid = UUID().uuidString
+        user.numericID = newNumericID
+        return user
+    }
+    
+    func updated(with requestElement: JSON) throws -> ManagedUser {
+        var user = self
+        if let email: String = requestElement.optionalElement(.email) {
+            user.email = email
+        }
+        if let givenName: String = requestElement.optionalElement(.givenName) { // FIXME: handle null
+            user.givenName = givenName
+        }
+        if let surname: String = requestElement.optionalElement(.surname) { // FIXME: handle null
+            user.surname = surname
+        }
+        if let fullName: String = requestElement.optionalElement(.fullName) {
+            user.fullName = fullName
+        }
+        if let requestAuthMethods = requestElement[Key.authMethods.rawValue].dictionary {
+            // TODO: factorize
+            let filteredAuthMethodsPairs = requestAuthMethods.flatMap {
+                (key: String, value: JSON) -> (String,String)? in
+                if let value = value.string {
+                    return (key, value)
+                }
+                return nil
+            }
+            user.authMethods = try AuthMethods.generate(Dictionary(filteredAuthMethodsPairs))
+        }
+        return user
     }
 }
 
