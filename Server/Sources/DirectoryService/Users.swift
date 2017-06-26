@@ -46,7 +46,7 @@ class Users {
             // TODO: verify not deleted
             do {
                 let retrievedUser = try ManagedUser(databaseRecord:document)
-                response.send(json: retrievedUser.responseElement())
+                response.send(json: try retrievedUser.responseElement())
             }
             catch let error as EasyLoginError {
                 sendError(error, to: response)
@@ -58,7 +58,7 @@ class Users {
     }
     
     func createUserHandler(request: RouterRequest, response: RouterResponse, next: ()->Void) -> Void {
-        defer { next() }
+        defer { next() } // FIXME: defer to closure, or call explicitly
         Log.debug("handling POST")
         guard let parsedBody = request.body else {
             Log.error("body parsing failure")
@@ -80,7 +80,7 @@ class Users {
                     NotificationService.notifyAllClients()
                     response.statusCode = .created
                     response.headers.setLocation("/db/users/\(createdUser.uuid)")
-                    response.send(json: createdUser.responseElement())
+                    response.send(json: try! createdUser.responseElement())
                 }
             }
             catch let error as EasyLoginError {
@@ -121,9 +121,11 @@ fileprivate func insert(_ user: ManagedUser, into database: Database, completion
     nextNumericID(database: database) {
         numericID in
         Log.debug("next numeric id = \(numericID)")
-        var userWithID = user
-        userWithID.numericID = numericID
-        let document = JSON(userWithID.databaseRecord())
+        guard let userWithID = try? user.inserted(newNumericID: numericID) else {
+            completion(nil, NSError(domain: "EasyLogin", code: 1, userInfo: nil)) // FIXME: define error
+            return
+        }
+        let document = try! JSON(userWithID.databaseRecord())
         database.create(document, callback: { (id: String?, rev: String?, createdDocument: JSON?, error: NSError?) in
             guard createdDocument != nil else {
                 completion(nil, error)
