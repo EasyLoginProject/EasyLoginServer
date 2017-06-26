@@ -24,6 +24,7 @@ public struct ManagedUser { // PersistentRecord, Serializable
         case surname
         case fullName
         case authMethods
+        case databaseUUID = "_id"
     }
     
     public let uuid: String
@@ -36,38 +37,41 @@ public struct ManagedUser { // PersistentRecord, Serializable
     public let fullName: String
     public let authMethods: [String: String]
 
-    let type = "user"
+    static let type = "user"
+}
+
+fileprivate extension JSON {
+    func mandatoryElement<T>(_ key: ManagedUser.Key) throws -> T {
+        guard let element = self[key.rawValue].object as? T else { throw EasyLoginError.invalidDocument(key.rawValue) }
+        return element
+    }
+    
+    func mandatoryFieldFromRequest<T>(_ key: ManagedUser.Key) throws -> T {
+        guard let field = self[key.rawValue].object as? T else { throw EasyLoginError.missingField(key.rawValue) }
+        return field
+    }
+    
+    func optionalElement<T>(_ key: ManagedUser.Key) -> T? {
+        return self[key.rawValue].object as? T
+    }
 }
 
 public extension ManagedUser { // PersistentRecord
-    /*
-    init(database:Database, uuid:UUID) {
-        // move to caller
-    }
-    
-    func persist(to database:Database) {
-        // move to caller
-    }
- */
-    
-    init?(databaseRecord:JSON) {
-        // TODO: assert type == "user"
-        // TODO: assert not deleted
-        guard let uuid = databaseRecord["_id"].string else { return nil }
-        guard let numericID = databaseRecord[Key.numericID.rawValue].int else { return nil }
-        guard let shortName = databaseRecord[Key.shortname.rawValue].string else { return nil }
-        guard let principalName = databaseRecord[Key.principalName.rawValue].string else { return nil }
-        guard let email = databaseRecord[Key.email.rawValue].string else { return nil }
-        guard let fullName = databaseRecord[Key.fullName.rawValue].string else { return nil }
-        guard let authMethods = databaseRecord[Key.authMethods.rawValue].dictionary else { return nil }
-        self.uuid = uuid
-        self.numericID = numericID
-        self.shortName = shortName
-        self.principalName = principalName
-        self.email = email
-        self.givenName = databaseRecord[Key.givenName.rawValue].string
-        self.surname = databaseRecord[Key.surname.rawValue].string
-        self.fullName = fullName
+    init(databaseRecord:JSON) throws {
+        // No type or unexpected type: requested document was not found
+        guard let documentType: String = databaseRecord.optionalElement(.type) else { throw EasyLoginError.notFound }
+        guard documentType == ManagedUser.type else { throw EasyLoginError.notFound }
+        // TODO: verify not deleted
+        // Missing field: document is invalid
+        self.uuid = try databaseRecord.mandatoryElement(.databaseUUID)
+        self.numericID = try databaseRecord.mandatoryElement(.numericID)
+        self.shortName = try databaseRecord.mandatoryElement(.shortname)
+        self.principalName = try databaseRecord.mandatoryElement(.principalName)
+        self.email = try databaseRecord.mandatoryElement(.email)
+        self.fullName = try databaseRecord.mandatoryElement(.fullName)
+        self.givenName = databaseRecord.optionalElement(.givenName)
+        self.surname = databaseRecord.optionalElement(.surname)
+        guard let authMethods = databaseRecord[Key.authMethods.rawValue].dictionary else { throw EasyLoginError.invalidDocument(Key.authMethods.rawValue) }
         let filteredAuthMethodsPairs = authMethods.flatMap {
             (key: String, value: JSON) -> (String,String)? in
             if let value = value.string {
@@ -80,8 +84,8 @@ public extension ManagedUser { // PersistentRecord
     
     func databaseRecord() -> [String:Any] {
         var record: [String:Any] = [
-            "_id": uuid,
-            Key.type.rawValue: type,
+            Key.databaseUUID.rawValue: uuid,
+            Key.type.rawValue: ManagedUser.type,
             Key.numericID.rawValue: numericID,
             Key.shortname.rawValue: shortName,
             Key.principalName.rawValue: principalName,
@@ -90,25 +94,24 @@ public extension ManagedUser { // PersistentRecord
             Key.authMethods.rawValue: authMethods
         ]
         if let givenName = givenName {
-            record["givenName"] = givenName
+            record[Key.givenName.rawValue] = givenName
         }
         if let surname = surname {
-            record["surname"] = surname
+            record[Key.surname.rawValue] = surname
         }
         return record
     }
 }
 
 public extension ManagedUser { // ServerAPI
-    init?(requestElement:JSON) {
-        //guard let numericID = requestElement[Key.numericID.rawValue].int else { return nil }
-        guard let shortName = requestElement[Key.shortname.rawValue].string else { return nil }
-        Log.debug("short name = \(shortName)")
-        guard let principalName = requestElement[Key.principalName.rawValue].string else { return nil }
-        Log.debug("principal name = \(principalName)")
-        guard let email = requestElement[Key.email.rawValue].string else { return nil }
-        guard let fullName = requestElement[Key.fullName.rawValue].string else { return nil }
-        guard let requestAuthMethods = requestElement[Key.authMethods.rawValue].dictionary else { return nil }
+    init(requestElement:JSON) throws {
+        self.shortName = try requestElement.mandatoryFieldFromRequest(.shortname)
+        self.principalName = try requestElement.mandatoryFieldFromRequest(.principalName)
+        self.email = try requestElement.mandatoryFieldFromRequest(.email)
+        self.fullName = try requestElement.mandatoryFieldFromRequest(.fullName)
+        self.givenName = requestElement.optionalElement(.givenName)
+        self.surname = requestElement.optionalElement(.surname)
+        guard let requestAuthMethods = requestElement[Key.authMethods.rawValue].dictionary else { throw EasyLoginError.missingField(Key.authMethods.rawValue) }
         let filteredAuthMethodsPairs = requestAuthMethods.flatMap {
             (key: String, value: JSON) -> (String,String)? in
             if let value = value.string {
@@ -116,18 +119,11 @@ public extension ManagedUser { // ServerAPI
             }
             return nil
         }
-        guard let generatedAuthMethods = AuthMethods.generate(Dictionary(filteredAuthMethodsPairs)) else { return nil }
+        self.authMethods = try AuthMethods.generate(Dictionary(filteredAuthMethodsPairs))
         let uuid = UUID().uuidString
         let numericID = 123 // TODO: generate
         self.uuid = uuid
         self.numericID = numericID
-        self.shortName = shortName
-        self.principalName = principalName
-        self.email = email
-        self.givenName = requestElement[Key.givenName.rawValue].string
-        self.surname = requestElement[Key.surname.rawValue].string
-        self.fullName = fullName
-        self.authMethods = generatedAuthMethods
     }
     
     func responseElement() -> JSON {
@@ -141,18 +137,18 @@ public extension ManagedUser { // ServerAPI
             Key.authMethods.rawValue: authMethods
         ]
         if let givenName = givenName {
-            record["givenName"] = givenName
+            record[Key.givenName.rawValue] = givenName
         }
         if let surname = surname {
-            record["surname"] = surname
+            record[Key.surname.rawValue] = surname
         }
         return JSON(record)
     }
 }
 
 enum AuthMethods {
-    static func generate(_ authMethods: [String:String]) -> [String:String]? {
-        guard authMethods.count != 0 else { return nil }
+    static func generate(_ authMethods: [String:String]) throws -> [String:String] {
+        guard authMethods.count != 0 else { throw EasyLoginError.missingField(ManagedUser.Key.authMethods.rawValue) }
         if let cleartext = authMethods["cleartext"] {
             var generated = authMethods
             generated["cleartext"] = nil

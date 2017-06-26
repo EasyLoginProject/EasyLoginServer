@@ -1,5 +1,5 @@
 //
-//  DatabaseUsers.swift
+//  Users.swift
 //  EasyLogin
 //
 //  Created by Frank on 19/05/17.
@@ -44,11 +44,16 @@ class Users {
             }
             // TODO: verify type == "user"
             // TODO: verify not deleted
-            guard let retrievedUser = ManagedUser(databaseRecord:document) else {
-                sendError(.debug("Response creation failed"), to: response)
-                return
+            do {
+                let retrievedUser = try ManagedUser(databaseRecord:document)
+                response.send(json: retrievedUser.responseElement())
             }
-            response.send(json: retrievedUser.responseElement())
+            catch let error as EasyLoginError {
+                sendError(error, to: response)
+            }
+            catch {
+                sendError(.debug("Internal error"), to: response)
+            }
         })
     }
     
@@ -63,21 +68,26 @@ class Users {
         Log.debug("handling body")
         switch(parsedBody) {
         case .json(let jsonBody):
-            guard let user = ManagedUser(requestElement:jsonBody) else {
-                sendError(.debug("User creation failed"), to: response)
-                return
-            }
-            insert(user, into: database) {
-                createdUser, error in
-                guard let createdUser = createdUser else {
-                    let errorMessage = error?.localizedDescription ?? "error is nil"
-                    sendError(.debug("Response creation failed: \(errorMessage)"), to: response)
-                    return
+            do {
+                let user = try ManagedUser(requestElement:jsonBody)
+                insert(user, into: database) {
+                    createdUser, error in
+                    guard let createdUser = createdUser else {
+                        let errorMessage = error?.localizedDescription ?? "error is nil"
+                        sendError(.debug("Response creation failed: \(errorMessage)"), to: response)
+                        return
+                    }
+                    NotificationService.notifyAllClients()
+                    response.statusCode = .created
+                    response.headers.setLocation("/db/users/\(createdUser.uuid)")
+                    response.send(json: createdUser.responseElement())
                 }
-                NotificationService.notifyAllClients()
-                response.statusCode = .created
-                response.headers.setLocation("/db/users/\(createdUser.uuid)")
-                response.send(json: createdUser.responseElement())
+            }
+            catch let error as EasyLoginError {
+                sendError(error, to: response)
+            }
+            catch {
+                sendError(.debug("User creation failed"), to: response)
             }
         default:
             sendError(.malformedBody, to: response)
@@ -119,8 +129,13 @@ fileprivate func insert(_ user: ManagedUser, into database: Database, completion
                 completion(nil, error)
                 return
             }
-            let createdUser = ManagedUser(databaseRecord:document)
-            completion(createdUser, nil)
+            do {
+                let createdUser = try ManagedUser(databaseRecord:document)
+                completion(createdUser, nil)
+            }
+            catch {
+                completion(nil, nil) // TODO: set error
+            }
         })
     }
 }

@@ -38,11 +38,16 @@ class Devices {
                 sendError(.notFound, to: response)
                 return
             }
-            guard let retrievedDevice = ManagedDevice(databaseRecord:document) else {
-                sendError(.debug("Response creation failed"), to: response)
-                return
+            do {
+                let retrievedDevice = try ManagedDevice(databaseRecord:document)
+                response.send(json: retrievedDevice.responseElement())
             }
-            response.send(json: retrievedDevice.responseElement())
+            catch let error as EasyLoginError {
+                sendError(error, to: response)
+            }
+            catch {
+                sendError(.debug("Internal error"), to: response)
+            }
         })
     }
     
@@ -55,20 +60,25 @@ class Devices {
         }
         switch(parsedBody) {
         case .json(let jsonBody):
-            guard let device = ManagedDevice(requestElement:jsonBody) else {
-                sendError(.debug("Device creation failed"), to: response)
-                return
-            }
-            insert(device, into: database) {
-                createdDevice in
-                guard let createdDevice = createdDevice else {
-                    sendError(.debug("Response creation failed"), to: response)
-                    return
+            do {
+                let device = try ManagedDevice(requestElement:jsonBody)
+                insert(device, into: database) {
+                    createdDevice in
+                    guard let createdDevice = createdDevice else {
+                        sendError(.debug("Response creation failed"), to: response)
+                        return
+                    }
+                    NotificationService.notifyAllClients()
+                    response.statusCode = .created
+                    response.headers.setLocation("/db/devices/\(createdDevice.uuid)")
+                    response.send(json: createdDevice.responseElement())
                 }
-                NotificationService.notifyAllClients()
-                response.statusCode = .created
-                response.headers.setLocation("/db/devices/\(createdDevice.uuid)")
-                response.send(json: createdDevice.responseElement())
+            }
+            catch let error as EasyLoginError {
+                sendError(error, to: response)
+            }
+            catch {
+                sendError(.debug("Device creation failed"), to: response)
             }
         default:
             sendError(.malformedBody, to: response)
@@ -109,8 +119,13 @@ fileprivate func insert(_ device: ManagedDevice, into database: Database, comple
             completion(nil)
             return
         }
-        let createdDevice = ManagedDevice(databaseRecord:document)
-        completion(createdDevice)
+        do {
+            let createdDevice = try ManagedDevice(databaseRecord:document)
+            completion(createdDevice)
+        }
+        catch {
+            completion(nil) // TODO: set error
+        }
     })
 }
 
