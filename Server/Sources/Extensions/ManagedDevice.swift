@@ -45,17 +45,24 @@ public struct ManagedDevice { // PersistentRecord, Serializable
         case munkiApps
         case munkiOptionalApps
         case databaseUUID = "_id"
+        case databaseRevision = "_rev"
     }
     
-    public let uuid: String
-    public let hardwareUUID: String?
-    public let serialNumber: String
-    public let deviceName: String
-    public let tags: [String]
-    public let syncedSets: [String]
-    public let syncSetSelectionMode: SyncMode
+    public fileprivate(set) var revision: String?
+    public fileprivate(set) var uuid: String?
+    public fileprivate(set) var hardwareUUID: String?
+    public fileprivate(set) var serialNumber: String
+    public fileprivate(set) var deviceName: String
+    public fileprivate(set) var tags: [String]
+    public fileprivate(set) var syncedSets: [String]
+    public fileprivate(set) var syncSetSelectionMode: SyncMode
     
     static let type = "device"
+}
+
+public enum ManagedDeviceError: Error {
+    case notInserted
+    case alreadyInserted
 }
 
 fileprivate extension JSON {
@@ -81,6 +88,7 @@ public extension ManagedDevice { // PersistentRecord
         guard documentType == ManagedDevice.type else { throw EasyLoginError.notFound }
         // TODO: verify not deleted
         // Missing field: document is invalid
+        self.revision = databaseRecord.optionalElement(.databaseRevision)
         self.uuid = try databaseRecord.mandatoryFieldFromDocument(.databaseUUID)
         self.serialNumber = try databaseRecord.mandatoryFieldFromDocument(.serialNumber)
         self.deviceName = try databaseRecord.mandatoryFieldFromDocument(.deviceName)
@@ -96,9 +104,10 @@ public extension ManagedDevice { // PersistentRecord
         self.syncSetSelectionMode = syncSetSelectionMode
     }
     
-    func databaseRecord() -> [String:Any] {
+    func databaseRecord() throws -> [String:Any] {
+        guard let uuid = uuid else { throw ManagedDeviceError.notInserted }
         var record: [String:Any] = [
-            "_id": uuid,
+            Key.databaseUUID.rawValue: uuid,
             Key.type.rawValue: ManagedDevice.type,
             Key.serialNumber.rawValue: serialNumber,
             Key.deviceName.rawValue: deviceName,
@@ -126,7 +135,8 @@ public extension ManagedDevice { // ServerAPI
         self.uuid = uuid
     }
     
-    func responseElement() -> JSON {
+    func responseElement() throws -> JSON {
+        guard let uuid = uuid else { throw ManagedDeviceError.notInserted }
         var record: [String:Any] = [
             Key.uuid.rawValue: uuid,
             Key.serialNumber.rawValue: serialNumber,
@@ -142,3 +152,19 @@ public extension ManagedDevice { // ServerAPI
     }
 }
 
+public extension ManagedDevice { // mutabiliry
+    func inserted() throws -> ManagedDevice {
+        if uuid != nil { throw ManagedDeviceError.alreadyInserted }
+        var device = self
+        device.uuid = UUID().uuidString
+        return device
+    }
+    
+    func updated(with requestElement: JSON) throws -> ManagedDevice {
+        var device = self
+        if let hardwareUUID: String = requestElement.optionalElement(.hardwareUUID) { // FIXME: handle null
+            device.hardwareUUID = hardwareUUID
+        }
+        return device
+    }
+}

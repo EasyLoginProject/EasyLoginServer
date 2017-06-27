@@ -40,7 +40,7 @@ class Devices {
             }
             do {
                 let retrievedDevice = try ManagedDevice(databaseRecord:document)
-                response.send(json: retrievedDevice.responseElement())
+                response.send(json: try retrievedDevice.responseElement())
             }
             catch let error as EasyLoginError {
                 sendError(error, to: response)
@@ -71,7 +71,7 @@ class Devices {
                     NotificationService.notifyAllClients()
                     response.statusCode = .created
                     response.headers.setLocation("/db/devices/\(createdDevice.uuid)")
-                    response.send(json: createdDevice.responseElement())
+                    response.send(json: try! createdDevice.responseElement())
                 }
             }
             catch let error as EasyLoginError {
@@ -112,7 +112,7 @@ class Devices {
 }
 
 fileprivate func insert(_ device: ManagedDevice, into database: Database, completion: @escaping (ManagedDevice?) -> Void) -> Void {
-    let document = JSON(device.databaseRecord())
+    let document = JSON(try! device.databaseRecord())
     database.create(document, callback: { (id: String?, rev: String?, createdDocument: JSON?, error: NSError?) in
         guard createdDocument != nil else {
             Log.error("Create device: \(error)")
