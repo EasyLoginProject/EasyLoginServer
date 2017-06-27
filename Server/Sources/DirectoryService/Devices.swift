@@ -23,8 +23,9 @@ class Devices {
     
     func installHandlers(to router: Router) {
         router.get("/devices", handler: listDevicesHandler)
-        router.get("/devices/:uuid", handler: getDeviceHandler)
         router.post("/devices", handler: createDeviceHandler)
+        router.get("/devices/:uuid", handler: getDeviceHandler)
+        router.put("/devices/:uuid", handler: updateDeviceHandler)
     }
     
     fileprivate func getDeviceHandler(request: RouterRequest, response: RouterResponse, next: ()->Void) -> Void {
@@ -47,6 +48,53 @@ class Devices {
             }
             catch {
                 sendError(.debug("Internal error"), to: response)
+            }
+        })
+    }
+    
+    fileprivate func updateDeviceHandler(request: RouterRequest, response: RouterResponse, next: ()->Void) -> Void {
+        defer { next() }
+        guard let uuid = request.parameters["uuid"] else {
+            sendError(.missingField("uuid"), to:response)
+            return
+        }
+        database.retrieve(uuid, callback: { (document: JSON?, error: NSError?) in
+            guard let document = document else {
+                sendError(.notFound, to: response)
+                return
+            }
+            // TODO: verify type == "device"
+            // TODO: verify not deleted
+            guard let parsedBody = request.body else {
+                Log.error("body parsing failure")
+                sendError(.malformedBody, to:response)
+                return
+            }
+            switch(parsedBody) {
+            case .json(let jsonBody):
+                do {
+                    let retrievedDevice = try ManagedDevice(databaseRecord:document)
+                    let updatedDevice = try retrievedDevice.updated(with: jsonBody)
+                    update(updatedDevice, into: self.database) { (writtenDevice, error) in
+                        guard writtenDevice != nil else {
+                            let errorMessage = error?.localizedDescription ?? "error is nil"
+                            sendError(.debug("Response creation failed: \(errorMessage)"), to: response)
+                            return
+                        }
+                        NotificationService.notifyAllClients()
+                        response.statusCode = .OK
+                        response.headers.setLocation("/db/users/\(updatedDevice.uuid)")
+                        response.send(json: try! updatedDevice.responseElement())
+                    }
+                }
+                catch let error as EasyLoginError {
+                    sendError(error, to: response)
+                }
+                catch {
+                    sendError(.debug("Internal error"), to: response)
+                }
+            default:
+                sendError(.malformedBody, to: response)
             }
         })
     }
@@ -129,3 +177,19 @@ fileprivate func insert(_ device: ManagedDevice, into database: Database, comple
     })
 }
 
+fileprivate func update(_ device: ManagedDevice, into database: Database, completion: @escaping (ManagedDevice?, NSError?) -> Void) -> Void {
+    let document = try! JSON(device.databaseRecord())
+    database.update(device.uuid!, rev: device.revision!, document: document, callback: { (rev: String?, updatedDocument: JSON?, error: NSError?) in
+        guard updatedDocument != nil else {
+            completion(nil, error)
+            return
+        }
+        do {
+            let updatedDevice = try ManagedDevice(databaseRecord:document)
+            completion(updatedDevice, nil)
+        }
+        catch {
+            completion(nil, nil) // TODO: set error
+        }
+    })
+}

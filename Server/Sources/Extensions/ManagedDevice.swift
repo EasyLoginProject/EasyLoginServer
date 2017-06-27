@@ -32,7 +32,6 @@ public struct ManagedDevice { // PersistentRecord, Serializable
         case hardwareUUID
         case serialNumber
         case deviceName
-        case lockedTime
         case tags
         case syncedSets
         case syncSetSelectionMode
@@ -164,6 +163,18 @@ public extension ManagedDevice { // mutabiliry
         var device = self
         if let hardwareUUID: String = requestElement.optionalElement(.hardwareUUID) { // FIXME: handle null
             device.hardwareUUID = hardwareUUID
+        }
+        if let serialNumber: String = requestElement.optionalElement(.serialNumber) {
+            device.serialNumber = serialNumber
+        }
+        if let deviceName: String = requestElement.optionalElement(.deviceName) {
+            device.deviceName = deviceName
+        }
+        // TODO: enforce constraints
+        //device.syncedSets = requestElement[Key.syncedSets.rawValue].array?.flatMap { $0.string } ?? [uuid]
+        if let selectionModeName: String = requestElement.optionalElement(.syncSetSelectionMode) {
+            guard let syncSetSelectionMode = SyncMode(optionalRawValue: selectionModeName) else { throw EasyLoginError.validation(Key.syncSetSelectionMode.rawValue) }
+            device.syncSetSelectionMode = syncSetSelectionMode
         }
         return device
     }
