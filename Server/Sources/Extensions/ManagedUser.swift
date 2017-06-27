@@ -155,7 +155,9 @@ public extension ManagedUser { // ServerAPI
         }
         return JSON(record)
     }
-    
+}
+
+public extension ManagedUser { // mutability
     func inserted(newNumericID: Int) throws -> ManagedUser { // TODO: use NumericIDGenerator
         if uuid != nil { throw ManagedUserError.alreadyInserted }
         if numericID != nil { throw ManagedUserError.alreadyInserted }
