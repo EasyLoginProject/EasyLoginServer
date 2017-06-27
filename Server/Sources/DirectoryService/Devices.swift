@@ -26,6 +26,7 @@ class Devices {
         router.post("/devices", handler: createDeviceHandler)
         router.get("/devices/:uuid", handler: getDeviceHandler)
         router.put("/devices/:uuid", handler: updateDeviceHandler)
+        router.delete("/devices/:uuid", handler: deleteDeviceHandler)
     }
     
     fileprivate func getDeviceHandler(request: RouterRequest, response: RouterResponse, next: ()->Void) -> Void {
@@ -133,6 +134,40 @@ class Devices {
         }
     }
     
+    fileprivate func deleteDeviceHandler(request: RouterRequest, response: RouterResponse, next: ()->Void) -> Void {
+        defer { next() }
+        guard let uuid = request.parameters["uuid"] else {
+            sendError(.missingField("uuid"), to:response)
+            return
+        }
+        database.retrieve(uuid, callback: { (document: JSON?, error: NSError?) in
+            guard let document = document else {
+                sendError(.notFound, to: response)
+                return
+            }
+            do {
+                let retrievedDevice = try ManagedDevice(databaseRecord:document)
+                // This will generate an error when trying to delete a malformed record.
+                // Is this what is expected?
+                markDeleted(retrievedDevice, into: self.database) {
+                    success in
+                    if (success) {
+                        response.statusCode = .noContent
+                    }
+                    else {
+                        sendError(.debug("Internal error"), to: response)
+                    }
+                }
+            }
+            catch let error as EasyLoginError {
+                sendError(error, to: response)
+            }
+            catch {
+                sendError(.debug("Internal error"), to: response)
+            }
+        })
+    }
+    
     fileprivate func listDevicesHandler(request: RouterRequest, response: RouterResponse, next: ()->Void) -> Void {
         defer { next() }
         database.queryByView("all_devices", ofDesign: "main_design", usingParameters: []) { (databaseResponse, error) in
@@ -191,5 +226,13 @@ fileprivate func update(_ device: ManagedDevice, into database: Database, comple
         catch {
             completion(nil, nil) // TODO: set error
         }
+    })
+}
+
+fileprivate func markDeleted(_ device: ManagedDevice, into database: Database, completion: @escaping (Bool) -> Void) -> Void {
+    let document = try! JSON(device.databaseRecord(deleted: true))
+    database.update(device.uuid!, rev: device.revision!, document: document, callback: { (rev: String?, updatedDocument: JSON?, error: NSError?) in
+        let success = updatedDocument != nil
+        completion(success)
     })
 }
