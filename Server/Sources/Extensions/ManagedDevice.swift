@@ -56,7 +56,9 @@ public struct ManagedDevice { // PersistentRecord, Serializable
     public fileprivate(set) var syncedSets: [String]
     public fileprivate(set) var syncSetSelectionMode: SyncMode
     
+    // TODO: implement as an enum
     static let type = "device"
+    static let deleted = "device_deleted"
 }
 
 public enum ManagedDeviceError: Error {
@@ -103,11 +105,11 @@ public extension ManagedDevice { // PersistentRecord
         self.syncSetSelectionMode = syncSetSelectionMode
     }
     
-    func databaseRecord() throws -> [String:Any] {
+    func databaseRecord(deleted: Bool = false) throws -> [String:Any] {
         guard let uuid = uuid else { throw ManagedDeviceError.notInserted }
         var record: [String:Any] = [
             Key.databaseUUID.rawValue: uuid,
-            Key.type.rawValue: ManagedDevice.type,
+            Key.type.rawValue: deleted ? ManagedDevice.deleted : ManagedDevice.type,
             Key.serialNumber.rawValue: serialNumber,
             Key.deviceName.rawValue: deviceName,
             Key.tags.rawValue: tags,

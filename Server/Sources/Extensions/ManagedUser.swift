@@ -39,7 +39,9 @@ public struct ManagedUser { // PersistentRecord, Serializable
     public fileprivate(set) var fullName: String
     public fileprivate(set) var authMethods: [String: String]
 
+    // TODO: implement as an enum
     static let type = "user"
+    static let deleted = "user_deleted"
 }
 
 public enum ManagedUserError: Error {
@@ -92,12 +94,12 @@ public extension ManagedUser { // PersistentRecord
         self.authMethods = Dictionary(filteredAuthMethodsPairs)
     }
     
-    func databaseRecord() throws -> [String:Any] {
+    func databaseRecord(deleted: Bool = false) throws -> [String:Any] {
         guard let uuid = uuid else { throw ManagedUserError.notInserted }
         guard let numericID = numericID else { throw ManagedUserError.notInserted }
         var record: [String:Any] = [
             Key.databaseUUID.rawValue: uuid,
-            Key.type.rawValue: ManagedUser.type,
+            Key.type.rawValue: deleted ? ManagedUser.deleted : ManagedUser.type,
             Key.numericID.rawValue: numericID,
             Key.shortname.rawValue: shortName,
             Key.principalName.rawValue: principalName,
