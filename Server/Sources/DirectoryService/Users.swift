@@ -30,9 +30,10 @@ class Users {
         router.post("/users", handler: createUserHandler)
         router.get("/users/:uuid", handler: getUserHandler)
         router.put("/users/:uuid", handler: updateUserHandler)
+        router.delete("/users/:uuid", handler: deleteUserHandler)
     }
     
-    func getUserHandler(request: RouterRequest, response: RouterResponse, next: ()->Void) -> Void {
+    fileprivate func getUserHandler(request: RouterRequest, response: RouterResponse, next: ()->Void) -> Void {
         defer { next() }
         guard let uuid = request.parameters["uuid"] else {
             sendError(.missingField("uuid"), to:response)
@@ -58,7 +59,7 @@ class Users {
         })
     }
     
-    func updateUserHandler(request: RouterRequest, response: RouterResponse, next: ()->Void) -> Void {
+    fileprivate func updateUserHandler(request: RouterRequest, response: RouterResponse, next: ()->Void) -> Void {
         defer { next() }
         guard let uuid = request.parameters["uuid"] else {
             sendError(.missingField("uuid"), to:response)
@@ -105,7 +106,7 @@ class Users {
         })
     }
     
-    func createUserHandler(request: RouterRequest, response: RouterResponse, next: ()->Void) -> Void {
+    fileprivate func createUserHandler(request: RouterRequest, response: RouterResponse, next: ()->Void) -> Void {
         defer { next() } // FIXME: defer to closure, or call explicitly
         Log.debug("handling POST")
         guard let parsedBody = request.body else {
@@ -142,7 +143,41 @@ class Users {
         }
     }
     
-    func listUsersHandler(request: RouterRequest, response: RouterResponse, next: ()->Void) -> Void {
+    fileprivate func deleteUserHandler(request: RouterRequest, response: RouterResponse, next: ()->Void) -> Void {
+        defer { next() }
+        guard let uuid = request.parameters["uuid"] else {
+            sendError(.missingField("uuid"), to:response)
+            return
+        }
+        database.retrieve(uuid, callback: { (document: JSON?, error: NSError?) in
+            guard let document = document else {
+                sendError(.notFound, to: response)
+                return
+            }
+            do {
+                let retrievedUser = try ManagedUser(databaseRecord:document)
+                // This will generate an error when trying to delete a malformed record.
+                // Is this what is expected?
+                markDeleted(retrievedUser, into: self.database) {
+                    success in
+                    if (success) {
+                        response.statusCode = .noContent
+                    }
+                    else {
+                        sendError(.debug("Internal error"), to: response)
+                    }
+                }
+            }
+            catch let error as EasyLoginError {
+                sendError(error, to: response)
+            }
+            catch {
+                sendError(.debug("Internal error"), to: response)
+            }
+        })
+    }
+    
+    fileprivate func listUsersHandler(request: RouterRequest, response: RouterResponse, next: ()->Void) -> Void {
         defer { next() }
         database.queryByView("all_users", ofDesign: "main_design", usingParameters: []) { (databaseResponse, error) in
             guard let databaseResponse = databaseResponse else {
@@ -215,5 +250,13 @@ fileprivate func update(_ user: ManagedUser, into database: Database, completion
         catch {
             completion(nil, nil) // TODO: set error
         }
+    })
+}
+
+fileprivate func markDeleted(_ user: ManagedUser, into database: Database, completion: @escaping (Bool) -> Void) -> Void {
+    let document = try! JSON(user.databaseRecord(deleted: true))
+    database.update(user.uuid!, rev: user.revision!, document: document, callback: { (rev: String?, updatedDocument: JSON?, error: NSError?) in
+        let success = updatedDocument != nil
+        completion(success)
     })
 }
