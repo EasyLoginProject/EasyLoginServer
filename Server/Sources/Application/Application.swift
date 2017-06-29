@@ -38,6 +38,8 @@ public func initialize() throws {
     manager.load(.environmentVariables)
            .load(.commandLineArguments) // always give precedence to CLI args
     
+    let inspectorService = InspectorService()
+    
     var database: Database? = nil
     if let databaseDictionary = manager["database"] as? [String:Any] {
         guard let databaseName = databaseDictionary["name"] as? String else { throw ConfigError.missingDatabaseName }
@@ -62,9 +64,11 @@ public func initialize() throws {
     if let database = database {
         let directoryService = DirectoryService(database: database)
         router.all("/db", middleware: directoryService.router())
-        installNotificationService()
+        let notificationService = installNotificationService()
+        inspectorService.registerInspectable(notificationService, name: "notifications")
     }
-    // TODO: else install diagnostic handler
+    
+    inspectorService.installHandlers(to: router)
 }
 
 public func installInitErrorRoute() {

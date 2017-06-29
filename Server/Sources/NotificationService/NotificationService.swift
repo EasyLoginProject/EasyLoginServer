@@ -11,12 +11,14 @@ import Kitura
 import KituraWebSocket
 import LoggerAPI
 import Dispatch
+import Extensions
 
 private var service: NotificationService?
 
-public func installNotificationService() {
+public func installNotificationService() -> NotificationService {
     service = NotificationService()
     WebSocket.register(service: service!, onPath: "notifications")
+    return service!
 }
 
 public class NotificationService {
@@ -71,5 +73,11 @@ extension NotificationService {
     
     public static func notifyAllClients() { // temporary, to be replaced with NotificationCenter when available
         service?.sendUpdateMessage()
+    }
+}
+
+extension NotificationService: Inspectable {
+    public func inspect() -> [String : Any] {
+        return ["connections": connections.count]
     }
 }
