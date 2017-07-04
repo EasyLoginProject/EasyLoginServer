@@ -20,9 +20,11 @@ enum UsersError: Error {
 
 class Users {
     let database: Database
+    let numericIDGenerator: PersistentCounter
     
     init(database: Database) {
         self.database = database
+        self.numericIDGenerator = PersistentCounter(database: database, name: "users.numericID", initialValue: 1789)
     }
     
     func installHandlers(to router: Router) {
@@ -119,7 +121,7 @@ class Users {
         case .json(let jsonBody):
             do {
                 let user = try ManagedUser(requestElement:jsonBody)
-                insert(user, into: database) {
+                insert(user, into: database, generator: numericIDGenerator) {
                     createdUser, error in
                     guard let createdUser = createdUser else {
                         let errorMessage = error?.localizedDescription ?? "error is nil"
@@ -199,11 +201,15 @@ class Users {
     }
 }
 
-fileprivate func insert(_ user: ManagedUser, into database: Database, completion: @escaping (ManagedUser?, NSError?) -> Void) -> Void {
+fileprivate func insert(_ user: ManagedUser, into database: Database, generator: PersistentCounter, completion: @escaping (ManagedUser?, NSError?) -> Void) -> Void {
     // TODO: ensure shortName and principalName are unique
-    nextNumericID(database: database) {
+    generator.nextValue() {
         numericID in
         Log.debug("next numeric id = \(numericID)")
+        guard let numericID = numericID else {
+            completion(nil, NSError(domain: "EasyLogin", code: 1, userInfo: nil)) // FIXME: define error
+            return
+        }
         guard let userWithID = try? user.inserted(newNumericID: numericID) else {
             completion(nil, NSError(domain: "EasyLogin", code: 1, userInfo: nil)) // FIXME: define error
             return
@@ -222,17 +228,6 @@ fileprivate func insert(_ user: ManagedUser, into database: Database, completion
                 completion(nil, nil) // TODO: set error
             }
         })
-    }
-}
-
-fileprivate func nextNumericID(database: Database, _ block: @escaping (Int)->Void) -> Void {
-    database.queryByView("users_numeric_id", ofDesign: "main_design", usingParameters: []) { (databaseResponse, error) in
-        if let lastNumericID = databaseResponse?["rows"][0]["value"]["max"].int {
-            block(lastNumericID + 1)
-        }
-        else {
-            block(1)
-        }
     }
 }
 
