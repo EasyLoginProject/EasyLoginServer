@@ -96,6 +96,9 @@ class Users {
                         response.send(json: try! updatedUser.responseElement())
                     }
                 }
+                catch ManagedUserError.nullMandatoryField(let fieldName) {
+                    sendError(.validation(fieldName), to: response)
+                }
                 catch let error as EasyLoginError {
                     sendError(error, to: response)
                 }
