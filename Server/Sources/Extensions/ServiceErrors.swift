@@ -20,8 +20,10 @@ extension EasyLoginError {
             return .forbidden
         case .notFound:
             return .notFound
-        case .malformedBody, .missingField, .validation:
+        case .malformedBody:
             return .preconditionFailed
+        case .missingField, .validation:
+            return .unprocessableEntity
         case .databaseNotAvailable, .invalidDocument:
             return .internalServerError
         default:

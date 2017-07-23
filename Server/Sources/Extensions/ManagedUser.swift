@@ -47,6 +47,7 @@ public struct ManagedUser { // PersistentRecord, Serializable
 public enum ManagedUserError: Error {
     case notInserted
     case alreadyInserted
+    case nullMandatoryField(String)
 }
 
 fileprivate extension JSON {
@@ -62,6 +63,10 @@ fileprivate extension JSON {
     
     func optionalElement<T>(_ key: ManagedUser.Key) -> T? {
         return self[key.rawValue].object as? T
+    }
+    
+    func isNull(_ key: ManagedUser.Key) -> Bool {
+        return self[key.rawValue].exists() && type(of: self[key.rawValue].object) == NSNull.self
     }
 }
 
@@ -170,15 +175,24 @@ public extension ManagedUser { // mutability
     }
     
     func updated(with requestElement: JSON) throws -> ManagedUser {
+        guard !requestElement.isNull(.email) else { throw ManagedUserError.nullMandatoryField(Key.email.rawValue) }
+        guard !requestElement.isNull(.fullName) else { throw ManagedUserError.nullMandatoryField(Key.fullName.rawValue) }
+        guard !requestElement.isNull(.authMethods) else { throw ManagedUserError.nullMandatoryField(Key.authMethods.rawValue) }
         var user = self
         if let email: String = requestElement.optionalElement(.email) {
             user.email = email
         }
-        if let givenName: String = requestElement.optionalElement(.givenName) { // FIXME: handle null
+        if let givenName: String = requestElement.optionalElement(.givenName) {
             user.givenName = givenName
         }
-        if let surname: String = requestElement.optionalElement(.surname) { // FIXME: handle null
+        else if requestElement.isNull(.givenName) {
+            user.givenName = nil
+        }
+        if let surname: String = requestElement.optionalElement(.surname) {
             user.surname = surname
+        }
+        else if requestElement.isNull(.surname) {
+            user.surname = nil
         }
         if let fullName: String = requestElement.optionalElement(.fullName) {
             user.fullName = fullName
