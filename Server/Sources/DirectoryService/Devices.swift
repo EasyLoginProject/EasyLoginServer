@@ -88,6 +88,9 @@ class Devices {
                         response.send(json: try! updatedDevice.responseElement())
                     }
                 }
+                catch ManagedDeviceError.nullMandatoryField(let fieldName) {
+                    sendError(.validation(fieldName), to: response)
+                }
                 catch let error as EasyLoginError {
                     sendError(error, to: response)
                 }

@@ -64,6 +64,7 @@ public struct ManagedDevice { // PersistentRecord, Serializable
 public enum ManagedDeviceError: Error {
     case notInserted
     case alreadyInserted
+    case nullMandatoryField(String)
 }
 
 fileprivate extension JSON {
@@ -79,6 +80,10 @@ fileprivate extension JSON {
     
     func optionalElement<T>(_ key: ManagedDevice.Key) -> T? {
         return self[key.rawValue].object as? T
+    }
+    
+    func isNull(_ key: ManagedDevice.Key) -> Bool {
+        return self[key.rawValue].exists() && type(of: self[key.rawValue].object) == NSNull.self
     }
 }
 
@@ -162,9 +167,14 @@ public extension ManagedDevice { // mutabiliry
     }
     
     func updated(with requestElement: JSON) throws -> ManagedDevice {
+        guard !requestElement.isNull(.serialNumber) else { throw ManagedDeviceError.nullMandatoryField(Key.serialNumber.rawValue) }
+        guard !requestElement.isNull(.deviceName) else { throw ManagedDeviceError.nullMandatoryField(Key.deviceName.rawValue) }
         var device = self
-        if let hardwareUUID: String = requestElement.optionalElement(.hardwareUUID) { // FIXME: handle null
+        if let hardwareUUID: String = requestElement.optionalElement(.hardwareUUID) {
             device.hardwareUUID = hardwareUUID
+        }
+        else if requestElement.isNull(.hardwareUUID) {
+            device.hardwareUUID = nil
         }
         if let serialNumber: String = requestElement.optionalElement(.serialNumber) {
             device.serialNumber = serialNumber
