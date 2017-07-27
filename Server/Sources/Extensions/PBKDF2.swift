@@ -60,8 +60,9 @@ public class PBKDF2 {
     public func generateString(fromPassword password: String) throws -> String {
         let salt = try Random.generate(byteCount: saltLength)
         let derivedKey = PBKDF.deriveKey(fromPassword: password, salt: salt, prf: algorithm, rounds: rounds, derivedKeyLength: UInt(derivedKeyLength))
-        let saltString = Data(salt).base64EncodedString()
-        let keyString = Data(derivedKey).base64EncodedString()
+        let base64SuffixCharacterSet = CharacterSet(charactersIn: "=")
+        let saltString = Data(salt).base64EncodedString().trimmingCharacters(in: base64SuffixCharacterSet)
+        let keyString = Data(derivedKey).base64EncodedString().trimmingCharacters(in: base64SuffixCharacterSet)
         let modularString = "$\(stringPrefix)$\(rounds)$\(saltString)$\(keyString)"
         return modularString
     }
