@@ -10,7 +10,6 @@ import Foundation
 import CouchDB
 import SwiftyJSON
 import LoggerAPI
-import Cryptor
 
 public struct ManagedUser { // PersistentRecord, Serializable
     enum Key: String {
@@ -123,7 +122,7 @@ public extension ManagedUser { // PersistentRecord
 }
 
 public extension ManagedUser { // ServerAPI
-    init(requestElement:JSON) throws {
+    init(requestElement:JSON, authMethodGenerator: AuthMethodGenerator) throws {
         self.shortName = try requestElement.mandatoryFieldFromRequest(.shortname)
         self.principalName = try requestElement.mandatoryFieldFromRequest(.principalName)
         self.email = try requestElement.mandatoryFieldFromRequest(.email)
@@ -139,7 +138,7 @@ public extension ManagedUser { // ServerAPI
             }
             return nil
         }
-        self.authMethods = try AuthMethods.generate(Dictionary(filteredAuthMethodsPairs))
+        self.authMethods = try authMethodGenerator.generate(Dictionary(filteredAuthMethodsPairs))
     }
     
     func responseElement() throws -> JSON {
@@ -174,7 +173,7 @@ public extension ManagedUser { // mutability
         return user
     }
     
-    func updated(with requestElement: JSON) throws -> ManagedUser {
+    func updated(with requestElement: JSON, authMethodGenerator: AuthMethodGenerator) throws -> ManagedUser {
         guard !requestElement.isNull(.email) else { throw ManagedUserError.nullMandatoryField(Key.email.rawValue) }
         guard !requestElement.isNull(.fullName) else { throw ManagedUserError.nullMandatoryField(Key.fullName.rawValue) }
         guard !requestElement.isNull(.authMethods) else { throw ManagedUserError.nullMandatoryField(Key.authMethods.rawValue) }
@@ -206,24 +205,8 @@ public extension ManagedUser { // mutability
                 }
                 return nil
             }
-            user.authMethods = try AuthMethods.generate(Dictionary(filteredAuthMethodsPairs))
+            user.authMethods = try authMethodGenerator.generate(Dictionary(filteredAuthMethodsPairs))
         }
         return user
-    }
-}
-
-enum AuthMethods {
-    static func generate(_ authMethods: [String:String]) throws -> [String:String] {
-        guard authMethods.count != 0 else { throw EasyLoginError.missingField(ManagedUser.Key.authMethods.rawValue) }
-        if let cleartext = authMethods["cleartext"] {
-            var generated = authMethods
-            generated["cleartext"] = nil
-            generated["sha1"] = cleartext.sha1
-            generated["sha256"] = cleartext.sha256
-            generated["sha512"] = cleartext.sha512
-            // TODO: PBKDF2
-            return generated
-        }
-        return authMethods
     }
 }

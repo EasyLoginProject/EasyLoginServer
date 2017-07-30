@@ -21,10 +21,12 @@ enum UsersError: Error {
 class Users {
     let database: Database
     let numericIDGenerator: PersistentCounter
+    let authMethodGenerator: AuthMethodGenerator
     
     init(database: Database) {
         self.database = database
         self.numericIDGenerator = PersistentCounter(database: database, name: "users.numericID", initialValue: 1789)
+        self.authMethodGenerator = AuthMethodGenerator()
     }
     
     func installHandlers(to router: Router) {
@@ -83,7 +85,7 @@ class Users {
             case .json(let jsonBody):
                 do {
                     let retrievedUser = try ManagedUser(databaseRecord:document)
-                    let updatedUser = try retrievedUser.updated(with: jsonBody)
+                    let updatedUser = try retrievedUser.updated(with: jsonBody, authMethodGenerator: self.authMethodGenerator)
                     update(updatedUser, into: self.database) { (writtenUser, error) in
                         guard writtenUser != nil else {
                             let errorMessage = error?.localizedDescription ?? "error is nil"
@@ -123,7 +125,7 @@ class Users {
         switch(parsedBody) {
         case .json(let jsonBody):
             do {
-                let user = try ManagedUser(requestElement:jsonBody)
+                let user = try ManagedUser(requestElement:jsonBody, authMethodGenerator: self.authMethodGenerator)
                 insert(user, into: database, generator: numericIDGenerator) {
                     createdUser, error in
                     guard let createdUser = createdUser else {
