@@ -67,6 +67,21 @@ public class PBKDF2 {
         return modularString
     }
     
+    static func data(fromBase64 base64String: String) -> Data? {
+        let paddedString: String
+            switch(base64String.characters.count % 4) {
+            case 3:
+                paddedString = base64String + "="
+            case 2:
+                paddedString = base64String + "=="
+            case 1:
+                paddedString = base64String + "==="
+            default:
+                paddedString = base64String
+        }
+        return Data(base64Encoded: paddedString)
+    }
+    
     public static func verifyPassword(_ password: String, withString modularString: String) -> Bool {
         let components = modularString.components(separatedBy: CharacterSet(charactersIn: "$"))
         guard components.count == 5 else { return false }
@@ -74,8 +89,8 @@ public class PBKDF2 {
         guard
             let prf = self.algorithm(fromPrefix: prefixString),
             let rounds = Int(roundsString),
-            let saltData = Data(base64Encoded: saltString),
-            let hashData = Data(base64Encoded: hashString)
+            let saltData = data(fromBase64: saltString),
+            let hashData = data(fromBase64: hashString)
         else {
             return false
         }
