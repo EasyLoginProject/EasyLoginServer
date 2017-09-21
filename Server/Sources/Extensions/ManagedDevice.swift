@@ -25,7 +25,7 @@ public enum SyncMode: String {
 
 // TODO: most fields may be inherited
 
-public struct ManagedDevice { // PersistentRecord, Serializable
+public struct ManagedDevice: PersistentRecord { // PersistentRecord, Serializable
     enum Key: String {
         case type
         case uuid
