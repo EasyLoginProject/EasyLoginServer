@@ -8,29 +8,37 @@
 
 import Foundation
 import Kitura
-import CouchDB
 import Extensions
 
 class EasyLoginAuthenticator: RouterMiddleware {
-    let database: Database
+    let userProvider: UserRecordProvider
     
-    init(database: Database) {
-        self.database = database
+    init(userProvider: UserRecordProvider) {
+        self.userProvider = userProvider
     }
     
     func handle(request: RouterRequest, response: RouterResponse, next: @escaping () -> Void) throws {
         defer {
             next()
         }
+        guard let (login, password) = basicCredentials(request: request) else {
+            request.userInfo["EasyLoginAuthorization"] = AuthorizationNone(reason: "missing authentication") // TODO: 4xx code
+            return
+        }
+        guard let user = userProvider.user(login: login) else {
+            request.userInfo["EasyLoginAuthorization"] = AuthorizationNone(reason: "user not found")
+            return
+        }
+        print ("check \(user) password \(password)")
         request.userInfo["EasyLoginAuthorization"] = AuthorizationNone(reason: "not implemented... yet")
     }
     
-    class func basicCredentials(request: RouterRequest) -> (login: String, password: String)? {
+    func basicCredentials(request: RouterRequest) -> (login: String, password: String)? {
         guard let authorizationHeader = request.headers["Authorization"] else { return nil }
         return decodeBasicCredentials(authorizationHeader)
     }
     
-    class func decodeBasicCredentials(_ authorizationHeader: String) -> (login: String, password: String)? {
+    func decodeBasicCredentials(_ authorizationHeader: String) -> (login: String, password: String)? {
         let authorizationComponents = authorizationHeader.components(separatedBy: " ")
         guard authorizationComponents.count >= 2 else { return nil }
         guard authorizationComponents[0] == "Basic" else { return nil }
@@ -45,7 +53,7 @@ class EasyLoginAuthenticator: RouterMiddleware {
 }
 
 extension RouterRequest {
-    public func authorization() -> Authorization {
+    public func authorization() -> Authorization { // TODO: var, get, set
         return self.userInfo["EasyLoginAuthorization"] as! Authorization
     }
 }
