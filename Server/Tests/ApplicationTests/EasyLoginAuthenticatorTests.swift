@@ -20,11 +20,14 @@ struct MockUserProvider: UserRecordProvider {
         self.returnedUser = returnedUser
     }
     
-    func user(login: String) -> ManagedUser? {
+    func userAuthMethods(login: String, callback: @escaping (UserAuthMethods?) -> Void) {
         if login == expectedLogin {
-            return returnedUser
+            let result = UserAuthMethods(id: returnedUser.uuid!, authMethods: returnedUser.authMethods)
+            callback(result)
         }
-        return nil
+        else {
+            callback(nil)
+        }
     }
 }
 

@@ -18,19 +18,22 @@ class EasyLoginAuthenticator: RouterMiddleware {
     }
     
     func handle(request: RouterRequest, response: RouterResponse, next: @escaping () -> Void) throws {
-        defer {
-            next()
-        }
         guard let (login, password) = basicCredentials(request: request) else {
             request.userInfo["EasyLoginAuthorization"] = AuthorizationNone(reason: "missing authentication") // TODO: 4xx code
+            next()
             return
         }
-        guard let user = userProvider.user(login: login) else {
-            request.userInfo["EasyLoginAuthorization"] = AuthorizationNone(reason: "user not found")
-            return
+        userProvider.userAuthMethods(login: login) {
+            authMethods in
+            print ("authMethods = \(authMethods)")
+            next()
         }
-        print ("check \(user) password \(password)")
-        request.userInfo["EasyLoginAuthorization"] = AuthorizationNone(reason: "not implemented... yet")
+//        guard let user = userProvider.user(login: login) else {
+//            request.userInfo["EasyLoginAuthorization"] = AuthorizationNone(reason: "user not found")
+//            return
+//        }
+//        print ("check \(user) password \(password)")
+//        request.userInfo["EasyLoginAuthorization"] = AuthorizationNone(reason: "not implemented... yet")
     }
     
     func basicCredentials(request: RouterRequest) -> (login: String, password: String)? {

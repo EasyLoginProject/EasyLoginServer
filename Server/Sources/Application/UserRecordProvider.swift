@@ -8,7 +8,12 @@
 
 import Extensions
 
+struct UserAuthMethods {
+    let id: String
+    let authMethods: [String: String]
+}
+
 protocol UserRecordProvider {
-    func user(login: String) -> ManagedUser?
+    func userAuthMethods(login: String, callback: @escaping (UserAuthMethods?) -> Void)
 }
 
