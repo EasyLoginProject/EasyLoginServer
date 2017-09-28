@@ -25,15 +25,18 @@ class EasyLoginAuthenticator: RouterMiddleware {
         }
         userProvider.userAuthMethods(login: login) {
             authMethods in
-            print ("authMethods = \(authMethods)")
+            guard
+                let authMethods = authMethods,
+                let modularString = authMethods.authMethods["pbkdf2"]
+            else {
+                request.userInfo["EasyLoginAuthorization"] = AuthorizationNone(reason: "user not found")
+                next()
+                return
+            }
+            let valid = PBKDF2.verifyPassword(password, withString: modularString)
+            print ("password valid: \(valid)")
             next()
         }
-//        guard let user = userProvider.user(login: login) else {
-//            request.userInfo["EasyLoginAuthorization"] = AuthorizationNone(reason: "user not found")
-//            return
-//        }
-//        print ("check \(user) password \(password)")
-//        request.userInfo["EasyLoginAuthorization"] = AuthorizationNone(reason: "not implemented... yet")
     }
     
     func basicCredentials(request: RouterRequest) -> (login: String, password: String)? {
