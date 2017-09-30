@@ -17,6 +17,7 @@ import CouchDB
 import Extensions
 import DirectoryService
 import NotificationService
+import MunkiServer
 
 public enum ConfigError: Error {
     case missingDatabaseInfo
@@ -63,8 +64,10 @@ public func initialize() throws {
     
     if let database = database {
         let directoryService = DirectoryService(database: database)
+        let munkiServer = MunkiServer(database: database)
         router.all(middleware: EasyLoginAuthenticator(userProvider: database))
         router.all("/db", middleware: directoryService.router())
+        router.all("/munki", middleware: munkiServer.router())
         let notificationService = installNotificationService()
         inspectorService.registerInspectable(notificationService, name: "notifications")
     }

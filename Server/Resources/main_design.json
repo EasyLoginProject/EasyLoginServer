@@ -13,7 +13,14 @@
     "users_numeric_id": {
       "map" : "function(doc) { if (doc.type === 'user') { emit(null, doc.numericID); } }",
       "reduce" : "_stats"
-    }
+    },
+      "all_munki_items": {
+          "map" : "function(doc) {if (doc.type === 'munki_item') {emit(doc._id, {\"path\": doc._id, \"name\": doc.name, \"display_name\":doc.display_name, \"version\": doc.version});}}",
+      },
+      "all_munki_catalogs": {
+          "map" : "function(doc) { if (doc.type === 'munki_item' && Array.isArray(doc.catalogs)) { doc.catalogs.forEach( function (catalog) { emit(\"catalog\", catalog); }) } }",
+          "reduce" : "function (keys, values, rereduce) {return values.filter(function(item, pos){ return values.indexOf(item) == pos;});}"
+      },
   },
   "language": "javascript"
 }
