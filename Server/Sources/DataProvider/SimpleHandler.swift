@@ -31,7 +31,7 @@ public protocol SimpleHandler : AbstractHandler {
 public extension SimpleHandler {
     func installHandlers(to router: Router) {
         router.get("/"+apiNameForMultipleDocuments, handler: listAllDocuments)
-        router.get("/"+apiNameForMultipleDocuments+"/:document_id", handler: getRequestedDocument)
+        router.get("/"+apiNameForMultipleDocuments+"/:document_id*", handler: getRequestedDocument)
     }
     
     func resumeDocumentForListingPurpose(document: JSON) -> Any? {
