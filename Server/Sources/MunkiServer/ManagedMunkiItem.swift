@@ -6,6 +6,10 @@
 //
 //
 
+// YGI (2017 oct): this file need a really big improvement
+// We must be able to factorize most of this work via a list of property to handle and a for in
+// Current implemention is way too prone to typo errors
+
 import Foundation
 import CouchDB
 import Kitura
@@ -115,6 +119,8 @@ public class ManagedMunkiItem : DataProvider.ManagedObject {
     
     
     required public init(databaseRecord:JSON) throws {
+        
+        // YGI (2017 oct): I really miss KVC…
         catalogs = try databaseRecord.mandatoryFieldFromDocument(ManagedMunkiItemKey.catalogs.rawValue)
         description = try databaseRecord.mandatoryFieldFromDocument(ManagedMunkiItemKey.description.rawValue)
         developer = try databaseRecord.mandatoryFieldFromDocument(ManagedMunkiItemKey.developer.rawValue)
@@ -162,8 +168,6 @@ public class ManagedMunkiItem : DataProvider.ManagedObject {
         uninstallable = databaseRecord.optionalElement(ManagedMunkiItemKey.uninstallable.rawValue)
         update_for = databaseRecord.optionalElement(ManagedMunkiItemKey.update_for.rawValue)
         version = databaseRecord.optionalElement(ManagedMunkiItemKey.version.rawValue)
-        // I really miss KVC…
-        
         
         try super.init(databaseRecord: databaseRecord)
     }
@@ -178,6 +182,7 @@ public class ManagedMunkiItem : DataProvider.ManagedObject {
         record[ManagedMunkiItemKey.installer_type.rawValue] = installer_type
         record[ManagedMunkiItemKey.name.rawValue] = name
         
+        // YGI (2017 oct): Here again, the lack of KVC is such a nightmare…
         if let autoremove = autoremove {
             record[ManagedMunkiItemKey.autoremove.rawValue] = autoremove
         }
