@@ -67,15 +67,58 @@ open class ManagedObject : ManagedObjectProtocol {
         self.revision = databaseRecord.optionalElement(CommonKey.databaseRevision.rawValue)
     }
     
+    open func mandatoryPropertiesForDictionaryRepresentation() -> [String:String] {
+        return ["uuid": CommonKey.uuid.rawValue]
+    }
+    
+    open func optionalPropertiesForDictionaryRepresentation() -> [String:String] {
+        return [String:String]()
+    }
+    
     open func dictionaryRepresentation() throws -> [String:Any] {
-        guard let uuid = uuid else { throw ManagedObjectError.notInserted }
+        var dictionaryRepresentation = [String:Any]()
+        let mandatoryProperties = mandatoryPropertiesForDictionaryRepresentation()
+        let optionalProperties = optionalPropertiesForDictionaryRepresentation()
         
-        return [
-            CommonKey.databaseUUID.rawValue: uuid
-        ]
+        let m = Mirror(reflecting: self)
+        for child in m.children {
+            if let propertyName = child.label {
+                if let mandatoryDictionaryKey = mandatoryProperties[propertyName] {
+                    if let value = self.unwrap(child.value) {
+                        dictionaryRepresentation[mandatoryDictionaryKey] = value
+                    } else {
+                        throw ManagedObjectError.nullMandatoryField(mandatoryDictionaryKey)
+                    }
+                } else if let optionalDictionaryKey = optionalProperties[propertyName] {
+                    dictionaryRepresentation[optionalDictionaryKey] = child.value
+                }
+            }
+        }
+        
+        return dictionaryRepresentation
+    }
+    
+    private func unwrap(_ subject: Any) -> Any? {
+        var value: Any?
+        let mirrored = Mirror(reflecting:subject)
+        if mirrored.displayStyle != .optional {
+            value = subject
+        } else if let firstChild = mirrored.children.first {
+            value = firstChild.value
+        }
+        return value
     }
     
     public func responseElement() throws -> JSON{
         return try JSON(dictionaryRepresentation())
     }
+    
+    public subscript(key: String) -> Any? {
+        let m = Mirror(reflecting: self)
+        for child in m.children {
+            if child.label == key { return child.value }
+        }
+        return nil
+    }
+
 }

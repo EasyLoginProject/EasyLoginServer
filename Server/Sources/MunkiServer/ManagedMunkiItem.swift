@@ -172,135 +172,59 @@ public class ManagedMunkiItem : DataProvider.ManagedObject {
         try super.init(databaseRecord: databaseRecord)
     }
     
-    override open func dictionaryRepresentation() throws -> [String:Any] {
-        var record = try super.dictionaryRepresentation()
-        
-        record[ManagedMunkiItemKey.catalogs.rawValue] = catalogs
-        record[ManagedMunkiItemKey.description.rawValue] = description
-        record[ManagedMunkiItemKey.developer.rawValue] = developer
-        record[ManagedMunkiItemKey.display_name.rawValue] = display_name
-        record[ManagedMunkiItemKey.installer_type.rawValue] = installer_type
-        record[ManagedMunkiItemKey.name.rawValue] = name
-        
-        // YGI (2017 oct): Here again, the lack of KVC is such a nightmare…
-        if let autoremove = autoremove {
-            record[ManagedMunkiItemKey.autoremove.rawValue] = autoremove
-        }
-        if let blocking_applications = blocking_applications {
-            record[ManagedMunkiItemKey.blocking_applications.rawValue] = blocking_applications
-        }
-        if let force_install_after_date = force_install_after_date {
-            record[ManagedMunkiItemKey.force_install_after_date.rawValue] = force_install_after_date
-        }
-        if let icon_name = icon_name {
-            record[ManagedMunkiItemKey.icon_name.rawValue] = icon_name
-        }
-        if let installable_condition = installable_condition {
-            record[ManagedMunkiItemKey.installable_condition.rawValue] = installable_condition
-        }
-        if let installed_size = installed_size {
-            record[ManagedMunkiItemKey.installed_size.rawValue] = installed_size
-        }
-        if let installer_choices_xml = installer_choices_xml {
-            record[ManagedMunkiItemKey.installer_choices_xml.rawValue] = installer_choices_xml
-        }
-        if let installer_environment = installer_environment {
-            record[ManagedMunkiItemKey.installer_environment.rawValue] = installer_environment
-        }
-        if let installer_item_hash = installer_item_hash {
-            record[ManagedMunkiItemKey.installer_item_hash.rawValue] = installer_item_hash
-        }
-        if let installer_item_location = installer_item_location {
-            record[ManagedMunkiItemKey.installer_item_location.rawValue] = installer_item_location
-        }
-        if let installs = installs {
-            record[ManagedMunkiItemKey.installs.rawValue] = installs
-        }
-        if let items_to_copy = items_to_copy {
-            record[ManagedMunkiItemKey.items_to_copy.rawValue] = items_to_copy
-        }
-        if let minimum_munki_version = minimum_munki_version {
-            record[ManagedMunkiItemKey.minimum_munki_version.rawValue] = minimum_munki_version
-        }
-        if let minimum_os_version = minimum_os_version {
-            record[ManagedMunkiItemKey.minimum_os_version.rawValue] = minimum_os_version
-        }
-        if let maximum_os_version = maximum_os_version {
-            record[ManagedMunkiItemKey.maximum_os_version.rawValue] = maximum_os_version
-        }
-        if let notes = notes {
-            record[ManagedMunkiItemKey.notes.rawValue] = notes
-        }
-//        if let package_complete_url = package_complete_url {
-//            record[ManagedMunkiItemKey.package_complete_url.rawValue] = package_complete_url
-//        }
-        if let package_path = package_path {
-            record[ManagedMunkiItemKey.package_path.rawValue] = package_path
-        }
-        if let installcheck_script = installcheck_script {
-            record[ManagedMunkiItemKey.installcheck_script.rawValue] = installcheck_script
-        }
-        if let uninstallcheck_script = uninstallcheck_script {
-            record[ManagedMunkiItemKey.uninstallcheck_script.rawValue] = uninstallcheck_script
-        }
-        if let on_demand = on_demand {
-            record[ManagedMunkiItemKey.on_demand.rawValue] = on_demand
-        }
-        if let postinstall_script = postinstall_script {
-            record[ManagedMunkiItemKey.postinstall_script.rawValue] = postinstall_script
-        }
-        if let postuninstall_script = postuninstall_script {
-            record[ManagedMunkiItemKey.postuninstall_script.rawValue] = postuninstall_script
-        }
-        if let preinstall_alert = preinstall_alert {
-            record[ManagedMunkiItemKey.preinstall_alert.rawValue] = preinstall_alert
-        }
-        if let preuninstall_alert = preuninstall_alert {
-            record[ManagedMunkiItemKey.preuninstall_alert.rawValue] = preuninstall_alert
-        }
-        if let preinstall_script = preinstall_script {
-            record[ManagedMunkiItemKey.preinstall_script.rawValue] = preinstall_script
-        }
-        if let preuninstall_script = preuninstall_script {
-            record[ManagedMunkiItemKey.preuninstall_script.rawValue] = preuninstall_script
-        }
-        if let receipts = receipts {
-            record[ManagedMunkiItemKey.receipts.rawValue] = receipts
-        }
-        if let requires = requires {
-            record[ManagedMunkiItemKey.requires.rawValue] = requires
-        }
-        if let restart_action = restart_action {
-            record[ManagedMunkiItemKey.restart_action.rawValue] = restart_action
-        }
-        if let supported_architectures = supported_architectures {
-            record[ManagedMunkiItemKey.supported_architectures.rawValue] = supported_architectures
-        }
-        if let suppress_bundle_relocation = suppress_bundle_relocation {
-            record[ManagedMunkiItemKey.suppress_bundle_relocation.rawValue] = suppress_bundle_relocation
-        }
-        if let unattended_install = unattended_install {
-            record[ManagedMunkiItemKey.unattended_install.rawValue] = unattended_install
-        }
-        if let unattended_uninstall = unattended_uninstall {
-            record[ManagedMunkiItemKey.unattended_uninstall.rawValue] = unattended_uninstall
-        }
-        if let uninstall_method = uninstall_method {
-            record[ManagedMunkiItemKey.uninstall_method.rawValue] = uninstall_method
-        }
-        if let uninstall_script = uninstall_script {
-            record[ManagedMunkiItemKey.uninstall_script.rawValue] = uninstall_script
-        }
-        if let uninstaller_item_location = uninstaller_item_location {
-            record[ManagedMunkiItemKey.uninstaller_item_location.rawValue] = uninstaller_item_location
-        }
-        if let uninstallable = uninstallable {
-            record[ManagedMunkiItemKey.uninstallable.rawValue] = uninstallable
-        }
-        if let update_for = update_for {
-            record[ManagedMunkiItemKey.update_for.rawValue] = update_for
-        }
-        
-        return record
+    override open func mandatoryPropertiesForDictionaryRepresentation() -> [String:String] {
+        return [
+            "catalogs": ManagedMunkiItemKey.catalogs.rawValue,
+            "description": ManagedMunkiItemKey.description.rawValue,
+            "developer": ManagedMunkiItemKey.developer.rawValue,
+            "display_name": ManagedMunkiItemKey.display_name.rawValue,
+            "installer_type": ManagedMunkiItemKey.installer_type.rawValue,
+            "name": ManagedMunkiItemKey.name.rawValue,
+        ]
     }
+    
+    override open func optionalPropertiesForDictionaryRepresentation() -> [String:String] {
+        return [
+            "autoremove": ManagedMunkiItemKey.autoremove.rawValue,
+            "blocking_applications": ManagedMunkiItemKey.blocking_applications.rawValue,
+            "force_install_after_date": ManagedMunkiItemKey.force_install_after_date.rawValue,
+            "icon_name": ManagedMunkiItemKey.icon_name.rawValue,
+            "installable_condition": ManagedMunkiItemKey.installable_condition.rawValue,
+            "installed_size": ManagedMunkiItemKey.installed_size.rawValue,
+            "installer_choices_xml": ManagedMunkiItemKey.installer_choices_xml.rawValue,
+            "installer_environment": ManagedMunkiItemKey.installer_environment.rawValue,
+            "installer_item_hash": ManagedMunkiItemKey.installer_item_hash.rawValue,
+            "installer_item_location": ManagedMunkiItemKey.installer_item_location.rawValue,
+            "installs": ManagedMunkiItemKey.installs.rawValue,
+            "items_to_copy": ManagedMunkiItemKey.items_to_copy.rawValue,
+            "minimum_munki_version": ManagedMunkiItemKey.minimum_munki_version.rawValue,
+            "minimum_os_version": ManagedMunkiItemKey.minimum_os_version.rawValue,
+            "maximum_os_version": ManagedMunkiItemKey.maximum_os_version.rawValue,
+            "notes": ManagedMunkiItemKey.notes.rawValue,
+            "package_complete_url": ManagedMunkiItemKey.package_complete_url.rawValue,
+            "package_path": ManagedMunkiItemKey.package_path.rawValue,
+            "installcheck_script": ManagedMunkiItemKey.installcheck_script.rawValue,
+            "uninstallcheck_script": ManagedMunkiItemKey.uninstallcheck_script.rawValue,
+            "on_demand": ManagedMunkiItemKey.on_demand.rawValue,
+            "postinstall_script": ManagedMunkiItemKey.postinstall_script.rawValue,
+            "postuninstall_script": ManagedMunkiItemKey.postuninstall_script.rawValue,
+            "preinstall_alert": ManagedMunkiItemKey.preinstall_alert.rawValue,
+            "preuninstall_alert": ManagedMunkiItemKey.preuninstall_alert.rawValue,
+            "preinstall_script": ManagedMunkiItemKey.preinstall_script.rawValue,
+            "preuninstall_script": ManagedMunkiItemKey.preuninstall_script.rawValue,
+            "receipts": ManagedMunkiItemKey.receipts.rawValue,
+            "requires": ManagedMunkiItemKey.requires.rawValue,
+            "restart_action": ManagedMunkiItemKey.restart_action.rawValue,
+            "supported_architectures": ManagedMunkiItemKey.supported_architectures.rawValue,
+            "suppress_bundle_relocation": ManagedMunkiItemKey.suppress_bundle_relocation.rawValue,
+            "unattended_install": ManagedMunkiItemKey.unattended_install.rawValue,
+            "unattended_uninstall": ManagedMunkiItemKey.unattended_uninstall.rawValue,
+            "uninstall_method": ManagedMunkiItemKey.uninstall_method.rawValue,
+            "uninstall_script": ManagedMunkiItemKey.uninstall_script.rawValue,
+            "uninstaller_item_location": ManagedMunkiItemKey.uninstaller_item_location.rawValue,
+            "uninstallable": ManagedMunkiItemKey.uninstallable.rawValue,
+            "update_for": ManagedMunkiItemKey.update_for.rawValue,
+        ]
+    }
+    
 }
