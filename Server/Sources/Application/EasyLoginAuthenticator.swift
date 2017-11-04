@@ -52,8 +52,8 @@ class EasyLoginAuthenticator: RouterMiddleware {
         guard let credentialsData = Data(base64Encoded: encodedCredentials) else { return nil }
         guard let decodedCredentials = String(data: credentialsData, encoding: .utf8) else { return nil }
         guard let separatorRange = decodedCredentials.range(of: ":") else { return nil }
-        let login = decodedCredentials.substring(to: separatorRange.lowerBound)
-        let password = decodedCredentials.substring(from: separatorRange.upperBound)
+        let login = String(decodedCredentials[...separatorRange.lowerBound])
+        let password = String(decodedCredentials[separatorRange.upperBound...])
         return (login, password)
     }
 }
