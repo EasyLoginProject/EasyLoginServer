@@ -28,7 +28,7 @@ public extension JSON {
     }
     
     public func isNull(_ key: String) -> Bool {
-        return self[key].exists() && type(of: self[key].object) == NSNull.self
+        return self[key].exists() && Swift.type(of: self[key].object) == NSNull.self
     }
 }
 

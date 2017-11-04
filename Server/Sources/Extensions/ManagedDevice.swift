@@ -83,7 +83,7 @@ fileprivate extension JSON {
     }
     
     func isNull(_ key: ManagedDevice.Key) -> Bool {
-        return self[key.rawValue].exists() && type(of: self[key.rawValue].object) == NSNull.self
+        return self[key.rawValue].exists() && Swift.type(of: self[key.rawValue].object) == NSNull.self
     }
 }
 
