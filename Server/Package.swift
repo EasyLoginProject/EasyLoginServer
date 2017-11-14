@@ -6,19 +6,19 @@ let package = Package(
         Target(name: "NotificationService", dependencies: [
             .Target(name: "Extensions")
         ]),
-        Target(name: "DirectoryService", dependencies: [
+        Target(name: "EasyLoginDirectoryService", dependencies: [
             .Target(name: "Extensions"),
             .Target(name: "NotificationService")
         ]),
         Target(name: "Application", dependencies: [
         	.Target(name: "Extensions"),
-        	.Target(name: "DirectoryService"),
+        	.Target(name: "EasyLoginDirectoryService"),
         	.Target(name: "NotificationService")
         ]),
         Target(name: "EasyLogin", dependencies: [
             .Target(name: "Application"),
             .Target(name: "Extensions"),
-            .Target(name: "DirectoryService"),
+            .Target(name: "EasyLoginDirectoryService"),
             .Target(name: "NotificationService")
         ])
     ],

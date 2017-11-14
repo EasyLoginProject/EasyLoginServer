@@ -15,7 +15,7 @@ import Configuration
 import CloudFoundryConfig
 import CouchDB
 import Extensions
-import DirectoryService
+import EasyLoginDirectoryService
 import NotificationService
 
 public enum ConfigError: Error {
@@ -62,7 +62,7 @@ public func initialize() throws {
     router.put(middleware:BodyParser())
     
     if let database = database {
-        let directoryService = DirectoryService(database: database)
+        let directoryService = EasyLoginDirectoryService(database: database)
         router.all(middleware: EasyLoginAuthenticator(userProvider: database))
         router.all("/db", middleware: directoryService.router())
         let notificationService = installNotificationService()
