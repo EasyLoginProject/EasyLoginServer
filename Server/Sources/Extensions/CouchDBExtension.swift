@@ -59,7 +59,7 @@ public extension CouchDBClient {
                     }
                     let document = JSON.parse(string: json)
                     database.createDesign("main_design", document: document) { (result, error) in
-                        Log.info("database index creation: \(result)")
+                        Log.info("database index creation: \(String(describing: result))")
                     }
                 }
             }
