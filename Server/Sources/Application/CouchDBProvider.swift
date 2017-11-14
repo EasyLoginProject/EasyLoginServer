@@ -14,6 +14,7 @@ extension Database: UserRecordProvider {
     func userAuthMethods(login: String, callback: @escaping (UserAuthMethods?) -> Void) {
         self.queryByView("user_authMethods_by_shortname", ofDesign: "main_design", usingParameters: [.keys([login as AnyObject])]) { (databaseResponse, error) in
             guard let databaseResponse = databaseResponse else {
+                // TODO: report error
                 callback(nil)
                 return
             }

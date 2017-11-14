@@ -29,12 +29,23 @@ class EasyLoginAuthenticator: RouterMiddleware {
                 let authMethods = authMethods,
                 let modularString = authMethods.authMethods["pbkdf2"]
             else {
-                request.userInfo["EasyLoginAuthorization"] = AuthorizationNone(reason: "user not found")
+                request.userInfo["EasyLoginAuthorization"] = AuthorizationNone(reason: "invalid login or password") // TODO: 4xx code, stop processing
                 next()
                 return
             }
             let valid = PBKDF2.verifyPassword(password, withString: modularString)
             print ("password valid: \(valid)")
+            if (valid) {
+                if (login == "admin") { // TODO: define admin role
+                    request.userInfo["EasyLoginAuthorization"] = AuthorizationAll()
+                }
+                else {
+                    request.userInfo["EasyLoginAuthorization"] = AuthorizationForUser(id: authMethods.id)
+                }
+            }
+            else {
+                request.userInfo["EasyLoginAuthorization"] = AuthorizationNone(reason: "invalid login or password") // TODO: 4xx code, stop processing
+            }
             next()
         }
     }
@@ -59,8 +70,13 @@ class EasyLoginAuthenticator: RouterMiddleware {
 }
 
 extension RouterRequest {
-    public func authorization() -> Authorization { // TODO: var, get, set
-        return self.userInfo["EasyLoginAuthorization"] as! Authorization
+    public var easyLoginAuthorization: Authorization {
+        get {
+            return userInfo["EasyLoginAuthorization"] as! Authorization
+        }
+        set {
+            userInfo["EasyLoginAuthorization"] = newValue
+        }
     }
 }
 
@@ -85,5 +101,63 @@ struct AuthorizationNone: Authorization {
     
     func canDelete(_ record: PersistentRecord) -> AuthorizationResult {
         return .denied(reason: reason)
+    }
+}
+
+struct AuthorizationAll: Authorization {
+    func canCreate(_ type: String) -> AuthorizationResult {
+        return .granted
+    }
+    
+    func canRead(field: String, from record: PersistentRecord) -> AuthorizationResult {
+        return .granted
+    }
+    
+    func canUpdate(field: String, from record: PersistentRecord) -> AuthorizationResult {
+        return .granted
+    }
+    
+    func canDelete(_ record: PersistentRecord) -> AuthorizationResult {
+        return .granted
+    }
+}
+
+struct AuthorizationForUser: Authorization {
+    let id: String
+    
+    init(id: String) {
+        self.id = id
+    }
+    
+    func canCreate(_ type: String) -> AuthorizationResult {
+        return .denied(reason: "not admin account")
+    }
+    
+    func canRead(field: String, from record: PersistentRecord) -> AuthorizationResult {
+        if (isMe(record)) {
+            return .granted
+        }
+        return .denied(reason: "non-admin user can only access own record")
+    }
+    
+    func canUpdate(field: String, from record: PersistentRecord) -> AuthorizationResult {
+        if (isMe(record)) {
+            return .granted
+        }
+        return .denied(reason: "non-admin user can only update own record")
+    }
+    
+    func canDelete(_ record: PersistentRecord) -> AuthorizationResult {
+        return .denied(reason: "not admin account")
+    }
+    
+    func isMe(_ record: PersistentRecord) -> Bool {
+        guard let user = record as? ManagedUser else {
+            return false
+        }
+        guard let recordUUID = user.uuid else {
+            return false
+        }
+        return id == recordUUID
     }
 }
