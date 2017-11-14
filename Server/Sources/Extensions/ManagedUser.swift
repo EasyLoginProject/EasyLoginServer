@@ -11,7 +11,7 @@ import CouchDB
 import SwiftyJSON
 import LoggerAPI
 
-public struct ManagedUser { // PersistentRecord, Serializable
+public struct ManagedUser: PersistentRecord { // PersistentRecord, Serializable
     enum Key: String {
         case type
         case uuid
