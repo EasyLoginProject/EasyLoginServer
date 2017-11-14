@@ -141,7 +141,7 @@ public extension ManagedUser { // ServerAPI
         self.authMethods = try authMethodGenerator.generate(Dictionary(filteredAuthMethodsPairs))
     }
     
-    func responseElement() throws -> JSON {
+    func responseElement() throws -> [String: Any] {
         guard let uuid = uuid else { throw ManagedUserError.notInserted }
         guard let numericID = numericID else { throw ManagedUserError.notInserted }
         var record: [String:Any] = [
@@ -159,7 +159,7 @@ public extension ManagedUser { // ServerAPI
         if let surname = surname {
             record[Key.surname.rawValue] = surname
         }
-        return JSON(record)
+        return record
     }
 }
 

@@ -8,7 +8,6 @@
 
 import Foundation
 import Kitura
-import SwiftyJSON
 import Extensions
 
 public class InspectorService {
@@ -32,7 +31,6 @@ public class InspectorService {
         inspectableServices.forEach { (serviceName, inspectedService) in
             result[serviceName] = inspectedService.inspect()
         }
-        let json = JSON(result)
-        response.send(json: json)
+        response.send(json: result)
     }
 }
