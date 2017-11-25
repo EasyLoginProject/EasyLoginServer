@@ -40,12 +40,20 @@ public func initialize() throws {
     
     let inspectorService = InspectorService()
     
+    let mainDesignPath: String
+    if let environmentVariable = getenv("RESOURCES"), let resourcePath = String(validatingUTF8: environmentVariable) {
+        mainDesignPath = "\(resourcePath)/main_design.json"
+    }
+    else {
+        mainDesignPath = "Resources/main_design.json"
+    }
+    
     var database: Database? = nil
     if let databaseDictionary = manager["database"] as? [String:Any] {
         guard let databaseName = databaseDictionary["name"] as? String else { throw ConfigError.missingDatabaseName }
         let couchDBClient = CouchDBClient(dictionary: databaseDictionary)
         Log.info("Connected to CouchDB, client = \(couchDBClient), database name = \(databaseName)")
-        database = couchDBClient.createOrOpenDatabase(name: databaseName, designFile: "../../Resources/main_design.json")
+        database = couchDBClient.createOrOpenDatabase(name: databaseName, designFile: mainDesignPath)
     }
     else if let cloudantService = try? manager.getCloudantService(name: "EasyLogin-Cloudant") {
         Log.debug("Trying to connect to Cloudant service at \(cloudantService.host):\(cloudantService.port) as \(cloudantService.username)")
