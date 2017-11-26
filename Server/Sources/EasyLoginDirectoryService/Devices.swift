@@ -179,17 +179,14 @@ class Devices {
                 sendError(.debug("Database request failed: \(errorMessage)"), to: response)
                 return
             }
-            let deviceList = databaseResponse["rows"].array?.flatMap { device -> [String:Any]? in
-                if let uuid = device["value"]["uuid"].string,
-                    let serialNumber = device["value"]["serialNumber"].string,
-                    let deviceName = device["value"]["deviceName"].string {
-                    var record = ["uuid":uuid, "serialNumber":serialNumber, "deviceName":deviceName]
-                    if let hardwareUUID = device["value"]["hardwareUUID"].string {
-                        record["hardwareUUID"] = hardwareUUID
-                    }
-                    return record
+            let deviceList = databaseResponse["rows"].array?.flatMap { device -> ManagedDeviceRecap? in
+                do {
+                    return try ManagedDeviceRecap(databaseRecord: device["value"])
                 }
-                return nil
+                catch {
+                    print(error)
+                    return nil
+                }
             }
             let result = ["devices": deviceList ?? []]
             response.send(json: result)

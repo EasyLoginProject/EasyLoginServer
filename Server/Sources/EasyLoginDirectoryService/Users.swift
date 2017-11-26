@@ -192,13 +192,14 @@ class Users {
                 sendError(.debug("Database request failed: \(errorMessage)"), to: response)
                 return
             }
-            let userList = databaseResponse["rows"].array?.flatMap { user -> [String:Any]? in
-                if let uuid = user["value"]["uuid"].string,
-                    let numericID = user["value"]["numericID"].int,
-                    let shortname = user["value"]["shortname"].string {
-                    return ["uuid":uuid, "numericID":numericID, "shortname":shortname]
+            let userList = databaseResponse["rows"].array?.flatMap { user -> ManagedUserRecap? in
+                do {
+                    return try ManagedUserRecap(databaseRecord:user["value"])
                 }
-                return nil
+                catch {
+                    print("error? \(error)")
+                    return nil
+                }
             }
             let result = ["users": userList ?? []]
             response.send(json: result)
