@@ -85,7 +85,7 @@ class Users {
             case .json(let jsonBody):
                 do {
                     let retrievedUser = try ManagedUser(databaseRecord:document)
-                    let updatedUser = try retrievedUser.updated(with: jsonBody, authMethodGenerator: self.authMethodGenerator)
+                    let updatedUser = try retrievedUser.updated(with: JSON(jsonBody), authMethodGenerator: self.authMethodGenerator) // FIXME: use [String: Any] directly
                     update(updatedUser, into: self.database) { (writtenUser, error) in
                         guard writtenUser != nil else {
                             let errorMessage = error?.localizedDescription ?? "error is nil"
@@ -94,7 +94,7 @@ class Users {
                         }
                         NotificationService.notifyAllClients()
                         response.statusCode = .OK
-                        response.headers.setLocation("/db/users/\(updatedUser.uuid)")
+                        response.headers.setLocation("/db/users/\(String(describing: updatedUser.uuid))")
                         response.send(json: try! updatedUser.responseElement())
                     }
                 }
@@ -125,17 +125,17 @@ class Users {
         switch(parsedBody) {
         case .json(let jsonBody):
             do {
-                let user = try ManagedUser(requestElement:jsonBody, authMethodGenerator: self.authMethodGenerator)
+                let user = try ManagedUser(requestElement: JSON(jsonBody), authMethodGenerator: self.authMethodGenerator) // FIXME: use [String: Any] directly
                 insert(user, into: database, generator: numericIDGenerator) {
                     createdUser, error in
-                    guard let createdUser = createdUser else {
+                    guard let createdUser = createdUser, let createdUUID = createdUser.uuid else {
                         let errorMessage = error?.localizedDescription ?? "error is nil"
                         sendError(.debug("Response creation failed: \(errorMessage)"), to: response)
                         return
                     }
                     NotificationService.notifyAllClients()
                     response.statusCode = .created
-                    response.headers.setLocation("/db/users/\(createdUser.uuid)")
+                    response.headers.setLocation("/db/users/\(createdUUID)")
                     response.send(json: try! createdUser.responseElement())
                 }
             }
@@ -192,16 +192,17 @@ class Users {
                 sendError(.debug("Database request failed: \(errorMessage)"), to: response)
                 return
             }
-            let userList = databaseResponse["rows"].array?.flatMap { user -> [String:Any]? in
-                if let uuid = user["value"]["uuid"].string,
-                    let numericID = user["value"]["numericID"].int,
-                    let shortname = user["value"]["shortname"].string {
-                    return ["uuid":uuid, "numericID":numericID, "shortname":shortname]
+            let userList = databaseResponse["rows"].array?.flatMap { user -> ManagedUserRecap? in
+                do {
+                    return try ManagedUserRecap(databaseRecord:user["value"])
                 }
-                return nil
+                catch {
+                    print("error? \(error)")
+                    return nil
+                }
             }
             let result = ["users": userList ?? []]
-            response.send(json: JSON(result))
+            response.send(json: result)
         }
     }
 }
@@ -210,7 +211,7 @@ fileprivate func insert(_ user: ManagedUser, into database: Database, generator:
     // TODO: ensure shortName and principalName are unique
     generator.nextValue() {
         numericID in
-        Log.debug("next numeric id = \(numericID)")
+        Log.debug("next numeric id = \(String(describing: numericID))")
         guard let numericID = numericID else {
             completion(nil, NSError(domain: "EasyLogin", code: 1, userInfo: nil)) // FIXME: define error
             return

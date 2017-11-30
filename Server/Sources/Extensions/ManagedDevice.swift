@@ -83,7 +83,7 @@ fileprivate extension JSON {
     }
     
     func isNull(_ key: ManagedDevice.Key) -> Bool {
-        return self[key.rawValue].exists() && type(of: self[key.rawValue].object) == NSNull.self
+        return self[key.rawValue].exists() && Swift.type(of: self[key.rawValue].object) == NSNull.self
     }
 }
 
@@ -141,7 +141,7 @@ public extension ManagedDevice { // ServerAPI
         self.uuid = uuid
     }
     
-    func responseElement() throws -> JSON {
+    func responseElement() throws -> [String: Any] {
         guard let uuid = uuid else { throw ManagedDeviceError.notInserted }
         var record: [String:Any] = [
             Key.uuid.rawValue: uuid,
@@ -154,7 +154,7 @@ public extension ManagedDevice { // ServerAPI
         if let hardwareUUID = hardwareUUID {
             record[Key.hardwareUUID.rawValue] = hardwareUUID
         }
-        return JSON(record)
+        return record
     }
 }
 

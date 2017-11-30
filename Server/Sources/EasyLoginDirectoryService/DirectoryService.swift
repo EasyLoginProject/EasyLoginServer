@@ -10,7 +10,7 @@ import Foundation
 import CouchDB
 import Kitura
 
-public class DirectoryService {
+public class EasyLoginDirectoryService {
     let users: Users
     let devices: Devices
     

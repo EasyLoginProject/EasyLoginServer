@@ -11,7 +11,7 @@ import CouchDB
 import SwiftyJSON
 import LoggerAPI
 
-public struct ManagedUser: PersistentRecord { // PersistentRecord, Serializable
+public struct ManagedUser: PersistentRecord, Encodable {
     enum Key: String {
         case type
         case uuid
@@ -65,7 +65,7 @@ fileprivate extension JSON {
     }
     
     func isNull(_ key: ManagedUser.Key) -> Bool {
-        return self[key.rawValue].exists() && type(of: self[key.rawValue].object) == NSNull.self
+        return self[key.rawValue].exists() && Swift.type(of: self[key.rawValue].object) == NSNull.self
     }
 }
 
@@ -141,7 +141,7 @@ public extension ManagedUser { // ServerAPI
         self.authMethods = try authMethodGenerator.generate(Dictionary(filteredAuthMethodsPairs))
     }
     
-    func responseElement() throws -> JSON {
+    func responseElement() throws -> [String: Any] {
         guard let uuid = uuid else { throw ManagedUserError.notInserted }
         guard let numericID = numericID else { throw ManagedUserError.notInserted }
         var record: [String:Any] = [
@@ -159,7 +159,7 @@ public extension ManagedUser { // ServerAPI
         if let surname = surname {
             record[Key.surname.rawValue] = surname
         }
-        return JSON(record)
+        return record
     }
 }
 

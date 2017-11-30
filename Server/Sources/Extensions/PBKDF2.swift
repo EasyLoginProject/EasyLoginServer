@@ -69,7 +69,7 @@ public class PBKDF2 {
     
     static func data(fromBase64 base64String: String) -> Data? {
         let paddedString: String
-            switch(base64String.characters.count % 4) {
+            switch(base64String.count % 4) {
             case 3:
                 paddedString = base64String + "="
             case 2:

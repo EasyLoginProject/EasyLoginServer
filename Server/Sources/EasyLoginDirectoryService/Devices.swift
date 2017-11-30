@@ -75,16 +75,16 @@ class Devices {
             case .json(let jsonBody):
                 do {
                     let retrievedDevice = try ManagedDevice(databaseRecord:document)
-                    let updatedDevice = try retrievedDevice.updated(with: jsonBody)
+                    let updatedDevice = try retrievedDevice.updated(with: JSON(jsonBody)) // FIXME: use [String: Any] directly
                     update(updatedDevice, into: self.database) { (writtenDevice, error) in
-                        guard writtenDevice != nil else {
+                        guard writtenDevice != nil, let updatedUUID = updatedDevice.uuid else {
                             let errorMessage = error?.localizedDescription ?? "error is nil"
                             sendError(.debug("Response creation failed: \(errorMessage)"), to: response)
                             return
                         }
                         NotificationService.notifyAllClients()
                         response.statusCode = .OK
-                        response.headers.setLocation("/db/users/\(updatedDevice.uuid)")
+                        response.headers.setLocation("/db/users/\(updatedUUID)")
                         response.send(json: try! updatedDevice.responseElement())
                     }
                 }
@@ -113,16 +113,16 @@ class Devices {
         switch(parsedBody) {
         case .json(let jsonBody):
             do {
-                let device = try ManagedDevice(requestElement:jsonBody)
+                let device = try ManagedDevice(requestElement: JSON(jsonBody)) // FIXME: use [String: Any] directly
                 insert(device, into: database) {
                     createdDevice in
-                    guard let createdDevice = createdDevice else {
+                    guard let createdDevice = createdDevice, let createdUUID = createdDevice.uuid else {
                         sendError(.debug("Response creation failed"), to: response)
                         return
                     }
                     NotificationService.notifyAllClients()
                     response.statusCode = .created
-                    response.headers.setLocation("/db/devices/\(createdDevice.uuid)")
+                    response.headers.setLocation("/db/devices/\(createdUUID)")
                     response.send(json: try! createdDevice.responseElement())
                 }
             }
@@ -179,20 +179,17 @@ class Devices {
                 sendError(.debug("Database request failed: \(errorMessage)"), to: response)
                 return
             }
-            let deviceList = databaseResponse["rows"].array?.flatMap { device -> [String:Any]? in
-                if let uuid = device["value"]["uuid"].string,
-                    let serialNumber = device["value"]["serialNumber"].string,
-                    let deviceName = device["value"]["deviceName"].string {
-                    var record = ["uuid":uuid, "serialNumber":serialNumber, "deviceName":deviceName]
-                    if let hardwareUUID = device["value"]["hardwareUUID"].string {
-                        record["hardwareUUID"] = hardwareUUID
-                    }
-                    return record
+            let deviceList = databaseResponse["rows"].array?.flatMap { device -> ManagedDeviceRecap? in
+                do {
+                    return try ManagedDeviceRecap(databaseRecord: device["value"])
                 }
-                return nil
+                catch {
+                    print(error)
+                    return nil
+                }
             }
             let result = ["devices": deviceList ?? []]
-            response.send(json: JSON(result))
+            response.send(json: result)
         }
     }
 }
@@ -201,7 +198,7 @@ fileprivate func insert(_ device: ManagedDevice, into database: Database, comple
     let document = JSON(try! device.databaseRecord())
     database.create(document, callback: { (id: String?, rev: String?, createdDocument: JSON?, error: NSError?) in
         guard createdDocument != nil else {
-            Log.error("Create device: \(error)")
+            Log.error("Create device: \(String(describing: error))")
             completion(nil)
             return
         }
