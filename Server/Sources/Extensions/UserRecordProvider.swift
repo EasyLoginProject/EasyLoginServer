@@ -6,14 +6,12 @@
 //
 //
 
-import Extensions
-
-struct UserAuthMethods {
-    let id: String
-    let authMethods: [String: String]
+public struct UserAuthMethods {
+    public let id: String
+    public let authMethods: [String: String]
 }
 
-protocol UserRecordProvider {
+public protocol UserRecordProvider {
     func userAuthMethods(login: String, callback: @escaping (UserAuthMethods?) -> Void)
 }
 
