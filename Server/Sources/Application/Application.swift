@@ -17,6 +17,7 @@ import CouchDB
 import Extensions
 import EasyLoginDirectoryService
 import NotificationService
+import EasyLoginAPIForLDAPBridge
 
 public enum ConfigError: Error {
     case missingDatabaseInfo
@@ -73,6 +74,10 @@ public func initialize() throws {
         let directoryService = EasyLoginDirectoryService(database: database)
         router.all(middleware: EasyLoginAuthenticator(userProvider: database))
         router.all("/db", middleware: directoryService.router())
+        
+        let apiForLDAPBridge = APIForLDAPBridge(database: database)
+        router.all("/ldap", middleware: apiForLDAPBridge.router())
+        
         let notificationService = installNotificationService()
         inspectorService.registerInspectable(notificationService, name: "notifications")
     }
