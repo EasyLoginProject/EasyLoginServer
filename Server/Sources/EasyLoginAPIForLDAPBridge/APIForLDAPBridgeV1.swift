@@ -47,8 +47,8 @@ class APIForLDAPBridgeV1 {
             return
         }
         
-        guard let offeredAuthenticationMethods = authRequest.authentication, let simplePassword = offeredAuthenticationMethods.simple else {
-            completion(LDAPAuthResponse(isAuthenticated: false, message: "Unsupported authentication method"), RequestError.unauthorized)
+        guard let authenticationChallenges = authRequest.authentication else {
+            completion(LDAPAuthResponse(isAuthenticated: false, message: "Auhentication request missing"), RequestError.unauthorized)
             return
         }
         
@@ -62,13 +62,17 @@ class APIForLDAPBridgeV1 {
                     return
             }
             
-            let valid = PBKDF2.verifyPassword(simplePassword, withString: modularString)
-            
-            if (valid) {
-                completion(LDAPAuthResponse(isAuthenticated: true, message: nil), RequestError.ok)
-            }
-            else {
-                completion(LDAPAuthResponse(isAuthenticated: false, message: "Authentication denied"), RequestError.unauthorized)
+            if let simplePassword = authenticationChallenges.simple {
+                let valid = PBKDF2.verifyPassword(simplePassword, withString: modularString)
+                
+                if (valid) {
+                    completion(LDAPAuthResponse(isAuthenticated: true, message: nil), RequestError.ok)
+                }
+                else {
+                    completion(LDAPAuthResponse(isAuthenticated: false, message: "Authentication denied"), RequestError.unauthorized)
+                }
+            } else {
+                completion(LDAPAuthResponse(isAuthenticated: false, message: "Unsupported authentication methods"), RequestError.unauthorized)
             }
         }
         
