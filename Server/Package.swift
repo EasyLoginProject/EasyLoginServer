@@ -1,33 +1,44 @@
+// swift-tools-version:4.0
+// The swift-tools-version declares the minimum version of Swift required to build this package.
+
 import PackageDescription
 
 let package = Package(
     name: "EasyLogin",
-    targets: [
-        Target(name: "NotificationService", dependencies: [
-            .Target(name: "Extensions")
-        ]),
-        Target(name: "EasyLoginDirectoryService", dependencies: [
-            .Target(name: "Extensions"),
-            .Target(name: "NotificationService")
-        ]),
-        Target(name: "Application", dependencies: [
-        	.Target(name: "Extensions"),
-        	.Target(name: "EasyLoginDirectoryService"),
-        	.Target(name: "NotificationService")
-        ]),
-        Target(name: "EasyLogin", dependencies: [
-            .Target(name: "Application"),
-            .Target(name: "Extensions"),
-            .Target(name: "EasyLoginDirectoryService"),
-            .Target(name: "NotificationService")
-        ])
+    products: [
+        .executable(
+            name: "EasyLogin",
+            targets: ["EasyLogin"]),
+        .executable(
+            name: "EasyLoginBootstrap",
+            targets: ["EasyLoginBootstrap"]),
     ],
     dependencies: [
-    	.Package(url: "https://github.com/IBM-Swift/Kitura.git", majorVersion: 2, minor: 0),
-    	.Package(url: "https://github.com/IBM-Swift/Kitura-CouchDB.git", majorVersion: 1, minor: 7),
-    	.Package(url: "https://github.com/IBM-Swift/Kitura-WebSocket.git", majorVersion: 0, minor: 9),
-    	.Package(url: "https://github.com/IBM-Swift/HeliumLogger.git", majorVersion: 1, minor: 7),
-    	.Package(url: "https://github.com/IBM-Swift/CloudConfiguration.git", majorVersion: 2, minor: 0),
-        .Package(url: "https://github.com/IBM-Swift/BlueCryptor.git", majorVersion: 0, minor: 8)
+        .package(url: "https://github.com/IBM-Swift/Kitura.git", from: "2.0.0"),
+        .package(url: "https://github.com/IBM-Swift/Kitura-CouchDB.git", from: "1.7.0"),
+        .package(url: "https://github.com/IBM-Swift/Kitura-WebSocket.git", from: "0.9.0"),
+        .package(url: "https://github.com/IBM-Swift/HeliumLogger.git", from: "1.7.0"),
+        .package(url: "https://github.com/IBM-Swift/CloudConfiguration.git", from: "2.0.0"),
+        .package(url: "https://github.com/IBM-Swift/BlueCryptor.git", from: "0.8.0"),
+    ],
+    targets: [
+        .target(
+            name: "Extensions",
+            dependencies: ["CloudConfiguration", "CouchDB", "Cryptor", "Kitura", "Kitura-WebSocket"]),
+        .target(
+            name: "NotificationService",
+            dependencies: ["Extensions"]),
+        .target(
+            name: "EasyLoginDirectoryService",
+            dependencies: ["Extensions", "NotificationService"]),
+        .target(
+            name: "Application",
+            dependencies: ["Extensions", "EasyLoginDirectoryService", "NotificationService"]),
+        .target(
+            name: "EasyLogin",
+            dependencies: ["Application", "Extensions", "EasyLoginDirectoryService", "NotificationService"]),
+        .target(
+            name: "EasyLoginBootstrap",
+            dependencies: ["Application"]),
     ]
 )
