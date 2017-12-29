@@ -67,9 +67,6 @@ public func initialize() throws {
         throw ConfigError.missingDatabaseInfo
     }
     
-    router.post(middleware:BodyParser())
-    router.put(middleware:BodyParser())
-    
     if let database = database {
         let directoryService = EasyLoginDirectoryService(database: database)
         router.all(middleware: EasyLoginAuthenticator(userProvider: database))
