@@ -14,34 +14,102 @@ import SwiftyJSON
 import Extensions
 import NotificationService
 
-struct LDAPAuthRequest: Codable {
-    struct LDAPAuthScheme: Codable {
-        let simple: String?
-    }
-    
-    let authentication: LDAPAuthScheme?
-    let name: String?
-    let version: Int?
-}
-
-struct LDAPAuthResponse: Codable {
-    let isAuthenticated: Bool
-    let message: String?
-}
+// MARK: - LDAP REST Backend, Class V1
 
 class APIForLDAPBridgeV1 {
     let database: Database
     
     init(database: Database) {
         self.database = database
+        
+        
+        let ldapDesignPath: String
+        if let environmentVariable = getenv("RESOURCES"), let resourcePath = String(validatingUTF8: environmentVariable) {
+            ldapDesignPath = "\(resourcePath)/ldapv1_design.json"
+        }
+        else {
+            ldapDesignPath = "Resources/ldapv1_design.json"
+        }
+        
+        guard let json = try? String(contentsOfFile: ldapDesignPath, encoding:.utf8) else {
+            Log.error("cannot load file \(ldapDesignPath)")
+            return
+        }
+        let ldapDesign = JSON.parse(string: json)
+        
+        database.retrieve("_design/ldapv1_design") { (oldDocument, error) in
+            if let oldDocument = oldDocument, let rev = oldDocument["_rev"].string {
+                database.update("_design/ldapv1_design", rev: rev, document: ldapDesign, callback: { (_, _, error) in
+                    if error == nil {
+                        Log.info("Design document for LDAP v1 updated")
+                    }
+                })
+            } else {
+                database.createDesign("ldapv1_design", document: ldapDesign) { (result, error) in
+                    Log.info("LDAP database index creation: \(String(describing: result))")
+                }
+            }
+        }
     }
     
+    // MARK: Handler and handler management
     func installHandlers(to router: Router) {
         router.post("/v1/auth", handler: handleLDAPAuthentication)
+        router.post("/v1/search", handler: handleLDAPSearch)
     }
-
-    func handleLDAPAuthentication(authRequest: LDAPAuthRequest, completion:@escaping (LDAPAuthResponse?, RequestError?) -> Void) -> Void {
+    
+    func handleLDAPSearch(searchRequest: LDAPSearchRequest, completion:@escaping ([LDAPRecord]?, RequestError?) -> Void) -> Void {
+        guard let ldapFilter = searchRequest.filter else {
+            completion(nil, RequestError.unprocessableEntity)
+            return
+        }
+       
+        guard let collectionName = recordTypeFromSearchBase(searchRequest.baseObject) else {
+            completion(nil, RequestError.unauthorized)
+            return
+        }
         
+        let databaseViewForSearch: String
+        if collectionName == "users" {
+            databaseViewForSearch = "all_users"
+        } else {
+            completion(nil, RequestError.unauthorized)
+            return
+        }
+       
+        database.queryByView(databaseViewForSearch, ofDesign: "ldapv1_design", usingParameters: []) { (databaseResponse, error) in
+            guard let databaseResponse = databaseResponse else {
+                completion(nil, RequestError.internalServerError)
+                return
+            }
+            
+            let jsonDecoder = JSONDecoder()
+            
+            let ldapRecords = databaseResponse["rows"].array?.flatMap { user -> LDAPRecord? in
+                guard let rawJSON = try? user["value"].rawData() else {
+                    return nil
+                }
+                
+                guard let record = try? jsonDecoder.decode(LDAPRecord.self, from:rawJSON) else {
+                    return nil
+                }
+                
+                return record
+            }
+            
+            if let ldapRecords = ldapRecords {
+                if let result = self.perform(ldapFilter: ldapFilter, onRecords: ldapRecords) {
+                    completion(result, RequestError.ok)
+                } else {
+                    completion(nil, RequestError.internalServerError)
+                }
+            } else {
+                completion(nil, RequestError.internalServerError)
+            }
+        }
+    }
+    
+    func handleLDAPAuthentication(authRequest: LDAPAuthRequest, completion:@escaping (LDAPAuthResponse?, RequestError?) -> Void) -> Void {
         guard let username = authRequest.name else {
             completion(LDAPAuthResponse(isAuthenticated: false, message: "Username not provided"), RequestError.unauthorized)
             return
@@ -75,7 +143,159 @@ class APIForLDAPBridgeV1 {
                 completion(LDAPAuthResponse(isAuthenticated: false, message: "Unsupported authentication methods"), RequestError.unauthorized)
             }
         }
+    }
+    
+    // MARK: Subroutines for LDAP search
+    func perform(ldapFilter: LDAPFilter, onRecords ldapRecords: [LDAPRecord]) -> [LDAPRecord]? {
+
         
-        completion(LDAPAuthResponse(isAuthenticated: false, message: "Unkown failure"), RequestError.unauthorized)
+        // AND Operator
+        if let nestedFilters = ldapFilter.and {
+            var combinedResult = [LDAPRecord]()
+            var firstLoop = true
+            
+            for nestedFilter in nestedFilters {
+                if let nestedResult = perform(ldapFilter: nestedFilter, onRecords: ldapRecords) {
+                    
+                    if firstLoop {
+                        combinedResult.append(contentsOf: nestedResult)
+                        firstLoop = false
+                    } else {
+                        combinedResult = combinedResult.filter({ (recordFromCombinedResult) -> Bool in
+                            return nestedResult.contains(recordFromCombinedResult)
+                        })
+                    }
+                } else {
+                    return nil
+                }
+            }
+        }
+            
+            // OR Operator
+        else if let nestedFilters = ldapFilter.or {
+            var combinedResult = [LDAPRecord]()
+            
+            for nestedFilter in nestedFilters {
+                if let nestedResult = perform(ldapFilter: nestedFilter, onRecords: ldapRecords) {
+                    combinedResult.append(contentsOf: nestedResult)
+                } else {
+                    return nil
+                }
+            }
+        }
+            
+            
+            // NOT Operator
+        else if let nestedFilter = ldapFilter.not {
+            if let resultToSkip = perform(ldapFilter: nestedFilter, onRecords: ldapRecords) {
+                return ldapRecords.filter({ (recordToEvaluate) -> Bool in
+                    return !resultToSkip.contains(recordToEvaluate)
+                })
+            } else {
+                return nil
+            }
+        }
+            
+            // Equality Match Operation
+        else if let equalityMatch = ldapFilter.equalityMatch {
+            return ldapRecords.filter({ (recordToCheck) -> Bool in
+                switch equalityMatch.attributeDesc {
+                case "entryUUID":
+                    return recordToCheck.entryUUID == equalityMatch.assertionValue
+//                case "uidNumber":
+//                    return recordToCheck.uidNumber == equalityMatch.assertionValue
+                case "uid":
+                    return recordToCheck.uid == equalityMatch.assertionValue
+                case "userPrincipalName":
+                    return recordToCheck.userPrincipalName == equalityMatch.assertionValue
+                case "mail":
+                    return recordToCheck.mail == equalityMatch.assertionValue
+                case "givenName":
+                    return recordToCheck.givenName == equalityMatch.assertionValue
+                case "sn":
+                    return recordToCheck.sn == equalityMatch.assertionValue
+                case "cn":
+                    return recordToCheck.cn == equalityMatch.assertionValue
+                default:
+                    return false
+                }
+            })
+        }
+            // Substrings Operation
+        else if let substringsFilter = ldapFilter.substrings {
+            
+            return ldapRecords.filter({ (recordToCheck) -> Bool in
+                let valueToEvaluate: String?
+                switch substringsFilter.type {
+                case "entryUUID":
+                    valueToEvaluate = recordToCheck.entryUUID
+                case "uid":
+                    valueToEvaluate = recordToCheck.uid
+                case "userPrincipalName":
+                    valueToEvaluate = recordToCheck.userPrincipalName
+                case "mail":
+                    valueToEvaluate = recordToCheck.mail
+                case "givenName":
+                    valueToEvaluate = recordToCheck.givenName
+                case "sn":
+                    valueToEvaluate = recordToCheck.sn
+                case "cn":
+                    valueToEvaluate = recordToCheck.cn
+                default:
+                    valueToEvaluate = nil
+                }
+                
+                if let valueToEvaluate = valueToEvaluate {
+                    for substrings in substringsFilter.substrings {
+                        for (matchType, value) in substrings {
+                            switch matchType {
+                            case "any":
+                                if valueToEvaluate.contains(value) {
+                                    return true
+                                }
+                            case "initial":
+                                if valueToEvaluate.hasPrefix(value) {
+                                    return true
+                                }
+                            case "final":
+                                if valueToEvaluate.hasSuffix(value) {
+                                    return true
+                                }
+                            default:
+                                return false
+                            }
+                        }
+                    }
+                    return false
+                } else {
+                    return false
+                }
+            })
+        }
+            
+            // Unkown operator or operation
+        else {
+            return nil
+        }
+        return nil
+    }
+  
+    func recordTypeFromSearchBase(_ ldapSearchBase: String) -> String? {
+        if ldapSearchBase.hasSuffix(",dc=easylogin,dc=proxy") {
+            let requestedTree = ldapSearchBase.replacingOccurrences(of: ",dc=easylogin,dc=proxy", with: "")
+            let requestedTreeFields = requestedTree.split(separator: ",")
+            
+            if requestedTreeFields.count == 1 {
+                let requestForType = requestedTreeFields[0]
+                let requestForTypeFields = requestForType.split(separator: "=")
+                
+                if requestForTypeFields.count == 2 {
+                    if requestForTypeFields[0] == "cn" {
+                        return String(requestForTypeFields[1])
+                    }
+                }
+            }
+        }
+        return nil
     }
 }
