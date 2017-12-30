@@ -169,6 +169,8 @@ class APIForLDAPBridgeV1 {
                     return nil
                 }
             }
+            
+            return combinedResult
         }
             
             // OR Operator
@@ -182,6 +184,8 @@ class APIForLDAPBridgeV1 {
                     return nil
                 }
             }
+            
+            return combinedResult
         }
             
             
