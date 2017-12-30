@@ -322,6 +322,8 @@ class APIForLDAPBridgeV1 {
                     testedValue = recordToCheck.sn
                 case "cn":
                     testedValue = recordToCheck.cn
+                case "objectClass", "objectCategory":
+                    testedValues = recordToCheck.objectClass
                 default:
                     testedValue = nil
                 }
@@ -363,7 +365,7 @@ class APIForLDAPBridgeV1 {
                     valueToEvaluate = recordToCheck.cn
                 case "dn":
                     valueToEvaluate = recordToCheck.dn
-                case "objectClass":
+                case "objectClass", "objectCategory":
                     valuesToEvaluate = recordToCheck.objectClass
                 default:
                     valueToEvaluate = nil
@@ -447,7 +449,7 @@ class APIForLDAPBridgeV1 {
                     } else {
                         return false
                     }
-                case "objectClass":
+                case "objectClass", "objectCategory":
                     if let objectClasses = recordToCheck.objectClass {
                         return objectClasses.count > 0
                     } else {
