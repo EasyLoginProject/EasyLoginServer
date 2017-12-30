@@ -114,6 +114,7 @@ struct LDAPSearchRequest: Codable {
 
 struct LDAPRecord: Codable, Equatable {
     let entryUUID: String
+    
     let uidNumber: Int?
     let uid: String?
     let userPrincipalName: String?
@@ -121,6 +122,9 @@ struct LDAPRecord: Codable, Equatable {
     let givenName: String?
     let sn: String?
     let cn: String?
+    
+    var dn: String?
+    var objectClass: [String]?
     
     static func ==(lhs: LDAPRecord, rhs: LDAPRecord) -> Bool {
         return lhs.entryUUID == rhs.entryUUID
