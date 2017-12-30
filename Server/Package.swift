@@ -29,8 +29,11 @@ let package = Package(
             name: "EasyLoginDirectoryService",
             dependencies: ["Extensions", "NotificationService"]),
         .target(
+            name: "EasyLoginAPIForLDAPBridge",
+            dependencies: ["Extensions", "NotificationService"]),
+        .target(
             name: "Application",
-            dependencies: ["Extensions", "EasyLoginDirectoryService", "NotificationService"]),
+            dependencies: ["Extensions", "EasyLoginDirectoryService", "NotificationService", "EasyLoginAPIForLDAPBridge"]),
         .target(
             name: "EasyLogin",
             dependencies: ["Application", "Extensions", "EasyLoginDirectoryService", "NotificationService"]),
