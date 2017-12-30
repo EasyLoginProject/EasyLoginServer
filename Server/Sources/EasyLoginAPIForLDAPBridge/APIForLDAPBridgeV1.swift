@@ -19,6 +19,32 @@ import NotificationService
 class APIForLDAPBridgeV1 {
     let database: Database
     
+    let rootDSE = LDAPRootDSE(namingContexts: ["dc=easylogin,dc=proxy"],
+                              subschemaSubentry: ["cn=schema"],
+                              supportedLDAPVersion: ["3"],
+                              supportedSASLMechanisms: [],
+                              supportedExtension: [],
+                              supportedControl: [],
+                              supportedFeatures: [],
+                              vendorName: ["EasyLogin"],
+                              vendorVersion: ["1"],
+                              objectClass: ["top"])
+
+    let baseContainer = LDAPDomain(entryUUID: "00000000-0000-0000-0000-000000000000",
+                                   dn: "dc=easylogin,dc=proxy",
+                                   objectClass: ["top", "domain"],
+                                   domain: "easylogin")
+    
+    let userContainer = LDAPContainer(entryUUID: "00000000-0000-0000-0000-000000000001",
+                                      dn: "cn=users,dc=easylogin,dc=proxy",
+                                      objectClass: ["top", "container"],
+                                      cn: "users")
+    
+    let groupContainer = LDAPContainer(entryUUID: "00000000-0000-0000-0000-000000000002",
+                                       dn: "cn=groups,dc=easylogin,dc=proxy",
+                                       objectClass: ["top", "container"],
+                                       cn: "groups")
+    
     init(database: Database) {
         self.database = database
         
@@ -56,6 +82,48 @@ class APIForLDAPBridgeV1 {
     func installHandlers(to router: Router) {
         router.ldapPOST("/v1/auth", handler: handleLDAPAuthentication)
         router.ldapPOST("/v1/search", handler: handleLDAPSearch)
+        router.get("/v1/rootdse", handler: handleRootDSERequest)
+        router.get("/v1/firstlevelcontainers", handler: handleFirstLevelContrainers)
+        router.get("/v1/basecontainer", handler: handleBaseObjectInfo)
+    }
+    
+    func handleBaseObjectInfo(request: RouterRequest, response: RouterResponse, next: ()->Void) -> Void {
+        if let encodedRootObjects = try? JSONEncoder().encode(baseContainer) {
+            response.headers.setType("json")
+            response.status(.OK)
+            response.send(data: encodedRootObjects)
+        } else {
+            response.status(.internalServerError)
+        }
+        
+        next()
+    }
+    
+    func handleFirstLevelContrainers(request: RouterRequest, response: RouterResponse, next: ()->Void) -> Void {
+        
+        let rootObjects = [userContainer, groupContainer]
+        
+        if let encodedRootObjects = try? JSONEncoder().encode(rootObjects) {
+            response.headers.setType("json")
+            response.status(.OK)
+            response.send(data: encodedRootObjects)
+        } else {
+            response.status(.internalServerError)
+        }
+        
+        next()
+    }
+    
+    func handleRootDSERequest(request: RouterRequest, response: RouterResponse, next: ()->Void) -> Void {
+        if let encodedRootDSE = try? JSONEncoder().encode(rootDSE) {
+            response.headers.setType("json")
+            response.status(.OK)
+            response.send(data: encodedRootDSE)
+        } else {
+            response.status(.internalServerError)
+        }
+        
+        next()
     }
     
     func handleLDAPSearch(searchRequest: LDAPSearchRequest, completion:@escaping ([LDAPRecord]?, RequestError?) -> Void) -> Void {
@@ -63,59 +131,78 @@ class APIForLDAPBridgeV1 {
             completion(nil, RequestError.unprocessableEntity)
             return
         }
-       
-        guard let collectionName = recordTypeFromSearchBase(searchRequest.baseObject) else {
+        
+        
+        guard let (collectionName, requestedID) = recordTypeFromSearchBase(searchRequest.baseObject) else {
             completion(nil, RequestError.unauthorized)
             return
         }
         
-        let databaseViewForSearch: String
         if collectionName == "users" {
-            databaseViewForSearch = "all_users"
-        } else if collectionName == "general_server_info" {
+            if let requestedID = requestedID {
+                database.retrieve(requestedID, callback: { (document: JSON?, error: NSError?) in
+                    guard let document = document else {
+                        completion(nil, RequestError.notFound)
+                        return
+                    }
+                    do {
+                        let record = try LDAPRecord(databaseRecordForUser: document)
+                        completion([record], RequestError.ok)
+                    }
+                    catch {
+                        completion(nil, RequestError.internalServerError)
+                    }
+                })
+            } else {
+                if searchRequest.scope == 0 {
+                    completion(nil, RequestError.unprocessableEntity)
+                } else {
+                    database.queryByView("all_users", ofDesign: "ldapv1_design", usingParameters: []) { (databaseResponse, error) in
+                        guard let databaseResponse = databaseResponse else {
+                            completion(nil, RequestError.internalServerError)
+                            return
+                        }
+                        
+                        let jsonDecoder = JSONDecoder()
+                        
+                        let ldapRecords = databaseResponse["rows"].array?.flatMap { user -> LDAPRecord? in
+                            guard let rawJSON = try? user["value"].rawData() else {
+                                return nil
+                            }
+                            
+                            guard var record = try? jsonDecoder.decode(LDAPRecord.self, from:rawJSON) else {
+                                return nil
+                            }
+                            
+                            record.dn = "entryUUID=\(record.entryUUID),cn=\(collectionName),dc=easylogin,dc=proxy"
+                            record.hasSubordinates = "FALSE"
+                            if collectionName == "users" {
+                                record.objectClass = ["inetOrgPerson", "posixAccount"]
+                            }
+                            
+                            return record
+                        }
+                        
+                        if let ldapRecords = ldapRecords {
+                            if let result = self.perform(ldapFilter: ldapFilter, onRecords: ldapRecords) {
+                                completion(result, RequestError.ok)
+                            } else {
+                                completion(nil, RequestError.internalServerError)
+                            }
+                        } else {
+                            completion(nil, RequestError.internalServerError)
+                        }
+                    }
+                }
+            }
             
-            return
+            completion(nil, RequestError.unsupportedMediaType)
         } else {
             completion(nil, RequestError.unauthorized)
             return
         }
-       
-        database.queryByView(databaseViewForSearch, ofDesign: "ldapv1_design", usingParameters: []) { (databaseResponse, error) in
-            guard let databaseResponse = databaseResponse else {
-                completion(nil, RequestError.internalServerError)
-                return
-            }
-            
-            let jsonDecoder = JSONDecoder()
-            
-            let ldapRecords = databaseResponse["rows"].array?.flatMap { user -> LDAPRecord? in
-                guard let rawJSON = try? user["value"].rawData() else {
-                    return nil
-                }
-                
-                guard var record = try? jsonDecoder.decode(LDAPRecord.self, from:rawJSON) else {
-                    return nil
-                }
-                
-                record.dn = "entryUUID=\(record.entryUUID),cn=\(collectionName),dc=easylogin,dc=proxy"
-                
-                if collectionName == "users" {
-                    record.objectClass = ["inetOrgPerson", "posixAccount"]
-                }
-                
-                return record
-            }
-            
-            if let ldapRecords = ldapRecords {
-                if let result = self.perform(ldapFilter: ldapFilter, onRecords: ldapRecords) {
-                    completion(result, RequestError.ok)
-                } else {
-                    completion(nil, RequestError.internalServerError)
-                }
-            } else {
-                completion(nil, RequestError.internalServerError)
-            }
-        }
+        
+
     }
     
     func handleLDAPAuthentication(authRequest: LDAPAuthRequest, completion:@escaping (LDAPAuthResponse?, RequestError?) -> Void) -> Void {
@@ -157,7 +244,6 @@ class APIForLDAPBridgeV1 {
     // MARK: Subroutines for LDAP search
     func perform(ldapFilter: LDAPFilter, onRecords ldapRecords: [LDAPRecord]) -> [LDAPRecord]? {
 
-        
         // AND Operator
         if let nestedFilters = ldapFilter.and {
             var combinedResult = [LDAPRecord]()
@@ -377,7 +463,7 @@ class APIForLDAPBridgeV1 {
         return nil
     }
   
-    func recordTypeFromSearchBase(_ ldapSearchBase: String) -> String? {
+    func recordTypeFromSearchBase(_ ldapSearchBase: String) -> (String,String?)? {
         if ldapSearchBase.hasSuffix(",dc=easylogin,dc=proxy") {
             let requestedTree = ldapSearchBase.replacingOccurrences(of: ",dc=easylogin,dc=proxy", with: "")
             let requestedTreeFields = requestedTree.split(separator: ",")
@@ -388,12 +474,23 @@ class APIForLDAPBridgeV1 {
                 
                 if requestForTypeFields.count == 2 {
                     if requestForTypeFields[0] == "cn" {
-                        return String(requestForTypeFields[1])
+                        return (String(requestForTypeFields[1]), nil)
+                    }
+                }
+            } else if requestedTreeFields.count == 2 {
+                let requestForTypeFieldsForLeaf = requestedTreeFields[0].split(separator: "=")
+                let requestForTypeFieldsForNode = requestedTreeFields[1].split(separator: "=")
+                
+                if requestForTypeFieldsForLeaf.count == 2 {
+                    if requestForTypeFieldsForLeaf[0] == "entryUUID" {
+                        if requestForTypeFieldsForNode.count == 2 {
+                            if requestForTypeFieldsForNode[0] == "cn" {
+                                return (String(requestForTypeFieldsForNode[1]), String(requestForTypeFieldsForLeaf[1]))
+                            }
+                        }
                     }
                 }
             }
-        } else if ldapSearchBase == "" {
-            return "general_server_info"
         }
         
         return nil
