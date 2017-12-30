@@ -54,8 +54,8 @@ class APIForLDAPBridgeV1 {
     
     // MARK: Handler and handler management
     func installHandlers(to router: Router) {
-        router.post("/v1/auth", handler: handleLDAPAuthentication)
-        router.post("/v1/search", handler: handleLDAPSearch)
+        router.ldapPOST("/v1/auth", handler: handleLDAPAuthentication)
+        router.ldapPOST("/v1/search", handler: handleLDAPSearch)
     }
     
     func handleLDAPSearch(searchRequest: LDAPSearchRequest, completion:@escaping ([LDAPRecord]?, RequestError?) -> Void) -> Void {
