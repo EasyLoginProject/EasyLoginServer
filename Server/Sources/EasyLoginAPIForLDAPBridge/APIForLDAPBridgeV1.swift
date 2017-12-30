@@ -212,7 +212,9 @@ class APIForLDAPBridgeV1 {
             // Equality Match Operation
         else if let equalityMatch = ldapFilter.equalityMatch {
             return ldapRecords.filter({ (recordToCheck) -> Bool in
-                let testedValue: String?
+                var testedValue: String?
+                var testedValues: [String]?
+                
                 switch equalityMatch.attributeDesc {
                 case "entryUUID":
                     testedValue = recordToCheck.entryUUID
@@ -239,10 +241,17 @@ class APIForLDAPBridgeV1 {
                 }
                 
                 if let testedValue = testedValue {
-                    return testedValue == equalityMatch.assertionValue
-                } else {
-                    return false
+                    testedValues = [testedValue]
                 }
+                
+                if let testedValues = testedValues {
+                    for testedValue in testedValues {
+                        if testedValue == equalityMatch.assertionValue {
+                            return true
+                        }
+                    }
+                }
+                return false
             })
         }
             // Substrings Operation
@@ -251,44 +260,31 @@ class APIForLDAPBridgeV1 {
             return ldapRecords.filter({ (recordToCheck) -> Bool in
                 var valueToEvaluate: String?
                 var valuesToEvaluate: [String]?
-                let isMultivalued: Bool
                 switch substringsFilter.type {
                 case "entryUUID":
                     valueToEvaluate = recordToCheck.entryUUID
-                    isMultivalued = false
                 case "uid":
                     valueToEvaluate = recordToCheck.uid
-                    isMultivalued = false
                 case "userPrincipalName":
                     valueToEvaluate = recordToCheck.userPrincipalName
-                    isMultivalued = false
                 case "mail":
                     valueToEvaluate = recordToCheck.mail
-                    isMultivalued = false
                 case "givenName":
                     valueToEvaluate = recordToCheck.givenName
-                    isMultivalued = false
                 case "sn":
                     valueToEvaluate = recordToCheck.sn
-                    isMultivalued = false
                 case "cn":
                     valueToEvaluate = recordToCheck.cn
-                    isMultivalued = false
                 case "dn":
                     valueToEvaluate = recordToCheck.dn
-                    isMultivalued = false
                 case "objectClass":
                     valuesToEvaluate = recordToCheck.objectClass
-                    isMultivalued = true
                 default:
                     valueToEvaluate = nil
-                    isMultivalued = false
                 }
                 
-                if !isMultivalued {
-                    if let valueToEvaluate = valueToEvaluate {
-                        valuesToEvaluate = [valueToEvaluate]
-                    }
+                if let valueToEvaluate = valueToEvaluate {
+                    valuesToEvaluate = [valueToEvaluate]
                 }
                 
                 if let valuesToEvaluate = valuesToEvaluate {
