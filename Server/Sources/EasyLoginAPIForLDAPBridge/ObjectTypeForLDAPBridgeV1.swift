@@ -46,12 +46,15 @@ class LDAPFilter: Codable {
     let or: [LDAPFilter]?
     let not: LDAPFilter?
     
+    let present: String?
+    
     enum RepresentedFilterNode {
         case equalityMatch
         case substrings
         case and
         case or
         case not
+        case present
         case unkown
     }
     
@@ -71,6 +74,8 @@ class LDAPFilter: Codable {
         } else if let _ = not {
             return .not
             
+        } else if let _ = present {
+            return .present
         }
         
         return .unkown

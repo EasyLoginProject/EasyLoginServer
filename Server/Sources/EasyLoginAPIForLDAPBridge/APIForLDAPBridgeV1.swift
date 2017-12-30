@@ -72,6 +72,9 @@ class APIForLDAPBridgeV1 {
         let databaseViewForSearch: String
         if collectionName == "users" {
             databaseViewForSearch = "all_users"
+        } else if collectionName == "general_server_info" {
+            
+            return
         } else {
             completion(nil, RequestError.unauthorized)
             return
@@ -246,58 +249,135 @@ class APIForLDAPBridgeV1 {
         else if let substringsFilter = ldapFilter.substrings {
             
             return ldapRecords.filter({ (recordToCheck) -> Bool in
-                let valueToEvaluate: String?
+                var valueToEvaluate: String?
+                var valuesToEvaluate: [String]?
+                let isMultivalued: Bool
                 switch substringsFilter.type {
                 case "entryUUID":
                     valueToEvaluate = recordToCheck.entryUUID
+                    isMultivalued = false
                 case "uid":
                     valueToEvaluate = recordToCheck.uid
+                    isMultivalued = false
                 case "userPrincipalName":
                     valueToEvaluate = recordToCheck.userPrincipalName
+                    isMultivalued = false
                 case "mail":
                     valueToEvaluate = recordToCheck.mail
+                    isMultivalued = false
                 case "givenName":
                     valueToEvaluate = recordToCheck.givenName
+                    isMultivalued = false
                 case "sn":
                     valueToEvaluate = recordToCheck.sn
+                    isMultivalued = false
                 case "cn":
                     valueToEvaluate = recordToCheck.cn
+                    isMultivalued = false
+                case "dn":
+                    valueToEvaluate = recordToCheck.dn
+                    isMultivalued = false
+                case "objectClass":
+                    valuesToEvaluate = recordToCheck.objectClass
+                    isMultivalued = true
                 default:
                     valueToEvaluate = nil
+                    isMultivalued = false
                 }
                 
-                if let valueToEvaluate = valueToEvaluate {
-                    for substrings in substringsFilter.substrings {
-                        for (matchType, value) in substrings {
-                            switch matchType {
-                            case "any":
-                                if valueToEvaluate.contains(value) {
-                                    return true
+                if !isMultivalued {
+                    if let valueToEvaluate = valueToEvaluate {
+                        valuesToEvaluate = [valueToEvaluate]
+                    }
+                }
+                
+                if let valuesToEvaluate = valuesToEvaluate {
+                    for valueToEvaluate in valuesToEvaluate {
+                        for substrings in substringsFilter.substrings {
+                            for (matchType, value) in substrings {
+                                switch matchType {
+                                case "any":
+                                    if valueToEvaluate.contains(value) {
+                                        return true
+                                    }
+                                case "initial":
+                                    if valueToEvaluate.hasPrefix(value) {
+                                        return true
+                                    }
+                                case "final":
+                                    if valueToEvaluate.hasSuffix(value) {
+                                        return true
+                                    }
+                                default: break
                                 }
-                            case "initial":
-                                if valueToEvaluate.hasPrefix(value) {
-                                    return true
-                                }
-                            case "final":
-                                if valueToEvaluate.hasSuffix(value) {
-                                    return true
-                                }
-                            default:
-                                return false
                             }
                         }
                     }
                     return false
-                } else {
+                }
+                
+                return false
+            })
+        } else if let mustBePresent = ldapFilter.present {
+            return ldapRecords.filter({ (recordToCheck) -> Bool in
+                switch mustBePresent {
+                case "entryUUID":
+                    return true
+                case "uid":
+                    if let _ = recordToCheck.uid {
+                        return true
+                    } else {
+                        return false
+                    }
+                case "userPrincipalName":
+                    if let _ = recordToCheck.userPrincipalName {
+                        return true
+                    } else {
+                        return false
+                    }
+                case "mail":
+                    if let _ = recordToCheck.mail {
+                        return true
+                    } else {
+                        return false
+                    }
+                case "givenName":
+                    if let _ = recordToCheck.givenName {
+                        return true
+                    } else {
+                        return false
+                    }
+                case "sn":
+                    if let _ = recordToCheck.sn {
+                        return true
+                    } else {
+                        return false
+                    }
+                case "cn":
+                    if let _ = recordToCheck.cn {
+                        return true
+                    } else {
+                        return false
+                    }
+                case "dn":
+                    if let _ = recordToCheck.dn {
+                        return true
+                    } else {
+                        return false
+                    }
+                case "objectClass":
+                    if let objectClasses = recordToCheck.objectClass {
+                        return objectClasses.count > 0
+                    } else {
+                        return false
+                    }
+                default:
                     return false
                 }
             })
         }
             
             // Unkown operator or operation
-        else {
-            return nil
-        }
         return nil
     }
   
@@ -316,7 +396,10 @@ class APIForLDAPBridgeV1 {
                     }
                 }
             }
+        } else if ldapSearchBase == "" {
+            return "general_server_info"
         }
+        
         return nil
     }
 }
