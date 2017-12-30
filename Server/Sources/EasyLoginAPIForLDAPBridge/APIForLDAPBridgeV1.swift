@@ -90,8 +90,14 @@ class APIForLDAPBridgeV1 {
                     return nil
                 }
                 
-                guard let record = try? jsonDecoder.decode(LDAPRecord.self, from:rawJSON) else {
+                guard var record = try? jsonDecoder.decode(LDAPRecord.self, from:rawJSON) else {
                     return nil
+                }
+                
+                record.dn = "entryUUID=\(record.entryUUID),cn=\(collectionName),dc=easylogin,dc=proxy"
+                
+                if collectionName == "users" {
+                    record.objectClass = ["inetOrgPerson", "posixAccount"]
                 }
                 
                 return record
@@ -203,24 +209,35 @@ class APIForLDAPBridgeV1 {
             // Equality Match Operation
         else if let equalityMatch = ldapFilter.equalityMatch {
             return ldapRecords.filter({ (recordToCheck) -> Bool in
+                let testedValue: String?
                 switch equalityMatch.attributeDesc {
                 case "entryUUID":
-                    return recordToCheck.entryUUID == equalityMatch.assertionValue
-//                case "uidNumber":
-//                    return recordToCheck.uidNumber == equalityMatch.assertionValue
+                    testedValue = recordToCheck.entryUUID
+                case "uidNumber":
+                    if let uidNumber = recordToCheck.uidNumber {
+                        testedValue = String(uidNumber)
+                    } else {
+                        testedValue = nil
+                    }
                 case "uid":
-                    return recordToCheck.uid == equalityMatch.assertionValue
+                    testedValue = recordToCheck.uid
                 case "userPrincipalName":
-                    return recordToCheck.userPrincipalName == equalityMatch.assertionValue
+                    testedValue = recordToCheck.userPrincipalName
                 case "mail":
-                    return recordToCheck.mail == equalityMatch.assertionValue
+                    testedValue = recordToCheck.mail
                 case "givenName":
-                    return recordToCheck.givenName == equalityMatch.assertionValue
+                    testedValue = recordToCheck.givenName
                 case "sn":
-                    return recordToCheck.sn == equalityMatch.assertionValue
+                    testedValue = recordToCheck.sn
                 case "cn":
-                    return recordToCheck.cn == equalityMatch.assertionValue
+                    testedValue = recordToCheck.cn
                 default:
+                    testedValue = nil
+                }
+                
+                if let testedValue = testedValue {
+                    return testedValue == equalityMatch.assertionValue
+                } else {
                     return false
                 }
             })
