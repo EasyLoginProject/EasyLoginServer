@@ -12,8 +12,8 @@ import Kitura
 
 public class LDAPGatewayAPI {
     let v1Gateway: LDAPGatewayAPIv1
-    public init(database: Database) {
-        v1Gateway = LDAPGatewayAPIv1(database:database)
+    public init() throws {
+        v1Gateway = try LDAPGatewayAPIv1()
     }
     
     public func router() -> Router {

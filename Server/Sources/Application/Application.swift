@@ -72,7 +72,7 @@ public func initialize() throws {
         router.all(middleware: EasyLoginAuthenticator(userProvider: database))
         router.all("/db", middleware: directoryService.router())
         
-        let ldapGatewayAPI = LDAPGatewayAPI(database: database)
+        let ldapGatewayAPI = try LDAPGatewayAPI()
         router.all("/ldap", middleware: ldapGatewayAPI.router())
         
         let notificationService = installNotificationService()
