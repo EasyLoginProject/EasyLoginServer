@@ -21,22 +21,22 @@ let package = Package(
     ],
     targets: [
         .target(
-            name: "Extensions",
-            dependencies: ["CloudConfiguration", "CouchDB", "Cryptor", "Kitura", "Kitura-WebSocket"]),
-        .target(
             name: "NotificationService",
             dependencies: ["Extensions"]),
+        .target(
+            name: "Extensions",
+            dependencies: ["CloudConfiguration", "CouchDB", "Cryptor", "Kitura", "Kitura-WebSocket"]),
         .target(
             name: "EasyLoginDirectoryService",
             dependencies: ["Extensions", "NotificationService"]),
         .target(
-            name: "EasyLoginAPIForLDAPBridge",
+            name: "EasyLoginLDAPGatewayAPI",
             dependencies: ["Extensions", "NotificationService"]),
         .target(
             name: "Application",
-            dependencies: ["Extensions", "EasyLoginDirectoryService", "NotificationService", "EasyLoginAPIForLDAPBridge"]),
+            dependencies: ["Extensions", "EasyLoginDirectoryService", "NotificationService", "EasyLoginLDAPGatewayAPI"]),
         .target(
             name: "EasyLogin",
-            dependencies: ["Application", "Extensions", "EasyLoginDirectoryService", "NotificationService"]),
+            dependencies: ["Application"]),
     ]
 )
