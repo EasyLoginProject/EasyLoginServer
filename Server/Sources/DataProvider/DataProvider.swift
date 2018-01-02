@@ -152,48 +152,83 @@ public class DataProvider {
         }
     }
     
-    public func managedUser(withLogin login:String, completion: @escaping (ManagedUser?, CombinedError?) -> Void) {
-        if login.contains("@") {
-            jsonData(fromView: "user_brief_by_principalName", ofDesign: "main_design", usingParameters: [.keys([login as AnyObject])], completion: { (jsonData, jsonError) in
-                if let jsonData = jsonData {
-                    do {
-                        let jsonDecoder = JSONDecoder()
-                        jsonDecoder.userInfo[.managedObjectCodingStrategy] = ManagedObjectCodingStrategy.briefEncoding
-                        let viewResults = try jsonDecoder.decode(CouchDBViewResult<ManagedUser>.self, from: jsonData)
-                        
-                        if viewResults.rows.count != 1 {
-                            completion(nil, nil)
-                        } else {
-                            completion(viewResults.rows.first?.value, nil)
-                        }
-                    } catch {
-                        completion(nil, CombinedError(swiftError: error, cocoaError: nil))
-                    }
-                } else {
-                    completion(nil, CombinedError(swiftError: nil, cocoaError: jsonError))
+    public func completeManagedObjects<T: ManagedObject>(ofType:T.Type, completion: @escaping ([T]?, CombinedError?) -> Void) -> Void {
+        jsonData(fromView: T.viewToListThemAll(), ofDesign: T.designFile(), usingParameters: [.includeDocs(true)]) { (jsonData, jsonError) in
+            if let jsonData = jsonData {
+                do {
+                    let strategy: ManagedObjectCodingStrategy = .databaseEncoding
+                    let jsonDecoder = JSONDecoder()
+                    jsonDecoder.userInfo[.managedObjectCodingStrategy] = strategy
+                    let viewResults = try jsonDecoder.decode(CouchDBViewResult<T>.self, from: jsonData)
+                    
+                    let managedObjects = viewResults.rows.map({ (couchDBView) -> T in
+                        return couchDBView.value
+                    })
+                    
+                    completion(managedObjects, nil)
+                } catch {
+                    completion(nil, CombinedError(swiftError: error, cocoaError: nil))
                 }
-            })
-        } else {
-            jsonData(fromView: "user_brief_by_shortname", ofDesign: "main_design", usingParameters: [.keys([login as AnyObject])], completion: { (jsonData, jsonError) in
-                if let jsonData = jsonData {
-                    do {
-                        let jsonDecoder = JSONDecoder()
-                        jsonDecoder.userInfo[.managedObjectCodingStrategy] = ManagedObjectCodingStrategy.briefEncoding
-                        let viewResults = try jsonDecoder.decode(CouchDBViewResult<ManagedUser>.self, from: jsonData)
-                        
-                        if viewResults.rows.count != 1 {
-                            completion(nil, nil)
-                        } else {
-                            completion(viewResults.rows.first?.value, nil)
-                        }
-                    } catch {
-                        completion(nil, CombinedError(swiftError: error, cocoaError: nil))
-                    }
-                } else {
-                    completion(nil, CombinedError(swiftError: nil, cocoaError: jsonError))
-                }
-            })
+            } else {
+                completion(nil, CombinedError(swiftError: nil, cocoaError: jsonError))
+            }
         }
+    }
+    
+    public func managedUser(withLogin login:String, completion: @escaping (ManagedUser?, CombinedError?) -> Void) {
+        let guessedView: String
+        if login.contains("@") {
+            guessedView = "user_brief_by_principalName"
+        } else {
+            guessedView = "user_brief_by_shortname"
+        }
+        jsonData(fromView: guessedView, ofDesign: "main_design", usingParameters: [.keys([login as AnyObject])], completion: { (jsonData, jsonError) in
+            if let jsonData = jsonData {
+                do {
+                    let jsonDecoder = JSONDecoder()
+                    jsonDecoder.userInfo[.managedObjectCodingStrategy] = ManagedObjectCodingStrategy.briefEncoding
+                    let viewResults = try jsonDecoder.decode(CouchDBViewResult<ManagedUser>.self, from: jsonData)
+                    
+                    if viewResults.rows.count != 1 {
+                        completion(nil, nil)
+                    } else {
+                        completion(viewResults.rows.first?.value, nil)
+                    }
+                } catch {
+                    completion(nil, CombinedError(swiftError: error, cocoaError: nil))
+                }
+            } else {
+                completion(nil, CombinedError(swiftError: nil, cocoaError: jsonError))
+            }
+        })
+    }
+    
+    public func completeManagedUser(withLogin login:String, completion: @escaping (ManagedUser?, CombinedError?) -> Void) {
+        let guessedView: String
+        if login.contains("@") {
+            guessedView = "user_brief_by_principalName"
+        } else {
+            guessedView = "user_brief_by_shortname"
+        }
+        jsonData(fromView: guessedView, ofDesign: "main_design", usingParameters: [.keys([login as AnyObject]), .includeDocs(true)], completion: { (jsonData, jsonError) in
+            if let jsonData = jsonData {
+                do {
+                    let jsonDecoder = JSONDecoder()
+                    jsonDecoder.userInfo[.managedObjectCodingStrategy] = ManagedObjectCodingStrategy.databaseEncoding
+                    let viewResults = try jsonDecoder.decode(CouchDBViewResult<ManagedUser>.self, from: jsonData)
+                    
+                    if viewResults.rows.count != 1 {
+                        completion(nil, nil)
+                    } else {
+                        completion(viewResults.rows.first?.value, nil)
+                    }
+                } catch {
+                    completion(nil, CombinedError(swiftError: error, cocoaError: nil))
+                }
+            } else {
+                completion(nil, CombinedError(swiftError: nil, cocoaError: jsonError))
+            }
+        })
     }
 }
 

@@ -81,7 +81,7 @@ class LDAPGatewayAPIv1 {
                 next()
                 return
             } else {
-                dataProvider.managedObjects(ofType: ManagedUser.self, completion: { (managedUsers, error) in
+                dataProvider.completeManagedObjects(ofType: ManagedUser.self, completion: { (managedUsers, error) in
                     guard let managedUsers = managedUsers else {
                         response.status(.internalServerError)
                         next()
@@ -205,29 +205,22 @@ class LDAPGatewayAPIv1 {
             return
         }
         if let simplePassword = authenticationChallenges.simple {
-            dataProvider.managedUser(withLogin: username) { (managedUser, error) in
+            dataProvider.completeManagedUser(withLogin: username) { (managedUser, error) in
                 guard let managedUser = managedUser else {
                     completion(LDAPAuthResponse(isAuthenticated: false, message: "Authentication denied"), RequestError.unauthorized)
                     return
                 }
                 
-                self.dataProvider.managedObject(fromPartialManagedObject: managedUser, completion: { (managedUser, error) in
-                    guard let managedUser = managedUser else {
-                        completion(LDAPAuthResponse(isAuthenticated: false, message: "Authentication denied"), RequestError.unauthorized)
-                        return
+                do {
+                    if (try managedUser.verify(clearTextPassword: simplePassword))  {
+                        completion(LDAPAuthResponse(isAuthenticated: true, message: nil), RequestError.ok)
                     }
-                    
-                    do {
-                        if (try managedUser.verify(clearTextPassword: simplePassword))  {
-                            completion(LDAPAuthResponse(isAuthenticated: true, message: nil), RequestError.ok)
-                        }
-                        else {
-                            completion(LDAPAuthResponse(isAuthenticated: false, message: "Authentication denied"), RequestError.unauthorized)
-                        }
-                    } catch {
+                    else {
                         completion(LDAPAuthResponse(isAuthenticated: false, message: "Authentication denied"), RequestError.unauthorized)
                     }
-                })
+                } catch {
+                    completion(LDAPAuthResponse(isAuthenticated: false, message: "Authentication denied"), RequestError.unauthorized)
+                }
             }
         } else {
             completion(LDAPAuthResponse(isAuthenticated: false, message: "Unsupported authentication methods"), RequestError.unauthorized)

@@ -77,4 +77,26 @@ struct CouchDBViewRow<T: ManagedObject>: Codable {
     let value: T
     let id: String
     let key:CouchDBViewKeys
+    
+    enum CouchDBViewRowCodingKeys: CodingKey {
+        case value
+        case doc
+        case id
+        case key
+    }
+    
+    init(from decoder:Decoder) throws {
+        let container = try decoder.container(keyedBy: CouchDBViewRowCodingKeys.self)
+        
+        id = try container.decode(String.self, forKey: .id)
+        key = try container.decode(CouchDBViewKeys.self, forKey: .key)
+        
+        if let codingStrategy = decoder.userInfo[.managedObjectCodingStrategy] as? ManagedObjectCodingStrategy,
+            codingStrategy == .databaseEncoding,
+            let doc = try? container.decode(T.self, forKey: .doc) {
+            value = doc
+        } else {
+            value = try container.decode(T.self, forKey: .value)
+        }
+    }
 }
