@@ -18,6 +18,7 @@ let package = Package(
         .package(url: "https://github.com/IBM-Swift/HeliumLogger.git", from: "1.7.0"),
         .package(url: "https://github.com/IBM-Swift/CloudConfiguration.git", from: "2.0.0"),
         .package(url: "https://github.com/IBM-Swift/BlueCryptor.git", from: "0.8.0"),
+        .package(url: "https://github.com/IBM-Swift/Kitura-CORS.git", from: "2.0.0"),
     ],
     targets: [
         .target(
@@ -36,8 +37,11 @@ let package = Package(
             name: "EasyLoginLDAPGatewayAPI",
             dependencies: ["Extensions", "NotificationService", "DataProvider"]),
         .target(
+            name: "EasyLoginAdminAPI",
+            dependencies: ["Extensions", "NotificationService", "DataProvider", "KituraCORS"]),
+        .target(
             name: "Application",
-            dependencies: ["Extensions", "EasyLoginDirectoryService", "NotificationService", "EasyLoginLDAPGatewayAPI"]),
+            dependencies: ["Extensions", "EasyLoginDirectoryService", "NotificationService", "EasyLoginLDAPGatewayAPI", "EasyLoginAdminAPI"]),
         .target(
             name: "EasyLogin",
             dependencies: ["Application"]),

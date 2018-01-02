@@ -18,6 +18,7 @@ import Extensions
 import EasyLoginDirectoryService
 import NotificationService
 import EasyLoginLDAPGatewayAPI
+import EasyLoginAdminAPI
 
 public enum ConfigError: Error {
     case missingDatabaseInfo
@@ -75,8 +76,13 @@ public func initialize() throws {
         let ldapGatewayAPI = try LDAPGatewayAPI()
         router.all("/ldap", middleware: ldapGatewayAPI.router())
         
+        let adminAPI = try AdminAPI()
+        router.all("/admapi", middleware: adminAPI.router())
+        
         let notificationService = installNotificationService()
         inspectorService.registerInspectable(notificationService, name: "notifications")
+        
+        router.all("/admin", middleware: StaticFileServer(path: "./public/admin"))
     }
     
     inspectorService.installHandlers(to: router)

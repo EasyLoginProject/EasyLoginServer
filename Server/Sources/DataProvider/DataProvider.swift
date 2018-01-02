@@ -29,11 +29,13 @@ public enum DataProviderError: Error {
     case none
     case missingDatabaseInfo
     case singletonMissing
+    case tryingToUpdateNonExistingObject
 }
 
 public class DataProvider {
     private let couchDBClient: CouchDBClient
     private let database: Database
+    public let numericIDGenerator: PersistentCounter
     
     static private var privateSingleton: DataProvider?
     public static func singleton() throws -> DataProvider {
@@ -76,8 +78,12 @@ public class DataProvider {
         }
         
         database = couchDBClient.createOrOpenDatabase(name: databaseName, designFile: ConfigProvider.pathForRessource("main_design.json"))
+        numericIDGenerator = PersistentCounter(database: database, name: "users.numericID", initialValue: 1789)
         Log.info("Connected to CouchDB, client = \(couchDBClient), database name = \(databaseName)")
+        
     }
+    
+    // MARK: Database SPI
     
     private func jsonData(forRecordWithID recordID: String, completion: @escaping (Data?, NSError?) -> Void) {
         database.retrieve(recordID, callback: { (document: JSON?, error: NSError?) in
@@ -103,7 +109,33 @@ public class DataProvider {
         }
     }
     
-    public func managedObject<T: ManagedObject>(ofType:T.Type, withUUID uuid:String, completion: @escaping (T?, CombinedError?) -> Void) -> Void {
+    private func update(recordID: String, atRev rev:String, with jsonData:Data, completion: @escaping (String?, Data?, NSError?) -> Void) {
+        let document = JSON(data:jsonData)
+        database.update(recordID, rev: rev, document: document) { (rev, updatedDocument, error) in
+            if let updatedDocument = updatedDocument {
+                let jsonData = try? updatedDocument.rawData()
+                completion(rev, jsonData, error)
+            } else {
+                completion(rev, nil, error)
+            }
+        }
+    }
+    
+    private func create(recordWithJSONData jsonData:Data, completion: @escaping (Data?, NSError?) -> Void) {
+        let document = JSON(data:jsonData)
+        database.create(document) { (id, revision, document, error) in
+            if let document = document {
+                let jsonData = try? document.rawData()
+                completion(jsonData, error)
+            } else {
+                completion(nil, error)
+            }
+        }
+    }
+    
+    // MARK: Managed Object API
+    
+    public func completeManagedObject<T: ManagedObject>(ofType:T.Type, withUUID uuid:String, completion: @escaping (T?, CombinedError?) -> Void) -> Void {
         jsonData(forRecordWithID: uuid) { (jsonData, jsonError) in
             if let jsonData = jsonData {
                 do {
@@ -118,7 +150,7 @@ public class DataProvider {
         }
     }
     
-    public func managedObject<T: ManagedObject>(fromPartialManagedObject managedObject:T, completion: @escaping (T?, CombinedError?) -> Void) -> Void {
+    public func completeManagedObject<T: ManagedObject>(fromPartialManagedObject managedObject:T, completion: @escaping (T?, CombinedError?) -> Void) -> Void {
         if managedObject.isPartialRepresentation {
             jsonData(forRecordWithID: managedObject.uuid) { (jsonData, jsonError) in
                 if let jsonData = jsonData {
@@ -141,7 +173,7 @@ public class DataProvider {
         jsonData(fromView: T.viewToListThemAll(), ofDesign: T.designFile(), usingParameters: []) { (jsonData, jsonError) in
             if let jsonData = jsonData {
                 do {
-                    let strategy: ManagedObjectCodingStrategy = T.viewToListThemAllReturnPartialResult() ? .briefEncoding : .databaseEncoding
+                    let strategy: ManagedObjectCodingStrategy = T.requireFullObject() ? .databaseEncoding : T.viewToListThemAllReturnPartialResult() ? .briefEncoding : .databaseEncoding
                     let jsonDecoder = JSONDecoder()
                     jsonDecoder.userInfo[.managedObjectCodingStrategy] = strategy
                     let viewResults = try jsonDecoder.decode(CouchDBViewResult<T>.self, from: jsonData)
@@ -193,10 +225,7 @@ public class DataProvider {
         jsonData(fromView: guessedView, ofDesign: "main_design", usingParameters: [.keys([login as KeyType])], completion: { (jsonData, jsonError) in
             if let jsonData = jsonData {
                 do {
-                    let jsonDecoder = JSONDecoder()
-                    jsonDecoder.userInfo[.managedObjectCodingStrategy] = ManagedObjectCodingStrategy.briefEncoding
-                    let viewResults = try jsonDecoder.decode(CouchDBViewResult<ManagedUser>.self, from: jsonData)
-                    
+                    let viewResults = try CouchDBViewResult<ManagedUser>.objectFromJSON(data: jsonData, withCodingStrategy: ManagedObjectCodingStrategy.briefEncoding)
                     if viewResults.rows.count != 1 {
                         completion(nil, nil)
                     } else {
@@ -221,10 +250,7 @@ public class DataProvider {
         jsonData(fromView: guessedView, ofDesign: "main_design", usingParameters: [.keys([login as KeyType]), .includeDocs(true)], completion: { (jsonData, jsonError) in
             if let jsonData = jsonData {
                 do {
-                    let jsonDecoder = JSONDecoder()
-                    jsonDecoder.userInfo[.managedObjectCodingStrategy] = ManagedObjectCodingStrategy.databaseEncoding
-                    let viewResults = try jsonDecoder.decode(CouchDBViewResult<ManagedUser>.self, from: jsonData)
-                    
+                    let viewResults = try CouchDBViewResult<ManagedUser>.objectFromJSON(data: jsonData, withCodingStrategy: ManagedObjectCodingStrategy.databaseEncoding)
                     if viewResults.rows.count != 1 {
                         completion(nil, nil)
                     } else {
@@ -237,6 +263,92 @@ public class DataProvider {
                 completion(nil, CombinedError(swiftError: nil, cocoaError: jsonError))
             }
         })
+    }
+    
+    public func storeChangeFrom<T: ManagedObject>(mutableManagedObject:T, completion: @escaping (T?, CombinedError?) -> Void) throws  where T: MutableManagedObject {
+        guard mutableManagedObject.hasBeenEdited == true else {
+            completion(mutableManagedObject, nil)
+            return
+        }
+        
+        guard let revision = mutableManagedObject.revision else {
+            throw DataProviderError.tryingToUpdateNonExistingObject
+        }
+        
+        let jsonData = try mutableManagedObject.jsonData(withCodingStrategy: .databaseEncoding)
+        
+        update(recordID: mutableManagedObject.uuid, atRev: revision, with: jsonData) { (revision, updatedJSONData, error) in
+            if let updatedJSONData = updatedJSONData {
+                do {
+                    let updateResult = try JSONDecoder().decode(CouchDBUpdateResult.self, from: updatedJSONData)
+                    
+                    if updateResult.ok {
+                        self.completeManagedObject(ofType: T.self, withUUID: updateResult.id, completion: completion)
+                    } else {
+                        completion(nil, CombinedError(swiftError: nil, cocoaError: error))
+                    }
+                } catch {
+                    completion(nil, CombinedError(swiftError: error, cocoaError: nil))
+                }
+            } else {
+                completion(nil, CombinedError(swiftError: nil, cocoaError: error))
+            }
+        }
+    }
+    
+    public func insert<T: ManagedObject>(mutableManagedObject:T, completion: @escaping (T?, CombinedError?) -> Void) throws  where T: MutableManagedObject {
+        guard mutableManagedObject.hasBeenEdited == true else {
+            completion(mutableManagedObject, nil)
+            return
+        }
+        
+        let jsonData = try mutableManagedObject.jsonData(withCodingStrategy: .databaseEncoding)
+        
+        create(recordWithJSONData: jsonData) { (jsonData, error) in
+            if let jsonData = jsonData {
+                do {
+                    let updateResult = try JSONDecoder().decode(CouchDBUpdateResult.self, from: jsonData)
+                    
+                    if updateResult.ok {
+                        self.completeManagedObject(ofType: T.self, withUUID: updateResult.id, completion: completion)
+                    } else {
+                        completion(nil, CombinedError(swiftError: nil, cocoaError: error))
+                    }
+                } catch {
+                    completion(nil, CombinedError(swiftError: error, cocoaError: nil))
+                }
+            } else {
+                completion(nil, CombinedError(swiftError: nil, cocoaError: error))
+            }
+        }
+    }
+    
+    public func delete<T: ManagedObject>(managedObject:T, completion: @escaping (CombinedError?) -> Void) throws {
+        managedObject.markAsDeleted()
+        guard let revision = managedObject.revision else {
+            throw DataProviderError.tryingToUpdateNonExistingObject
+        }
+        
+        managedObject.markAsDeleted()
+        let jsonData = try managedObject.jsonData(withCodingStrategy: .databaseEncoding)
+        
+        update(recordID: managedObject.uuid, atRev: revision, with: jsonData) { (revision, updatedJSONData, error) in
+            if let updatedJSONData = updatedJSONData {
+                do {
+                    let updateResult = try JSONDecoder().decode(CouchDBUpdateResult.self, from: updatedJSONData)
+                    
+                    if updateResult.ok {
+                        completion(nil)
+                    } else {
+                        completion(CombinedError(swiftError: nil, cocoaError: error))
+                    }
+                } catch {
+                    completion(CombinedError(swiftError: error, cocoaError: nil))
+                }
+            } else {
+                completion(CombinedError(swiftError: nil, cocoaError: error))
+            }
+        }
     }
 }
 

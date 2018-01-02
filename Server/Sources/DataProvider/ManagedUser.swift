@@ -74,6 +74,19 @@ public class ManagedUser: ManagedObject {
         case fullName
     }
     
+    
+    fileprivate init(withNumericID numericID:Int, shortname:String, principalName:String, email:String?, givenName:String?, surname:String?, fullName:String?) {
+        self.numericID = numericID
+        self.shortname = shortname
+        self.principalName = principalName
+        self.email = email
+        self.givenName = givenName
+        self.surname = surname
+        self.fullName = fullName
+        super.init()
+        recordType = "user"
+    }
+    
     public required init(from decoder: Decoder) throws {
         let codingStrategy = decoder.userInfo[.managedObjectCodingStrategy] as? ManagedObjectCodingStrategy
         
@@ -146,5 +159,131 @@ public class ManagedUser: ManagedObject {
             }
         }
     }
+}
+
+public class MutableManagedUser : ManagedUser, MutableManagedObject {
+    public fileprivate(set) var hasBeenEdited = false
     
+    public override var debugDescription: String {
+        let objectAddress = String(format:"%2X", unsafeBitCast(self, to: Int.self))
+        var desc = "<\(type(of:self)):\(objectAddress) numericID:\(numericID), shortname:\(shortname), principalName:\(principalName)"
+        
+        if let email = email {
+            desc += ", email:\(email)"
+        }
+        
+        if let givenName = givenName {
+            desc += ", givenName:\(givenName)"
+        }
+        
+        if let surname = surname {
+            desc += ", surname:\(surname)"
+        }
+        
+        if let fullName = fullName {
+            desc += ", fullName:\(fullName)"
+        }
+        
+        desc += ", partialRepresentation:\(isPartialRepresentation)"
+        desc += ", hasBeenEdited:\(hasBeenEdited)>"
+        
+        return desc
+    }
+    
+    enum MutableManagedUserUpdateError: Error {
+        case invalidShortname
+        case invalidPrincipalName
+    }
+    
+    public override init(withNumericID numericID:Int, shortname:String, principalName:String, email:String?, givenName:String?, surname:String?, fullName:String?) {
+        hasBeenEdited = true
+        super.init(withNumericID: numericID, shortname: shortname, principalName: principalName, email: email, givenName: givenName, surname: surname, fullName: fullName)
+    }
+    
+    public required init(from decoder: Decoder) throws {
+        try super.init(from: decoder)
+    }
+    
+    public func setShortname(_ value:String) throws {
+        guard value != shortname else {
+            return
+        }
+        
+        if value.range(of: "^[a-z_][a-z0-9_-]{0,30}$", options: .regularExpression, range: nil, locale: nil) != nil {
+            shortname = value
+            hasBeenEdited = true
+        } else {
+            throw MutableManagedUserUpdateError.invalidShortname
+        }
+    }
+    
+    public func setPrincipalName(_ value:String) throws {
+        guard value != principalName else {
+            return
+        }
+        
+        if value.range(of: "^[a-z0-9_.-]+@[A-Za-z0-9.-]+$", options: .regularExpression, range: nil, locale: nil) != nil {
+            principalName = value
+            hasBeenEdited = true
+        } else {
+            throw MutableManagedUserUpdateError.invalidPrincipalName
+        }
+    }
+    
+    public func setEmail(_ value:String) throws {
+        guard value != email else {
+            return
+        }
+        
+        if value.range(of: "^[a-z0-9_.-]+@[A-Za-z0-9.-]+$", options: .regularExpression, range: nil, locale: nil) != nil {
+            email = value
+            hasBeenEdited = true
+        } else {
+            throw MutableManagedUserUpdateError.invalidPrincipalName
+        }
+    }
+    
+    public func setGivenName(_ value:String) throws {
+        guard value != givenName else {
+            return
+        }
+        
+        givenName = value
+        hasBeenEdited = true
+    }
+    
+    public func setSurname(_ value:String) throws {
+        guard value != surname else {
+            return
+        }
+        
+        surname = value
+        hasBeenEdited = true
+    }
+    
+    public func setFullName(_ value:String) throws {
+        guard value != fullName else {
+            return
+        }
+        
+        fullName = value
+        hasBeenEdited = true
+    }
+    
+    public func setClearTextPasssword(_ value:String) throws {
+        var generated = [String:String]()
+        
+        generated["sha1"] = value.sha1
+        generated["sha256"] = value.sha256
+        generated["sha512"] = value.sha512
+        let pbkdf2 = try PBKDF2().generateString(fromPassword: value)
+        generated["pbkdf2"] = pbkdf2
+        
+        authMethods = generated
+        hasBeenEdited = true
+    }
+    
+    override class func requireFullObject() -> Bool {
+        return true
+    }
 }

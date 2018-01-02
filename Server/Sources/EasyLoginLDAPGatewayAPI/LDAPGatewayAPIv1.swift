@@ -130,7 +130,7 @@ class LDAPGatewayAPIv1 {
                     let recordUUID = String(recordInfo[1])
                     if (recordField == LDAPUserRecord.fieldUsedInDN.rawValue) {
                         
-                        dataProvider.managedObject(ofType: ManagedUser.self, withUUID: recordUUID, completion: { (managedUser, error) in
+                        dataProvider.completeManagedObject(ofType: ManagedUser.self, withUUID: recordUUID, completion: { (managedUser, error) in
                             guard let managedUser = managedUser else {
                                 response.status(.notFound)
                                 next()
