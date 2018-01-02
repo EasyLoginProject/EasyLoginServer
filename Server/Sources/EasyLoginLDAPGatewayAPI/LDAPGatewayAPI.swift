@@ -7,7 +7,6 @@
 //
 
 import Foundation
-import CouchDB
 import Kitura
 
 public class LDAPGatewayAPI {
@@ -20,8 +19,5 @@ public class LDAPGatewayAPI {
         let router = Router()
         v1Gateway.installHandlers(to: router)
         return router
-    }
-    
-    
-    
+    }    
 }
