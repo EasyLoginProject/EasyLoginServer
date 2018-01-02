@@ -10,6 +10,65 @@ import DataProvider
 import Kitura
 import KituraCORS
 
+enum AdminAPIError: Error {
+    case missingField
+}
+
+struct DesiredUserFromAdminAPI: Codable {
+    let shortname: String?
+    let principalName: String?
+    let email: String?
+    let givenName: String?
+    let surname: String?
+    let fullName: String?
+    let clearTextPassword: String?
+    
+    func update(mutableManagedUser:MutableManagedUser) throws {
+        if let shortname = shortname {
+            try mutableManagedUser.setShortname(shortname)
+        }
+        if let principalName = principalName {
+            try mutableManagedUser.setPrincipalName(principalName)
+        }
+        if let email = email {
+            try mutableManagedUser.setEmail(email)
+        }
+        if let givenName = givenName {
+            try mutableManagedUser.setGivenName(givenName)
+        }
+        if let surname = surname {
+            try mutableManagedUser.setSurname(surname)
+        }
+        if let fullName = fullName {
+            try mutableManagedUser.setFullName(fullName)
+        }
+        if let clearTextPassword = clearTextPassword {
+            try mutableManagedUser.setClearTextPasssword(clearTextPassword)
+        }
+    }
+    
+    func createNewMutableManagedUser(withDataProvider dataProvider:DataProvider, completion: @escaping (MutableManagedUser?) -> Void) {
+        if let shortname = shortname, let principalName = principalName, let clearTextPassword = clearTextPassword {
+            dataProvider.numericIDGenerator.nextValue(completion: { (numericID) in
+                if let numericID = numericID {
+                    let newUser = MutableManagedUser(withNumericID: numericID, shortname: shortname, principalName: principalName, email: self.email, givenName: self.givenName, surname: self.surname, fullName: self.fullName)
+                    do {
+                        try newUser.setClearTextPasssword(clearTextPassword)
+                        completion(newUser)
+                    } catch {
+                        completion(nil)
+                    }
+                } else {
+                    completion(nil)
+                }
+            })
+            
+        } else {
+            completion(nil)
+        }
+    }
+}
+
 struct UserForAdminAPI: Codable {
     let uuid: String
     
@@ -20,7 +79,6 @@ struct UserForAdminAPI: Codable {
     let givenName: String?
     let surname: String?
     let fullName: String?
-    let clearTextPassword: String?
     
     enum CodingKeys: String, CodingKey {
         case uuid = "id"
@@ -31,7 +89,6 @@ struct UserForAdminAPI: Codable {
         case givenName
         case surname
         case fullName
-        case clearTextPassword
     }
     
     init(managedUser: ManagedUser) {
@@ -43,7 +100,6 @@ struct UserForAdminAPI: Codable {
         givenName = managedUser.givenName
         surname = managedUser.surname
         fullName = managedUser.fullName
-        clearTextPassword = nil
     }
 }
 
@@ -56,11 +112,15 @@ public class AdminAPI {
     
     public func router() -> Router {
         let router = Router()
-        let options = Options(allowedOrigin: .all, methods: ["GET","PUT"], allowedHeaders: ["X-Total-Count", "Content-Type"], maxAge: 5)
+        let options = Options(allowedOrigin: .all, methods: ["GET","PUT", "POST", "DELETE"], allowedHeaders: ["X-Total-Count", "Content-Type"], maxAge: 5, exposedHeaders: ["X-Total-Count", "Content-Type"])
         let cors = CORS(options: options)
         router.all("/*", middleware: cors)
         
         router.get("/users", handler: getUsers)
+        router.post("/users", handler: createUser)
+        router.get("/users/:uuid", handler: getUser)
+        router.put("/users/:uuid", handler: updateUser)
+        router.delete("/users/:uuid", handler: deleteUser)
         
         return router
     }
@@ -120,23 +180,40 @@ public class AdminAPI {
                             }
                         case .numericID:
                             return String(managedUser.numericID).contains(value)
-                        case .clearTextPassword:
-                            return false
                         }
                     })
                 }
             }
             
             
+            if let globalQuery = request.queryParameters["q"] {
+                let globalQuery = globalQuery.lowercased()
+                managedUsers = managedUsers.filter({ (managedUser) -> Bool in
+                    if managedUser.shortname.lowercased().contains(globalQuery) {
+                        return true
+                    } else if managedUser.principalName.lowercased().contains(globalQuery) {
+                        return true
+                    } else if let givenName = managedUser.givenName, givenName.lowercased().contains(globalQuery) {
+                        return true
+                    } else if let surname = managedUser.surname, surname.lowercased().contains(globalQuery) {
+                        return true
+                    } else if let fullName = managedUser.fullName, fullName.lowercased().contains(globalQuery) {
+                        return true
+                    } else {
+                        return false
+                    }
+                })
+            }
+            
             let sortKey: UserForAdminAPI.CodingKeys
             if let sortField = request.queryParameters["_sort"] {
                 if let requestedSortKey = UserForAdminAPI.CodingKeys(stringValue: sortField) {
                     sortKey = requestedSortKey
                 } else {
-                    sortKey = .uuid
+                    sortKey = .shortname
                 }
             } else {
-                sortKey = .uuid
+                sortKey = .shortname
             }
             
             let ascending: Bool
@@ -195,7 +272,7 @@ public class AdminAPI {
                     } else {
                         isAscendent = left.numericID < right.numericID
                     }
-                default:
+                case .numericID:
                     isAscendent = left.numericID < right.numericID
                 }
                 
@@ -206,6 +283,21 @@ public class AdminAPI {
                 }
             })
             
+            guard managedUsers.count != 0 else {
+                if let jsonData = try? JSONEncoder().encode([String]()) {
+                    response.headers.append("X-Total-Count", value: String(managedUsers.count))
+                    response.headers.setType("json")
+                    response.send(data: jsonData)
+                    response.status(.OK)
+                    next()
+                    return
+                } else {
+                    response.status(.internalServerError)
+                    next()
+                    return
+                }
+            }
+            
             let first: Int
             if let startValue = request.queryParameters["_start"], let start = Int(startValue), start >= 0 {
                 first = start
@@ -214,8 +306,8 @@ public class AdminAPI {
             }
             
             let last: Int
-            if let endValue = request.queryParameters["_end"], let end = Int(endValue), end < managedUsers.count {
-                last = end
+            if let endValue = request.queryParameters["_end"], let end = Int(endValue), end-1 < managedUsers.count {
+                last = end-1
             } else {
                 last = managedUsers.count - 1
             }
@@ -238,6 +330,221 @@ public class AdminAPI {
                 next()
                 return
             }
+        }
+    }
+    
+    func getUser(request: RouterRequest, response: RouterResponse, next: @escaping ()->Void) -> Void {
+        guard let contentType = request.headers["Content-Type"] else {
+            response.status(.unsupportedMediaType)
+            next()
+            return
+        }
+        
+        guard contentType.hasPrefix("application/json") else {
+            response.status(.unsupportedMediaType)
+            next()
+            return
+        }
+        
+        guard let recordUUID = request.parameters["uuid"] else {
+            response.status(.badRequest)
+            next()
+            return
+        }
+        
+        dataProvider.completeManagedObject(ofType: ManagedUser.self, withUUID: recordUUID) { (managedUser, error) in
+            guard let managedUser = managedUser else {
+                response.status(.notFound)
+                next()
+                return
+            }
+            
+            let userForAdminAPI = UserForAdminAPI(managedUser: managedUser)
+            
+            if let jsonData = try? JSONEncoder().encode(userForAdminAPI) {
+                response.headers.setType("json")
+                response.send(data: jsonData)
+                response.status(.OK)
+                next()
+                return
+            } else {
+                response.status(.internalServerError)
+                next()
+                return
+            }
+        }
+    }
+    
+    func updateUser(request: RouterRequest, response: RouterResponse, next: @escaping ()->Void) -> Void {
+        guard let contentType = request.headers["Content-Type"] else {
+            response.status(.unsupportedMediaType)
+            next()
+            return
+        }
+        
+        guard contentType.hasPrefix("application/json") else {
+            response.status(.unsupportedMediaType)
+            next()
+            return
+        }
+        
+        guard let recordUUID = request.parameters["uuid"] else {
+            response.status(.badRequest)
+            next()
+            return
+        }
+        
+        if let desiredUserFromAdminAPI = try? request.read(as: DesiredUserFromAdminAPI.self) {
+            dataProvider.completeManagedObject(ofType: MutableManagedUser.self, withUUID: recordUUID) { (mutableManagedUser, error) in
+                guard let mutableManagedUser = mutableManagedUser else {
+                    response.status(.notFound)
+                    next()
+                    return
+                }
+                
+                do {
+                    try desiredUserFromAdminAPI.update(mutableManagedUser: mutableManagedUser)
+                    try self.dataProvider.storeChangeFrom(mutableManagedObject: mutableManagedUser, completion: { (managedUser, error) in
+                        if let managedUser = managedUser {
+                            let userForAdminAPI = UserForAdminAPI(managedUser: managedUser)
+                            
+                            if let jsonData = try? JSONEncoder().encode(userForAdminAPI) {
+                                response.headers.setType("json")
+                                response.send(data: jsonData)
+                                response.status(.OK)
+                                next()
+                                return
+                            } else {
+                                response.status(.internalServerError)
+                                next()
+                                return
+                            }
+                            
+                        } else {
+                            response.status(.internalServerError)
+                            next()
+                            return
+                        }
+                    })
+                } catch {
+                    response.status(.badRequest)
+                    next()
+                    return
+                }
+            }
+        } else {
+            response.status(.internalServerError)
+            next()
+            return
+        }
+    }
+    
+    func deleteUser(request: RouterRequest, response: RouterResponse, next: @escaping ()->Void) -> Void {
+        guard let contentType = request.headers["Content-Type"] else {
+            response.status(.unsupportedMediaType)
+            next()
+            return
+        }
+        
+        guard contentType.hasPrefix("application/json") else {
+            response.status(.unsupportedMediaType)
+            next()
+            return
+        }
+        
+        guard let recordUUID = request.parameters["uuid"] else {
+            response.status(.badRequest)
+            next()
+            return
+        }
+        
+        dataProvider.completeManagedObject(ofType: ManagedUser.self, withUUID: recordUUID) { (managedUser, error) in
+            if let managedUser = managedUser {
+                do {
+                    try self.dataProvider.delete(managedObject: managedUser, completion: { (error) in
+                        if error != nil {
+                            response.status(.internalServerError)
+                            next()
+                            return
+                        } else {
+                            if let jsonData = try? JSONEncoder().encode([String:String]()) {
+                                response.headers.setType("json")
+                                response.send(data: jsonData)
+                            }
+                            
+                            response.status(.OK)
+                            next()
+                            return
+                        }
+                    })
+                } catch {
+                    response.status(.internalServerError)
+                    next()
+                    return
+                }
+            } else {
+                response.status(.notFound)
+                next()
+                return
+            }
+        }
+    }
+    
+    func createUser(request: RouterRequest, response: RouterResponse, next: @escaping ()->Void) -> Void {
+        guard let contentType = request.headers["Content-Type"] else {
+            response.status(.unsupportedMediaType)
+            next()
+            return
+        }
+        
+        guard contentType.hasPrefix("application/json") else {
+            response.status(.unsupportedMediaType)
+            next()
+            return
+        }
+        
+        if let desiredUserFromAdminAPI = try? request.read(as: DesiredUserFromAdminAPI.self) {
+            
+            desiredUserFromAdminAPI.createNewMutableManagedUser(withDataProvider: dataProvider) { (mutableManagedUser) in
+                guard let mutableManagedUser = mutableManagedUser else {
+                    response.status(.badRequest)
+                    next()
+                    return
+                }
+                
+                do {
+                    try self.dataProvider.insert(mutableManagedObject: mutableManagedUser, completion: { (managedUser, error) in
+                        if let managedUser = managedUser {
+                            let userForAdminAPI = UserForAdminAPI(managedUser: managedUser)
+                            
+                            if let jsonData = try? JSONEncoder().encode(userForAdminAPI) {
+                                response.headers.setType("json")
+                                response.send(data: jsonData)
+                                response.status(.OK)
+                                next()
+                                return
+                            } else {
+                                response.status(.internalServerError)
+                                next()
+                                return
+                            }
+                            
+                        } else {
+                            response.status(.internalServerError)
+                            next()
+                            return
+                        }
+                    })
+                } catch {
+                    response.status(.badRequest)
+                    next()
+                    return
+                }
+            }
+        } else {
+            response.status(.internalServerError)
+            next()
+            return
         }
     }
 }

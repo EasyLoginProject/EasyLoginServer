@@ -1,25 +1,25 @@
 {
-  "id": "_design/main_design",
-  "views": {
-    "all_users": {
-      "map" : "function(doc) { if (doc.type === 'user') { emit([doc.numericID, doc._id], {\"uuid\":doc._id, \"numericID\":doc.numericID, \"shortname\":doc.shortname, \"principalName\":doc.principalName, \"fullName\":doc.fullName}); } }"
+    "id": "_design/main_design",
+    "views": {
+        "all_users": {
+            "map" : "function(doc) { if (doc.type === 'user' && doc.deleted != true) { emit([doc.numericID, doc._id], {\"uuid\":doc._id, \"type\":doc.type, \"numericID\":doc.numericID, \"shortname\":doc.shortname, \"principalName\":doc.principalName, \"fullName\":doc.fullName}); } }"
+        },
+        "user_authMethods_by_shortname": {
+            "map" : "function(doc) { if (doc.type === 'user' && doc.deleted != true) { emit(doc.shortname, doc.authMethods); } }"
+        },
+        "user_brief_by_shortname": {
+            "map" : "function(doc) { if (doc.type === 'user' && doc.deleted != true) { emit(doc.shortname, {\"uuid\":doc._id, \"type\":doc.type, \"numericID\":doc.numericID, \"shortname\":doc.shortname, \"principalName\":doc.principalName, \"fullName\":doc.fullName}); } }"
+        },
+        "user_brief_by_principalName": {
+            "map" : "function(doc) { if (doc.type === 'user' && doc.deleted != true) { emit(doc.principalName,{\"uuid\":doc._id, \"type\":doc.type, \"numericID\":doc.numericID, \"shortname\":doc.shortname, \"principalName\":doc.principalName, \"fullName\":doc.fullName}); } }"
+        },
+        "all_devices": {
+            "map" : "function(doc) { if (doc.type === 'device') { emit(doc._id, {\"uuid\":doc._id, \"serialNumber\":doc.serialNumber, \"deviceName\":doc.deviceName, \"hardwareUUID\":doc.hardwareUUID}); } }"
+        },
+        "users_numeric_id": {
+            "map" : "function(doc) { if (doc.type === 'user') { emit(null, doc.numericID); } }",
+            "reduce" : "_stats"
+        }
     },
-    "user_authMethods_by_shortname": {
-      "map" : "function(doc) { if (doc.type === 'user') { emit(doc.shortname, doc.authMethods); } }"
-    },
-      "user_brief_by_shortname": {
-          "map" : "function(doc) { if (doc.type === 'user') { emit(doc.shortname, {\"uuid\":doc._id, \"numericID\":doc.numericID, \"shortname\":doc.shortname, \"principalName\":doc.principalName, \"fullName\":doc.fullName}); } }"
-      },
-      "user_brief_by_principalName": {
-          "map" : "function(doc) { if (doc.type === 'user') { emit(doc.principalName,{\"uuid\":doc._id, \"numericID\":doc.numericID, \"shortname\":doc.shortname, \"principalName\":doc.principalName, \"fullName\":doc.fullName}); } }"
-      },
-    "all_devices": {
-      "map" : "function(doc) { if (doc.type === 'device') { emit(doc._id, {\"uuid\":doc._id, \"serialNumber\":doc.serialNumber, \"deviceName\":doc.deviceName, \"hardwareUUID\":doc.hardwareUUID}); } }"
-    },
-    "users_numeric_id": {
-      "map" : "function(doc) { if (doc.type === 'user') { emit(null, doc.numericID); } }",
-      "reduce" : "_stats"
-    }
-  },
-  "language": "javascript"
+    "language": "javascript"
 }

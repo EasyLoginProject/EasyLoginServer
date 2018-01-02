@@ -81,6 +81,8 @@ public func initialize() throws {
         
         let notificationService = installNotificationService()
         inspectorService.registerInspectable(notificationService, name: "notifications")
+        
+        router.all("/admin", middleware: StaticFileServer(path: "./public/admin"))
     }
     
     inspectorService.installHandlers(to: router)

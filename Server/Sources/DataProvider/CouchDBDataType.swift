@@ -71,6 +71,13 @@ struct CouchDBViewResult<T: ManagedObject>: Codable {
     let rows: [CouchDBViewRow<T>]
     let offset: Int
     let total_rows: Int
+    
+    static func objectFromJSON(data jsonData:Data, withCodingStrategy strategy:ManagedObjectCodingStrategy) throws -> CouchDBViewResult<T> {
+        let jsonDecoder = JSONDecoder()
+        jsonDecoder.userInfo[.managedObjectCodingStrategy] = strategy
+        
+        return try jsonDecoder.decode(self, from: jsonData)
+    }
 }
 
 struct CouchDBViewRow<T: ManagedObject>: Codable {
@@ -99,4 +106,10 @@ struct CouchDBViewRow<T: ManagedObject>: Codable {
             value = try container.decode(T.self, forKey: .value)
         }
     }
+}
+
+struct CouchDBUpdateResult: Codable {
+    let id: String
+    let ok: Bool
+    let rev: String
 }

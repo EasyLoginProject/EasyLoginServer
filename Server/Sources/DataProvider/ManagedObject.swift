@@ -16,9 +16,15 @@ public enum ManagedObjectCodingStrategy {
     case briefEncoding
 }
 
+public protocol MutableManagedObject {
+    var hasBeenEdited: Bool { get }
+}
+
 public class ManagedObject : Codable, Equatable, CustomDebugStringConvertible {
     public let uuid: String
+    public fileprivate(set) var deleted: Bool
     public fileprivate(set) var revision: String?
+    var recordType: String
     let isPartialRepresentation: Bool
     
     public class func designFile() -> String {
@@ -45,10 +51,21 @@ public class ManagedObject : Codable, Equatable, CustomDebugStringConvertible {
     enum ManagedObjectDatabaseCodingKeys: String, CodingKey {
         case uuid = "_id"
         case revision = "_rev"
+        case deleted
+        case recordType = "type"
     }
     
     enum ManagedObjectPartialDatabaseCodingKeys: String, CodingKey {
         case uuid = "uuid"
+        case deleted
+        case recordType = "type"
+    }
+    
+    init() {
+        uuid = UUID().uuidString
+        isPartialRepresentation = false
+        deleted = false
+        recordType = "abstract"
     }
     
     required public init(from decoder: Decoder) throws {
@@ -59,12 +76,23 @@ public class ManagedObject : Codable, Equatable, CustomDebugStringConvertible {
             let container = try decoder.container(keyedBy: ManagedObjectDatabaseCodingKeys.self)
             uuid = try container.decode(String.self, forKey: .uuid)
             revision = try container.decode(String.self, forKey: .revision)
+            recordType = try container.decode(String.self, forKey: .recordType)
             isPartialRepresentation = false
-            
+            if let deletedMark = try? container.decode(Bool.self, forKey: .deleted) {
+                deleted = deletedMark
+            } else {
+                deleted = false
+            }
         case .briefEncoding?:
             let container = try decoder.container(keyedBy: ManagedObjectPartialDatabaseCodingKeys.self)
+            recordType = try container.decode(String.self, forKey: .recordType)
             uuid = try container.decode(String.self, forKey: .uuid)
             isPartialRepresentation = true
+            if let deletedMark = try? container.decode(Bool.self, forKey: .deleted) {
+                deleted = deletedMark
+            } else {
+                deleted = false
+            }
         }
     }
     
@@ -75,25 +103,41 @@ public class ManagedObject : Codable, Equatable, CustomDebugStringConvertible {
         case .databaseEncoding?, .none:
             var container = encoder.container(keyedBy: ManagedObjectDatabaseCodingKeys.self)
             try container.encode(uuid, forKey: .uuid)
+            try container.encode(recordType, forKey: .recordType)
+            if deleted {
+                try container.encode(deleted, forKey: .deleted)
+            }
             
         case .briefEncoding?:
             var container = encoder.container(keyedBy: ManagedObjectPartialDatabaseCodingKeys.self)
             try container.encode(uuid, forKey: .uuid)
+            try container.encode(recordType, forKey: .recordType)
+            if deleted {
+                try container.encode(deleted, forKey: .deleted)
+            }
         }
     }
     
-    public static func objectFromJSON(data jsonData:Data, withCodingStrategy strategy:ManagedObjectCodingStrategy) throws -> Self {
+    static func objectFromJSON(data jsonData:Data, withCodingStrategy strategy:ManagedObjectCodingStrategy) throws -> Self {
         let jsonDecoder = JSONDecoder()
         jsonDecoder.userInfo[.managedObjectCodingStrategy] = strategy
         
         return try jsonDecoder.decode(self, from: jsonData)
     }
     
-    public func jsonData(withCodingStrategy strategy:ManagedObjectCodingStrategy) throws -> Data {
+    func jsonData(withCodingStrategy strategy:ManagedObjectCodingStrategy) throws -> Data {
         let jsonEconder = JSONEncoder()
         jsonEconder.userInfo[.managedObjectCodingStrategy] = strategy
         
         return try jsonEconder.encode(self)
+    }
+    
+    class func requireFullObject() -> Bool {
+        return false
+    }
+    
+    func markAsDeleted() {
+        deleted = true
     }
     
 }
