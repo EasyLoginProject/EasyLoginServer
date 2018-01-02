@@ -12,6 +12,14 @@ import LoggerAPI
 import SwiftyJSON
 import Extensions
 
+// WARNING: Should no be necessary, don't know why Xcode can't see the original declaration comming from CouchDB
+#if os(Linux)
+    typealias KeyType = Any
+#else
+    /// Typealias used for building query parameters in view functions.
+    typealias KeyType = AnyObject
+#endif
+
 public struct CombinedError {
     let swiftError: Error?
     let cocoaError: NSError?
@@ -182,7 +190,7 @@ public class DataProvider {
         } else {
             guessedView = "user_brief_by_shortname"
         }
-        jsonData(fromView: guessedView, ofDesign: "main_design", usingParameters: [.keys([login as AnyObject])], completion: { (jsonData, jsonError) in
+        jsonData(fromView: guessedView, ofDesign: "main_design", usingParameters: [.keys([login as KeyType])], completion: { (jsonData, jsonError) in
             if let jsonData = jsonData {
                 do {
                     let jsonDecoder = JSONDecoder()
@@ -210,7 +218,7 @@ public class DataProvider {
         } else {
             guessedView = "user_brief_by_shortname"
         }
-        jsonData(fromView: guessedView, ofDesign: "main_design", usingParameters: [.keys([login as AnyObject]), .includeDocs(true)], completion: { (jsonData, jsonError) in
+        jsonData(fromView: guessedView, ofDesign: "main_design", usingParameters: [.keys([login as KeyType]), .includeDocs(true)], completion: { (jsonData, jsonError) in
             if let jsonData = jsonData {
                 do {
                     let jsonDecoder = JSONDecoder()
