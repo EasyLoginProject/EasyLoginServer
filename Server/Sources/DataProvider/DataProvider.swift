@@ -90,7 +90,7 @@ public class DataProvider {
                 return
             }
             
-            let jsonData = try? databaseResponse["rows"].rawData()
+            let jsonData = try? databaseResponse.rawData()
             completion(jsonData, nil)
         }
     }
@@ -136,9 +136,9 @@ public class DataProvider {
                     let strategy: ManagedObjectCodingStrategy = T.viewToListThemAllReturnPartialResult() ? .briefEncoding : .databaseEncoding
                     let jsonDecoder = JSONDecoder()
                     jsonDecoder.userInfo[.managedObjectCodingStrategy] = strategy
-                    let viewResults = try jsonDecoder.decode([ManagedObjectFromCouchDBView<T>].self, from: jsonData)
+                    let viewResults = try jsonDecoder.decode(CouchDBViewResult<T>.self, from: jsonData)
                     
-                    let managedObjects = viewResults.map({ (couchDBView) -> T in
+                    let managedObjects = viewResults.rows.map({ (couchDBView) -> T in
                         return couchDBView.value
                     })
                     
@@ -159,12 +159,12 @@ public class DataProvider {
                     do {
                         let jsonDecoder = JSONDecoder()
                         jsonDecoder.userInfo[.managedObjectCodingStrategy] = ManagedObjectCodingStrategy.briefEncoding
-                        let viewResults = try jsonDecoder.decode([ManagedObjectFromCouchDBView<ManagedUser>].self, from: jsonData)
+                        let viewResults = try jsonDecoder.decode(CouchDBViewResult<ManagedUser>.self, from: jsonData)
                         
-                        if viewResults.count != 0 {
+                        if viewResults.rows.count != 1 {
                             completion(nil, nil)
                         } else {
-                            completion(viewResults.first?.value, nil)
+                            completion(viewResults.rows.first?.value, nil)
                         }
                     } catch {
                         completion(nil, CombinedError(swiftError: error, cocoaError: nil))
@@ -179,12 +179,12 @@ public class DataProvider {
                     do {
                         let jsonDecoder = JSONDecoder()
                         jsonDecoder.userInfo[.managedObjectCodingStrategy] = ManagedObjectCodingStrategy.briefEncoding
-                        let viewResults = try jsonDecoder.decode([ManagedObjectFromCouchDBView<ManagedUser>].self, from: jsonData)
+                        let viewResults = try jsonDecoder.decode(CouchDBViewResult<ManagedUser>.self, from: jsonData)
                         
-                        if viewResults.count != 1 {
+                        if viewResults.rows.count != 1 {
                             completion(nil, nil)
                         } else {
-                            completion(viewResults.first?.value, nil)
+                            completion(viewResults.rows.first?.value, nil)
                         }
                     } catch {
                         completion(nil, CombinedError(swiftError: error, cocoaError: nil))
@@ -197,6 +197,4 @@ public class DataProvider {
     }
 }
 
-struct ManagedObjectFromCouchDBView<T: ManagedObject>: Codable {
-    let value: T
-}
+
