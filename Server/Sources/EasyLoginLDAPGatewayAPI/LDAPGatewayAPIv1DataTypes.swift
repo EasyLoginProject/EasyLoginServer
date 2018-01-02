@@ -6,8 +6,7 @@
 //
 
 import Foundation
-import Extensions
-import SwiftyJSON
+import DataProvider
 
 // MARK: - Codable objects for LDAP authentication requests
 
@@ -23,15 +22,6 @@ struct LDAPAuthRequest: Codable {
     let authentication: LDAPAuthScheme?
     let name: String?
     let version: Int?
-}
-
-/**
- Authentication response sent to the LDAP gateway that may or may not be used.
- In addition to setting isAuthenticated field, you must also return an apropriate HTTP Status Code.
- */
-struct LDAPAuthResponse: Codable {
-    let isAuthenticated: Bool
-    let message: String?
 }
 
 /**
@@ -257,11 +247,6 @@ extension CodingUserInfoKey {
     static let decodingStrategy = CodingUserInfoKey(rawValue: "decodingStrategy")!
 }
 
-enum DecodingStrategyForRecord {
-    case decodeFromDatabaseNativeFields
-    case decodeFromRecordStandardFeilds
-}
-
 /**
  Base object for all record that can be requested by the client. Provide some basics for DN construction, object comparaison, filtering process…
  */
@@ -315,11 +300,6 @@ class LDAPAbstractRecord : Codable, Equatable {
         }
     }
     
-    
-    enum LDAPAbstractDatabaseRecordCodingKeys: String, CodingKey {
-        case entryUUID = "_id"
-    }
-    
     enum LDAPAbstractRecordCodingKeys: String, CodingKey {
         case entryUUID
         case objectClass
@@ -328,13 +308,8 @@ class LDAPAbstractRecord : Codable, Equatable {
     }
     
     required init(from decoder: Decoder) throws {
-        if let decodingStrategy = decoder.userInfo[.decodingStrategy] as? DecodingStrategyForRecord, decodingStrategy == .decodeFromDatabaseNativeFields {
-            let values = try decoder.container(keyedBy: LDAPAbstractDatabaseRecordCodingKeys.self)
-            entryUUID = try values.decode(String.self, forKey: .entryUUID)
-        } else {
-            let values = try decoder.container(keyedBy: LDAPAbstractRecordCodingKeys.self)
-            entryUUID = try values.decode(String.self, forKey: .entryUUID)
-        }
+        let values = try decoder.container(keyedBy: LDAPAbstractRecordCodingKeys.self)
+        entryUUID = try values.decode(String.self, forKey: .entryUUID)
     }
     
     func encode(to encoder: Encoder) throws {
@@ -347,6 +322,10 @@ class LDAPAbstractRecord : Codable, Equatable {
     
     init(entryUUID: String) {
         self.entryUUID = entryUUID
+    }
+    
+    init(managedObject:ManagedObject) {
+        entryUUID = managedObject.uuid
     }
     
     func valuesForField(_ field:String) -> [String]? {
@@ -688,16 +667,6 @@ class LDAPUserRecord: LDAPAbstractRecord {
         }
     }
     
-    enum LDAPUserDatabaseRecordCodingKeys: String, CodingKey {
-        case uidNumber = "numericID"
-        case uid = "shortname"
-        case userPrincipalName = "principalName"
-        case mail = "email"
-        case givenName
-        case sn = "surname"
-        case cn = "fullName"
-    }
-    
     enum LDAPUserRecordCodingKeys: String, CodingKey {
         case uidNumber
         case uid
@@ -709,29 +678,16 @@ class LDAPUserRecord: LDAPAbstractRecord {
     }
     
     required init(from decoder: Decoder) throws {
-        if let decodingStrategy = decoder.userInfo[.decodingStrategy] as? DecodingStrategyForRecord, decodingStrategy == .decodeFromDatabaseNativeFields {
-            let values = try decoder.container(keyedBy: LDAPUserDatabaseRecordCodingKeys.self)
-            
-            uidNumber = try values.decode(Int.self, forKey: .uidNumber)
-            uid = try values.decode(String.self, forKey: .uid)
-            userPrincipalName = try values.decode(String.self, forKey: .userPrincipalName)
-            
-            mail = try? values.decode(String.self, forKey: .mail)
-            givenName = try? values.decode(String.self, forKey: .givenName)
-            sn = try? values.decode(String.self, forKey: .sn)
-            cn = try? values.decode(String.self, forKey: .cn)
-        } else {
-            let values = try decoder.container(keyedBy: LDAPUserRecordCodingKeys.self)
-            
-            uidNumber = try values.decode(Int.self, forKey: .uidNumber)
-            uid = try values.decode(String.self, forKey: .uid)
-            userPrincipalName = try values.decode(String.self, forKey: .userPrincipalName)
-            
-            mail = try? values.decode(String.self, forKey: .mail)
-            givenName = try? values.decode(String.self, forKey: .givenName)
-            sn = try? values.decode(String.self, forKey: .sn)
-            cn = try? values.decode(String.self, forKey: .cn)
-        }
+        let values = try decoder.container(keyedBy: LDAPUserRecordCodingKeys.self)
+        
+        uidNumber = try values.decode(Int.self, forKey: .uidNumber)
+        uid = try values.decode(String.self, forKey: .uid)
+        userPrincipalName = try values.decode(String.self, forKey: .userPrincipalName)
+        
+        mail = try? values.decode(String.self, forKey: .mail)
+        givenName = try? values.decode(String.self, forKey: .givenName)
+        sn = try? values.decode(String.self, forKey: .sn)
+        cn = try? values.decode(String.self, forKey: .cn)
         
         try super.init(from: decoder)
         privateObjectClass = ["inetOrgPerson", "posixAccount"]
@@ -761,6 +717,18 @@ class LDAPUserRecord: LDAPAbstractRecord {
         super.init(entryUUID: entryUUID)
         privateObjectClass = ["inetOrgPerson", "posixAccount"]
         privateParentContainer = LDAPContainerRecord.userContainer
+    }
+    
+    init(managedUser: ManagedUser) {
+        uid = managedUser.shortname
+        userPrincipalName = managedUser.principalName
+        uidNumber = managedUser.numericID
+        mail = managedUser.email
+        givenName = managedUser.givenName
+        sn = managedUser.surname
+        cn = managedUser.fullName
+        
+        super.init(managedObject: managedUser)
     }
     
     override func valuesForField(_ field:String) -> [String]? {

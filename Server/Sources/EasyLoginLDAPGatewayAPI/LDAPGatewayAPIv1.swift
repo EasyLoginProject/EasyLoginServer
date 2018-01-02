@@ -10,9 +10,8 @@ import CouchDB
 import Kitura
 import KituraContracts
 import LoggerAPI
-import SwiftyJSON
-import Extensions
 import NotificationService
+import DataProvider
 
 /**
  Router logic for the LDAP Gateway API in v1 (used by the Perl gateway).
@@ -22,7 +21,7 @@ class LDAPGatewayAPIv1 {
         return "dc=easylogin,dc=proxy"
     }
     
-    let database: Database
+    let dataProvider: DataProvider
     
     enum CustomRequestKeys : String {
         case availableRecords
@@ -31,42 +30,13 @@ class LDAPGatewayAPIv1 {
     
     // MARK: Class management
     
-    init(database: Database) {
-        self.database = database
-        
-        // TODO: Ask Frank to create a standard function linked to the atabase that can be used by any modules to load documents from the Resources folder
-        let ldapDesignPath: String
-        if let environmentVariable = getenv("RESOURCES"), let resourcePath = String(validatingUTF8: environmentVariable) {
-            ldapDesignPath = "\(resourcePath)/ldapv1_design.json"
-        }
-        else {
-            ldapDesignPath = "Resources/ldapv1_design.json"
-        }
-        
-        guard let json = try? String(contentsOfFile: ldapDesignPath, encoding:.utf8) else {
-            Log.error("cannot load file \(ldapDesignPath)")
-            return
-        }
-        let ldapDesign = JSON.parse(string: json)
-        
-        database.retrieve("_design/ldapv1_design") { (oldDocument, error) in
-            if let oldDocument = oldDocument, let rev = oldDocument["_rev"].string {
-                database.update("_design/ldapv1_design", rev: rev, document: ldapDesign, callback: { (_, _, error) in
-                    if error == nil {
-                        Log.info("Design document for LDAP v1 updated")
-                    }
-                })
-            } else {
-                database.createDesign("ldapv1_design", document: ldapDesign) { (result, error) in
-                    Log.info("LDAP database index creation: \(String(describing: result))")
-                }
-            }
-        }
+    init() throws {
+        dataProvider = try DataProvider.singleton()
     }
     
     // MARK: - Handler and handler management
     func installHandlers(to router: Router) {
-        router.ldapPOST("/v1/auth", handler: handleLDAPAuthentication)
+        router.post("/v1/auth", handler: handleLDAPAuthentication)
         router.post("/v1/search", handler: loadRecordsForLDAPSearch, filterRecordsForLDAPSearch)
     }
     
@@ -74,6 +44,17 @@ class LDAPGatewayAPIv1 {
     
     // MARK: Handler and subhandlers neededs for LDAP search of all kinds.
     func loadRecordsForLDAPSearch(request: RouterRequest, response: RouterResponse, next: @escaping ()->Void) -> Void {
+        guard let contentType = request.headers["Content-Type"] else {
+            response.status(.unsupportedMediaType)
+            next()
+            return
+        }
+        guard contentType.hasPrefix("application/json") else {
+            response.status(.unsupportedMediaType)
+            next()
+            return
+        }
+        
         guard let searchRequest = try? request.read(as: LDAPSearchRequest.self) else {
             response.status(.unprocessableEntity)
             next()
@@ -111,32 +92,22 @@ class LDAPGatewayAPIv1 {
                 next()
                 return
             } else {
-                database.queryByView("all_users", ofDesign: "ldapv1_design", usingParameters: []) { (databaseResponse, error) in
-                    guard let databaseResponse = databaseResponse else {
+                dataProvider.completeManagedObjects(ofType: ManagedUser.self, completion: { (managedUsers, error) in
+                    guard let managedUsers = managedUsers else {
                         response.status(.internalServerError)
                         next()
                         return
                     }
                     
-                    let jsonDecoder = JSONDecoder()
+                    let userRecords = managedUsers.map({ (managedUser) -> LDAPUserRecord in
+                        return LDAPUserRecord(managedUser: managedUser)
+                    })
                     
-                    let userRecords = databaseResponse["rows"].array?.flatMap { user -> LDAPUserRecord? in
-                        guard let record = try? jsonDecoder.decode(LDAPUserRecord.self, from:user["value"].rawData()) else {
-                            return nil
-                        }
-                        return record
-                    }
-                    
-                    if let userRecords = userRecords {
-                        request.userInfo[CustomRequestKeys.availableRecords.rawValue] = userRecords
-                        next()
-                        return
-                    } else {
-                        response.status(.internalServerError)
-                        next()
-                        return
-                    }
-                }
+                    request.userInfo[CustomRequestKeys.availableRecords.rawValue] = userRecords
+                    next()
+                    return
+                })
+                
                 return
             }
         case LDAPContainerRecord.groupContainer.dn:
@@ -158,24 +129,17 @@ class LDAPGatewayAPIv1 {
                     let recordField = String(recordInfo[0])
                     let recordUUID = String(recordInfo[1])
                     if (recordField == LDAPUserRecord.fieldUsedInDN.rawValue) {
-                        database.retrieve(recordUUID, callback: { (document: JSON?, error: NSError?) in
-                            guard let document = document else {
+                        
+                        dataProvider.managedObject(ofType: ManagedUser.self, withUUID: recordUUID, completion: { (managedUser, error) in
+                            guard let managedUser = managedUser else {
                                 response.status(.notFound)
                                 next()
                                 return
                             }
                             
-                            let jsonDecoder = JSONDecoder()
-                            jsonDecoder.userInfo[CodingUserInfoKey.decodingStrategy] = DecodingStrategyForRecord.decodeFromDatabaseNativeFields
-                            if let record = try? jsonDecoder.decode(LDAPUserRecord.self, from: document.rawData()) {
-                                request.userInfo[CustomRequestKeys.availableRecords.rawValue] = [record]
-                                next()
-                                return
-                            } else {
-                                response.status(.internalServerError)
-                                next()
-                                return
-                            }
+                            request.userInfo[CustomRequestKeys.availableRecords.rawValue] = [LDAPUserRecord(managedUser: managedUser)]
+                            next()
+                            return
                         })
                         return
                     } else {
@@ -211,6 +175,7 @@ class LDAPGatewayAPIv1 {
         if let ldapFilter = searchRequest.filter {
             if let filteredRecords = ldapFilter.filter(records: availableRecords) {
                 if let jsonData = try? JSONEncoder().encode(filteredRecords) {
+                    response.headers.setType("json")
                     response.send(data: jsonData)
                     response.status(.OK)
                     next()
@@ -227,6 +192,7 @@ class LDAPGatewayAPIv1 {
             }
         } else {
             if let jsonData = try? JSONEncoder().encode(availableRecords) {
+                response.headers.setType("json")
                 response.send(data: jsonData)
                 response.status(.OK)
                 next()
@@ -241,41 +207,61 @@ class LDAPGatewayAPIv1 {
     
     // MARK: LDAP Bind management (authentication)
     
-    func handleLDAPAuthentication(authRequest: LDAPAuthRequest, completion:@escaping (LDAPAuthResponse?, RequestError?) -> Void) -> Void {
+    func handleLDAPAuthentication(request: RouterRequest, response: RouterResponse, next: @escaping ()->Void) -> Void {
+        guard let contentType = request.headers["Content-Type"] else {
+            response.status(.unsupportedMediaType)
+            next()
+            return
+        }
+        guard contentType.hasPrefix("application/json") else {
+            response.status(.unsupportedMediaType)
+            next()
+            return
+        }
+        
+        guard let authRequest = try? request.read(as: LDAPAuthRequest.self) else {
+            response.status(.unprocessableEntity)
+            next()
+            return
+        }
+        
         guard let username = authRequest.name else {
-            completion(LDAPAuthResponse(isAuthenticated: false, message: "Username not provided"), RequestError.unauthorized)
+            response.status(.unauthorized)
+            next()
             return
         }
         
         guard let authenticationChallenges = authRequest.authentication else {
-            completion(LDAPAuthResponse(isAuthenticated: false, message: "Auhentication request missing"), RequestError.unauthorized)
+            response.status(.unauthorized)
+            next()
             return
         }
-        
-        //TODO: Ask frank to provide a simplest API on ManagedUser
-        database.userAuthMethods(login: username) {
-            authMethods in
-            guard
-                let authMethods = authMethods,
-                let modularString = authMethods.authMethods["pbkdf2"]
-                else {
-                    completion(LDAPAuthResponse(isAuthenticated: false, message: "Authentication denied"), RequestError.unauthorized)
+        if let simplePassword = authenticationChallenges.simple {
+            dataProvider.completeManagedUser(withLogin: username) { (managedUser, error) in
+                guard let managedUser = managedUser else {
+                    response.status(.unauthorized)
+                    next()
                     return
-            }
-            
-            if let simplePassword = authenticationChallenges.simple {
-                let valid = PBKDF2.verifyPassword(simplePassword, withString: modularString)
+                }
                 
-                if (valid) {
-                    completion(LDAPAuthResponse(isAuthenticated: true, message: nil), RequestError.ok)
+                do {
+                    if (try managedUser.verify(clearTextPassword: simplePassword))  {
+                        response.status(.OK)
+                        next()
+                    }
+                    else {
+                        response.status(.unauthorized)
+                        next()
+                    }
+                } catch {
+                    response.status(.unauthorized)
+                    next()
                 }
-                else {
-                    completion(LDAPAuthResponse(isAuthenticated: false, message: "Authentication denied"), RequestError.unauthorized)
-                }
-            } else {
-                completion(LDAPAuthResponse(isAuthenticated: false, message: "Unsupported authentication methods"), RequestError.unauthorized)
             }
+        } else {
+            response.status(.unauthorized)
+            next()
         }
     }
-  
+    
 }
