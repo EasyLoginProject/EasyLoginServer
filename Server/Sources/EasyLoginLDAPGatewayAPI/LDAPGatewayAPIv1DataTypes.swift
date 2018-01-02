@@ -25,15 +25,6 @@ struct LDAPAuthRequest: Codable {
 }
 
 /**
- Authentication response sent to the LDAP gateway that may or may not be used.
- In addition to setting isAuthenticated field, you must also return an apropriate HTTP Status Code.
- */
-struct LDAPAuthResponse: Codable {
-    let isAuthenticated: Bool
-    let message: String?
-}
-
-/**
  Represent all kind of complex filter request provided by the Perl gateway.
  Filter can be nested and agregated via an operator (and, or, not),
  so LDAPFilter need to be a class that can reference other instances.

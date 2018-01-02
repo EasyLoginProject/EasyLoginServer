@@ -36,7 +36,7 @@ class LDAPGatewayAPIv1 {
     
     // MARK: - Handler and handler management
     func installHandlers(to router: Router) {
-        router.ldapPOST("/v1/auth", handler: handleLDAPAuthentication)
+        router.post("/v1/auth", handler: handleLDAPAuthentication)
         router.post("/v1/search", handler: loadRecordsForLDAPSearch, filterRecordsForLDAPSearch)
     }
     
@@ -44,6 +44,17 @@ class LDAPGatewayAPIv1 {
     
     // MARK: Handler and subhandlers neededs for LDAP search of all kinds.
     func loadRecordsForLDAPSearch(request: RouterRequest, response: RouterResponse, next: @escaping ()->Void) -> Void {
+        guard let contentType = request.headers["Content-Type"] else {
+            response.status(.unsupportedMediaType)
+            next()
+            return
+        }
+        guard contentType.hasPrefix("application/json") else {
+            response.status(.unsupportedMediaType)
+            next()
+            return
+        }
+        
         guard let searchRequest = try? request.read(as: LDAPSearchRequest.self) else {
             response.status(.unprocessableEntity)
             next()
@@ -164,6 +175,7 @@ class LDAPGatewayAPIv1 {
         if let ldapFilter = searchRequest.filter {
             if let filteredRecords = ldapFilter.filter(records: availableRecords) {
                 if let jsonData = try? JSONEncoder().encode(filteredRecords) {
+                    response.headers.setType("json")
                     response.send(data: jsonData)
                     response.status(.OK)
                     next()
@@ -180,6 +192,7 @@ class LDAPGatewayAPIv1 {
             }
         } else {
             if let jsonData = try? JSONEncoder().encode(availableRecords) {
+                response.headers.setType("json")
                 response.send(data: jsonData)
                 response.status(.OK)
                 next()
@@ -194,36 +207,60 @@ class LDAPGatewayAPIv1 {
     
     // MARK: LDAP Bind management (authentication)
     
-    func handleLDAPAuthentication(authRequest: LDAPAuthRequest, completion:@escaping (LDAPAuthResponse?, RequestError?) -> Void) -> Void {
+    func handleLDAPAuthentication(request: RouterRequest, response: RouterResponse, next: @escaping ()->Void) -> Void {
+        guard let contentType = request.headers["Content-Type"] else {
+            response.status(.unsupportedMediaType)
+            next()
+            return
+        }
+        guard contentType.hasPrefix("application/json") else {
+            response.status(.unsupportedMediaType)
+            next()
+            return
+        }
+        
+        guard let authRequest = try? request.read(as: LDAPAuthRequest.self) else {
+            response.status(.unprocessableEntity)
+            next()
+            return
+        }
+        
         guard let username = authRequest.name else {
-            completion(LDAPAuthResponse(isAuthenticated: false, message: "Username not provided"), RequestError.unauthorized)
+            response.status(.unauthorized)
+            next()
             return
         }
         
         guard let authenticationChallenges = authRequest.authentication else {
-            completion(LDAPAuthResponse(isAuthenticated: false, message: "Auhentication request missing"), RequestError.unauthorized)
+            response.status(.unauthorized)
+            next()
             return
         }
         if let simplePassword = authenticationChallenges.simple {
             dataProvider.completeManagedUser(withLogin: username) { (managedUser, error) in
                 guard let managedUser = managedUser else {
-                    completion(LDAPAuthResponse(isAuthenticated: false, message: "Authentication denied"), RequestError.unauthorized)
+                    response.status(.unauthorized)
+                    next()
                     return
                 }
                 
                 do {
                     if (try managedUser.verify(clearTextPassword: simplePassword))  {
-                        completion(LDAPAuthResponse(isAuthenticated: true, message: nil), RequestError.ok)
+                        response.status(.OK)
+                        next()
                     }
                     else {
-                        completion(LDAPAuthResponse(isAuthenticated: false, message: "Authentication denied"), RequestError.unauthorized)
+                        response.status(.unauthorized)
+                        next()
                     }
                 } catch {
-                    completion(LDAPAuthResponse(isAuthenticated: false, message: "Authentication denied"), RequestError.unauthorized)
+                    response.status(.unauthorized)
+                    next()
                 }
             }
         } else {
-            completion(LDAPAuthResponse(isAuthenticated: false, message: "Unsupported authentication methods"), RequestError.unauthorized)
+            response.status(.unauthorized)
+            next()
         }
     }
     
