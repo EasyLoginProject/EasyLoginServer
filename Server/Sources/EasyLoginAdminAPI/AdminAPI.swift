@@ -125,18 +125,7 @@ public class AdminAPI {
         return router
     }
     
-    func getUsers(request: RouterRequest, response: RouterResponse, next: @escaping ()->Void) -> Void {
-        guard let contentType = request.headers["Content-Type"] else {
-            response.status(.unsupportedMediaType)
-            next()
-            return
-        }
-        guard contentType.hasPrefix("application/json") else {
-            response.status(.unsupportedMediaType)
-            next()
-            return
-        }
-        
+    func getUsers(request: RouterRequest, response: RouterResponse, next: @escaping ()->Void) -> Void {        
         dataProvider.completeManagedObjects(ofType: ManagedUser.self) { (managedUsers, error) in
             guard var managedUsers = managedUsers else {
                 response.status(.internalServerError)
@@ -334,18 +323,6 @@ public class AdminAPI {
     }
     
     func getUser(request: RouterRequest, response: RouterResponse, next: @escaping ()->Void) -> Void {
-        guard let contentType = request.headers["Content-Type"] else {
-            response.status(.unsupportedMediaType)
-            next()
-            return
-        }
-        
-        guard contentType.hasPrefix("application/json") else {
-            response.status(.unsupportedMediaType)
-            next()
-            return
-        }
-        
         guard let recordUUID = request.parameters["uuid"] else {
             response.status(.badRequest)
             next()
