@@ -82,7 +82,12 @@ public func initialize() throws {
         let notificationService = installNotificationService()
         inspectorService.registerInspectable(notificationService, name: "notifications")
         
-        router.all("/admin", middleware: StaticFileServer(path: "./public/admin"))
+        if let staticSettings = manager["static"] as? [String:Any] {
+            // --static.admin=/Users/ygi/Sources/EasyLogin/EasyLoginWebAdmin/src/admin/build
+            if let staticAdminPath = staticSettings["admin"] as? String {
+                router.all("/admin", middleware: StaticFileServer(path: staticAdminPath))
+            }
+        }
     }
     
     inspectorService.installHandlers(to: router)
