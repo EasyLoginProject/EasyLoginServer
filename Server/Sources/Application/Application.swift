@@ -19,6 +19,8 @@ import EasyLoginDirectoryService
 import NotificationService
 import EasyLoginLDAPGatewayAPI
 import EasyLoginAdminAPI
+import SwiftMetrics
+import SwiftMetricsDash
 
 public enum ConfigError: Error {
     case missingDatabaseInfo
@@ -83,11 +85,18 @@ public func initialize() throws {
         inspectorService.registerInspectable(notificationService, name: "notifications")
         
         if let staticSettings = manager["static"] as? [String:Any] {
-            // --static.admin=/Users/ygi/Sources/EasyLogin/EasyLoginWebAdmin/src/admin/build
+            // --static.admin=/Users/ygi/Sources/EasyLogin/EasyLoginWebAdmin/htdocs/admin
             if let staticAdminPath = staticSettings["admin"] as? String {
                 router.all("/admin", middleware: StaticFileServer(path: staticAdminPath))
             }
         }
+        
+        // Enable SwiftMetrics Monitoring
+        let sm = try SwiftMetrics()
+        
+        // Pass SwiftMetrics to the dashboard for visualising
+        let _ = try SwiftMetricsDash(swiftMetricsInstance: sm, endpoint: router)
+
     }
     
     inspectorService.installHandlers(to: router)
