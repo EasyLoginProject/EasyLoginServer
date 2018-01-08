@@ -729,6 +729,8 @@ class LDAPUserRecord: LDAPAbstractRecord {
         cn = managedUser.fullName
         
         super.init(managedObject: managedUser)
+        privateObjectClass = ["inetOrgPerson", "posixAccount"]
+        privateParentContainer = LDAPContainerRecord.userContainer
     }
     
     override func valuesForField(_ field:String) -> [String]? {
