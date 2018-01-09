@@ -1,10 +1,11 @@
 FROM ibmcom/swift-ubuntu-runtime:latest
 
-ENV RESOURCES /EasyLoginServer/Resources
-
 EXPOSE 8080
 
-COPY Server/.build/x86_64-unknown-linux/release/EasyLogin /EasyLoginServer/EasyLogin
-COPY Server/Resources $RESOURCES
+COPY Server /EasyLoginServer
+RUN chown -R root:root /EasyLoginServer
+RUN chown -R www-data:www-data /EasyLoginServer/.build
 
-CMD /EasyLoginServer/EasyLogin
+USER www-data
+
+CMD /EasyLoginServer/.build/x86_64-unknown-linux/release/EasyLogin
