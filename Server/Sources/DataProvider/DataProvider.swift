@@ -21,8 +21,13 @@ import Extensions
 #endif
 
 public struct CombinedError {
-    let swiftError: Error?
-    let cocoaError: NSError?
+    public let swiftError: Error?
+    public let cocoaError: NSError?
+    
+    public init(swiftError:Error?, cocoaError:NSError?) {
+        self.swiftError = swiftError
+        self.cocoaError = cocoaError
+    }
 }
 
 public enum DataProviderError: Error {
