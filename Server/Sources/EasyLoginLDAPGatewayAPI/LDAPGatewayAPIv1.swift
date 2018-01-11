@@ -28,6 +28,12 @@ class LDAPGatewayAPIv1 {
         case searchRequest
     }
     
+    enum LDAPGatewayError : Error {
+        case dnFieldNotSupported
+        case invalidDNSyntax
+        case usernameNotSupported
+    }
+    
     // MARK: Class management
     
     init() throws {
@@ -123,43 +129,17 @@ class LDAPGatewayAPIv1 {
             }
         default:
             // Find specific record
-            if let rangeOfUserDN = searchRequest.baseObject.range(of: ",\(LDAPContainerRecord.userContainer.dn)") {
-                let recordInfo = searchRequest.baseObject.prefix(upTo: rangeOfUserDN.lowerBound).split(separator: "=")
-                if (recordInfo.count == 2) {
-                    let recordField = String(recordInfo[0])
-                    let recordUUID = String(recordInfo[1])
-                    if (recordField == LDAPUserRecord.fieldUsedInDN.rawValue) {
-                        
-                        dataProvider.completeManagedObject(ofType: ManagedUser.self, withUUID: recordUUID, completion: { (managedUser, error) in
-                            guard let managedUser = managedUser else {
-                                response.status(.notFound)
-                                next()
-                                return
-                            }
-                            
-                            request.userInfo[CustomRequestKeys.availableRecords.rawValue] = [LDAPUserRecord(managedUser: managedUser)]
-                            next()
-                            return
-                        })
-                        return
-                    } else {
-                        // Could be improved to support search by alternate field, some LDAP server support this.
-                        response.status(.notImplemented)
-                        next()
-                        return
-                    }
-                } else {
-                    
+            managedUserWith(usernameOrDN:searchRequest.baseObject) { (managedUser, error) in
+                guard let managedUser = managedUser else {
+                    response.status(.notFound)
+                    next()
+                    return
                 }
-            } else {
-                response.status(.unauthorized)
+                
+                request.userInfo[CustomRequestKeys.availableRecords.rawValue] = [LDAPUserRecord(managedUser: managedUser)]
                 next()
                 return
             }
-            
-            response.status(.notImplemented)
-            next()
-            return
         }
     }
     
@@ -237,7 +217,7 @@ class LDAPGatewayAPIv1 {
             return
         }
         if let simplePassword = authenticationChallenges.simple {
-            dataProvider.completeManagedUser(withLogin: username) { (managedUser, error) in
+            managedUserWith(usernameOrDN: username) { (managedUser, error) in
                 guard let managedUser = managedUser else {
                     response.status(.unauthorized)
                     next()
@@ -264,4 +244,28 @@ class LDAPGatewayAPIv1 {
         }
     }
     
+    private func managedUserWith(usernameOrDN:String, completion: @escaping (ManagedUser?, CombinedError?)->Void) {
+        // Find specific record
+        if let rangeOfUserDN = usernameOrDN.range(of: ",\(LDAPContainerRecord.userContainer.dn)") {
+            let recordInfo = usernameOrDN.prefix(upTo: rangeOfUserDN.lowerBound).split(separator: "=")
+            if (recordInfo.count == 2) {
+                let recordField = String(recordInfo[0])
+                let recordUUID = String(recordInfo[1])
+                if (recordField == LDAPUserRecord.fieldUsedInDN.rawValue) {
+                    dataProvider.completeManagedObject(ofType: ManagedUser.self, withUUID: recordUUID, completion: { (managedUser, error) in
+                        completion(managedUser, error)
+                    })
+                } else {
+                    // Could be improved to support search by alternate field, some LDAP server support this.
+                    completion(nil, CombinedError(swiftError:LDAPGatewayError.dnFieldNotSupported, cocoaError:nil))
+                }
+            } else {
+                completion(nil, CombinedError(swiftError:LDAPGatewayError.invalidDNSyntax, cocoaError:nil))
+            }
+        } else {
+            dataProvider.completeManagedUser(withLogin: usernameOrDN) { (managedUser, error) in
+                completion(managedUser, error)
+            }
+        }
+    }
 }
