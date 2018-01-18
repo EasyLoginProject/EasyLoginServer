@@ -41,7 +41,9 @@ class UserGroups {
         }
         dataProvider.completeManagedObject(ofType: ManagedUserGroup.self, withUUID: uuid) {
             retrievedUserGroup, error in
-            if let retrievedUserGroup = retrievedUserGroup, retrievedUserGroup.deleted == false, let jsonData = try? JSONEncoder().encode(retrievedUserGroup) { // TODO: webserviceRepresentation (using codingKeys) -- don't encode _rev, replace _id
+            let jsonEncoder = JSONEncoder()
+            jsonEncoder.userInfo[.managedObjectCodingStrategy] = ManagedObjectCodingStrategy.apiEncoding(.full)
+            if let retrievedUserGroup = retrievedUserGroup, retrievedUserGroup.deleted == false, let jsonData = try? jsonEncoder.encode(retrievedUserGroup) {
                 response.send(data: jsonData)
                 response.headers.setType("json")
                 response.status(.OK)
@@ -175,7 +177,9 @@ class UserGroups {
         defer { next() }
         self.dataProvider.managedObjects(ofType: ManagedUserGroup.self) {
             list, error in
-            if let list = list, let jsonData = try? JSONEncoder().encode(list) {
+            let jsonEncoder = JSONEncoder()
+            jsonEncoder.userInfo[.managedObjectCodingStrategy] = ManagedObjectCodingStrategy.apiEncoding(.list)
+            if let list = list, let jsonData = try? jsonEncoder.encode(list) {
                 response.send(data: jsonData)
                 response.headers.setType("json")
                 response.status(.OK)

@@ -49,6 +49,16 @@ public class ManagedUserGroup: ManagedObject {
         case shortname
     }
     
+    enum ManagedUserGroupAPICodingKeys: String, CodingKey {
+        case numericID
+        case shortname
+        case commonName
+        case email
+        case memberOf
+        case nestedGroups
+        case members
+    }
+    
     
     fileprivate init(withNumericID numericID:Int, shortname:String, commonName:String, email:String?, memberOf:[String] = [], nestedGroups:[String] = [], members:[String] = []) {
         self.numericID = numericID
@@ -84,6 +94,9 @@ public class ManagedUserGroup: ManagedObject {
             memberOf = []
             nestedGroups = []
             members = []
+            
+        case .apiEncoding(_)?:
+            throw EasyLoginError.debug("not implemented")
         }
         
         try super.init(from: decoder)
@@ -107,6 +120,20 @@ public class ManagedUserGroup: ManagedObject {
             var container = encoder.container(keyedBy: ManagedUserGroupPartialDatabaseCodingKeys.self)
             try container.encode(numericID, forKey: .numericID)
             try container.encode(shortname, forKey: .shortname)
+            
+        case .apiEncoding(let view)?:
+            var container = encoder.container(keyedBy: ManagedUserGroupAPICodingKeys.self)
+            try container.encode(numericID, forKey: .numericID)
+            try container.encode(shortname, forKey: .shortname)
+            if view == .full {
+                try container.encode(commonName, forKey: .commonName)
+                if let email = email {
+                    try container.encode(email, forKey: .email)
+                }
+                try container.encode(memberOf, forKey: .memberOf)
+                try container.encode(nestedGroups, forKey: .nestedGroups)
+                try container.encode(members, forKey: .members)
+            }
         }
         try super.encode(to: encoder)
     }
