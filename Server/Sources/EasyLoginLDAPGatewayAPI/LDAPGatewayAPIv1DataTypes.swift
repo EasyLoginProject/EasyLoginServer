@@ -173,15 +173,15 @@ class LDAPFilter: Codable {
                                 for (matchType, value) in substrings {
                                     switch matchType {
                                     case "any":
-                                        if valueToEvaluate.contains(value) {
+                                        if valueToEvaluate.lowercased().contains(value.lowercased()) {
                                             return true
                                         }
                                     case "initial":
-                                        if valueToEvaluate.hasPrefix(value) {
+                                        if valueToEvaluate.lowercased().hasPrefix(value.lowercased()) {
                                             return true
                                         }
                                     case "final":
-                                        if valueToEvaluate.hasSuffix(value) {
+                                        if valueToEvaluate.lowercased().hasSuffix(value.lowercased()) {
                                             return true
                                         }
                                     default: break
