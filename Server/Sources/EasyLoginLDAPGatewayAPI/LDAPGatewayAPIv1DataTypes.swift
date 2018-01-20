@@ -309,7 +309,7 @@ class LDAPAbstractRecord : Codable, Equatable {
     
     required init(from decoder: Decoder) throws {
         let values = try decoder.container(keyedBy: LDAPAbstractRecordCodingKeys.self)
-        entryUUID = try values.decode(String.self, forKey: .entryUUID)
+        entryUUID = try values.decode(String.self, forKey: .entryUUID).uppercased()
     }
     
     func encode(to encoder: Encoder) throws {
