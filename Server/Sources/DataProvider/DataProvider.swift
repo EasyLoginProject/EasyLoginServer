@@ -11,6 +11,7 @@ import Kitura
 import LoggerAPI
 import SwiftyJSON
 import Extensions
+import NotificationService
 
 // WARNING: Should no be necessary, don't know why Xcode can't see the original declaration comming from CouchDB
 #if os(Linux)
@@ -289,6 +290,7 @@ public class DataProvider {
                     
                     if updateResult.ok {
                         self.completeManagedObject(ofType: T.self, withUUID: updateResult.id, completion: completion)
+                        NotificationService.notifyAllClients()
                     } else {
                         completion(nil, CombinedError(swiftError: nil, cocoaError: error))
                     }
@@ -316,6 +318,7 @@ public class DataProvider {
                     
                     if updateResult.ok {
                         self.completeManagedObject(ofType: T.self, withUUID: updateResult.id, completion: completion)
+                        NotificationService.notifyAllClients()
                     } else {
                         completion(nil, CombinedError(swiftError: nil, cocoaError: error))
                     }
@@ -329,7 +332,6 @@ public class DataProvider {
     }
     
     public func delete<T: ManagedObject>(managedObject:T, completion: @escaping (CombinedError?) -> Void) throws {
-        managedObject.markAsDeleted()
         guard let revision = managedObject.revision else {
             throw DataProviderError.tryingToUpdateNonExistingObject
         }
@@ -344,6 +346,7 @@ public class DataProvider {
                     
                     if updateResult.ok {
                         completion(nil)
+                        NotificationService.notifyAllClients()
                     } else {
                         completion(CombinedError(swiftError: nil, cocoaError: error))
                     }
