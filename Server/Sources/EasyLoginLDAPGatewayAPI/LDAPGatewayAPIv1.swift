@@ -10,7 +10,6 @@ import CouchDB
 import Kitura
 import KituraContracts
 import LoggerAPI
-import NotificationService
 import DataProvider
 
 /**
