@@ -155,7 +155,7 @@ class LDAPFilter: Codable {
                 return records.filter({ (recordToCheck) -> Bool in
                     if let testedValues = recordToCheck.valuesForField(equalityMatch.attributeDesc) {
                         for testedValue in testedValues {
-                            if testedValue == equalityMatch.assertionValue {
+                            if testedValue.lowercased() == equalityMatch.assertionValue.lowercased() {
                                 return true
                             }
                         }
@@ -173,15 +173,15 @@ class LDAPFilter: Codable {
                                 for (matchType, value) in substrings {
                                     switch matchType {
                                     case "any":
-                                        if valueToEvaluate.contains(value) {
+                                        if valueToEvaluate.lowercased().contains(value.lowercased()) {
                                             return true
                                         }
                                     case "initial":
-                                        if valueToEvaluate.hasPrefix(value) {
+                                        if valueToEvaluate.lowercased().hasPrefix(value.lowercased()) {
                                             return true
                                         }
                                     case "final":
-                                        if valueToEvaluate.hasSuffix(value) {
+                                        if valueToEvaluate.lowercased().hasSuffix(value.lowercased()) {
                                             return true
                                         }
                                     default: break
@@ -309,7 +309,7 @@ class LDAPAbstractRecord : Codable, Equatable {
     
     required init(from decoder: Decoder) throws {
         let values = try decoder.container(keyedBy: LDAPAbstractRecordCodingKeys.self)
-        entryUUID = try values.decode(String.self, forKey: .entryUUID)
+        entryUUID = try values.decode(String.self, forKey: .entryUUID).uppercased()
     }
     
     func encode(to encoder: Encoder) throws {

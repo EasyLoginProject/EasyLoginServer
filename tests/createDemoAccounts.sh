@@ -1,13 +1,19 @@
 #!/bin/bash
 
-SERVER_URL="http://127.0.0.1:8080"
+SERVER_URL="$1"
+
+if [ -z "$SERVER_URL" ]
+then
+	echo "Please, specify server base URL as first argument"
+	exit 1
+fi
 
 function createUserWithGivenNameSurnameFullNameShortnamePrincipalNameEmail {
 	JSON_TEMPLATE="{ \"surname\": \"%SURNAME%\", \"email\": \"%EMAIL%\", \"fullName\": \"%FULLNAME%\", \"givenName\": \"%GIVENNAME%\", \"principalName\": \"%PRINCIPALNAME%\", \"shortname\": \"%SHORTNAME%\", \"authMethods\": { \"cleartext\": \"Password123\" }}"
 
 	USER_RECORD=$(echo $JSON_TEMPLATE | sed "s/%GIVENNAME%/$1/g" | sed "s/%SURNAME%/$2/g" | sed "s/%FULLNAME%/$3/g" | sed "s/%SHORTNAME%/$4/g" | sed "s/%PRINCIPALNAME%/$5/g" | sed "s/%EMAIL%/$6/g")
 	
-	curl -s -X POST -H "Content-Type: application/json" -d "$USER_RECORD" "$SERVER_URL/db/users"
+	curl -k -s -X POST -H "Content-Type: application/json" -d "$USER_RECORD" "$SERVER_URL/db/users"
 }
 
 
