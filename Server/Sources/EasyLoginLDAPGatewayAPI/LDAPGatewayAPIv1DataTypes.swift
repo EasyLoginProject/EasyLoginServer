@@ -155,7 +155,7 @@ class LDAPFilter: Codable {
                 return records.filter({ (recordToCheck) -> Bool in
                     if let testedValues = recordToCheck.valuesForField(equalityMatch.attributeDesc) {
                         for testedValue in testedValues {
-                            if testedValue == equalityMatch.assertionValue {
+                            if testedValue.lowercased() == equalityMatch.assertionValue.lowercased() {
                                 return true
                             }
                         }
