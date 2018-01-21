@@ -205,10 +205,6 @@ class UserGroups {
         let (addedMemberIDs, removedMemberIDs) = diffArrays(initial: initialMembers, final: finalMembers)
         // update
     }
-    
-    fileprivate func diffArrays(initial: [String], final: [String]) -> (added: [String], removed: [String]) {
-        return ([], [])
-    }
 }
 
 extension MutableManagedUserGroup {
@@ -216,5 +212,13 @@ extension MutableManagedUserGroup {
         // TODO: implement
         // !!! difference between no key and key: null
     }
+}
+
+func diffArrays(initial: [String], final: [String]) -> (added: [String], removed: [String]) {
+    let initialSet = Set(initial)
+    let finalSet = Set(final)
+    let addedSet = finalSet.subtracting(initialSet)
+    let removedSet = initialSet.subtracting(finalSet)
+    return (Array(addedSet), Array(removedSet))
 }
 
