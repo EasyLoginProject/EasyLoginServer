@@ -19,9 +19,9 @@ class UserGroups {
     let dataProvider: DataProvider
     let numericIDGenerator: PersistentCounter
     
-    init(database: Database) throws {
+    init(database: Database, dataProvider: DataProvider) {
         self.database = database
-        self.dataProvider = try DataProvider.singleton() // FIXME: inject dependency
+        self.dataProvider = dataProvider
         self.numericIDGenerator = PersistentCounter(database: database, name: "usergroups.numericID", initialValue: 1789)
     }
     

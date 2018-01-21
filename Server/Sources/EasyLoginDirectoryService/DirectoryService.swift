@@ -9,16 +9,17 @@
 import Foundation
 import CouchDB
 import Kitura
+import DataProvider
 
 public class EasyLoginDirectoryService {
     let users: Users
     let devices: Devices
     let usergroups: UserGroups
     
-    public init(database: Database) throws {
+    public init(database: Database, dataProvider: DataProvider) {
         users = Users(database: database)
         devices = Devices(database: database)
-        usergroups = try UserGroups(database: database)
+        usergroups = UserGroups(database: database, dataProvider: dataProvider)
     }
     
     public func router() -> Router {

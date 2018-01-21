@@ -19,6 +19,7 @@ import EasyLoginDirectoryService
 import NotificationService
 import EasyLoginLDAPGatewayAPI
 import EasyLoginAdminAPI
+import DataProvider
 
 public enum ConfigError: Error {
     case missingDatabaseInfo
@@ -69,7 +70,8 @@ public func initialize() throws {
     }
     
     if let database = database {
-        let directoryService = EasyLoginDirectoryService(database: database)
+        let dataProvider = try DataProvider.singleton() // FIXME: provide database
+        let directoryService = EasyLoginDirectoryService(database: database, dataProvider: dataProvider)
         router.all(middleware: EasyLoginAuthenticator(userProvider: database))
         router.all("/db", middleware: directoryService.router())
         
