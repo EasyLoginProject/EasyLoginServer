@@ -9,6 +9,7 @@
 import XCTest
 import Extensions
 import SwiftyJSON
+@testable import Extensions
 @testable import Application
 
 struct MockUserProvider: UserRecordProvider {
@@ -32,6 +33,11 @@ struct MockUserProvider: UserRecordProvider {
 }
 
 class EasyLoginAuthenticatorTests: XCTestCase {
+    static var allTests = [
+        ("testEmptyBasicAuthenticationReturnsNil", testEmptyBasicAuthenticationReturnsNil),
+        ("testValidBasicAuthenticationReturnsTuple", testValidBasicAuthenticationReturnsTuple),
+    ]
+    
     func testEmptyBasicAuthenticationReturnsNil() throws {
         let authenticator = try mockAuthenticator()
         let auth = authenticator.decodeBasicCredentials("Basic ")

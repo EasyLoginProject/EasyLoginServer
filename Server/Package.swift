@@ -45,5 +45,9 @@ let package = Package(
         .target(
             name: "EasyLogin",
             dependencies: ["Application"]),
+        .testTarget(
+            name: "EasyLoginTests",
+            dependencies: ["Extensions", "EasyLoginDirectoryService", "NotificationService", "EasyLoginLDAPGatewayAPI", "EasyLoginAdminAPI", "Application"],
+            path: "Tests"),
     ]
 )

@@ -10,6 +10,12 @@ import XCTest
 import Extensions
 
 class PBKDF2Tests: XCTestCase {
+    static var allTests = [
+        ("testCallsWithSamePasswordGenerateDifferentHashes", testCallsWithSamePasswordGenerateDifferentHashes),
+        ("testModularStringHasFiveComponents", testModularStringHasFiveComponents),
+        ("testVerify", testVerify),
+    ]
+    
     func testCallsWithSamePasswordGenerateDifferentHashes() throws {
         let p = PBKDF2()
         let s1 = try p.generateString(fromPassword: "password")
