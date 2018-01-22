@@ -6,6 +6,7 @@
 //
 
 import Foundation
+import Dispatch
 import CouchDB
 import Kitura
 import LoggerAPI
@@ -156,6 +157,38 @@ public class DataProvider {
         }
     }
     
+    public func completeManagedObjects<T: ManagedObject>(ofType:T.Type, withUUIDs uuids:[String], completion: @escaping ([String:T], CombinedError?) -> Void) -> Void {
+        guard uuids.count != 0 else {
+            completion([:], nil)
+            return
+        }
+        var result: [String:T] = [:]
+        let remainingCount = DispatchSemaphore(value: uuids.count)
+        var lastError: CombinedError? = nil
+        for uuid in uuids {
+            jsonData(forRecordWithID: uuid) {
+                (jsonData, jsonError) in
+                if let jsonData = jsonData {
+                    do {
+                        let managedObject = try T.objectFromJSON(data: jsonData, withCodingStrategy: .databaseEncoding)
+                        result[uuid] = managedObject
+                    }
+                    catch {
+                        lastError = CombinedError(swiftError: error, cocoaError: nil)
+                    }
+                }
+                else {
+                    lastError = CombinedError(swiftError: nil, cocoaError: jsonError)
+                }
+                remainingCount.signal()
+            }
+        }
+        DispatchQueue.global().async {
+            remainingCount.wait()
+            completion(result, lastError)
+        }
+    }
+    
     public func completeManagedObject<T: ManagedObject>(fromPartialManagedObject managedObject:T, completion: @escaping (T?, CombinedError?) -> Void) -> Void {
         if managedObject.isPartialRepresentation {
             jsonData(forRecordWithID: managedObject.uuid) { (jsonData, jsonError) in
@@ -300,6 +333,37 @@ public class DataProvider {
             } else {
                 completion(nil, CombinedError(swiftError: nil, cocoaError: error))
             }
+        }
+    }
+    
+    public func storeChangesFrom<T: ManagedObject>(mutableManagedObjects:[T], completion: @escaping ([T], CombinedError?) -> Void) where T: MutableManagedObject {
+        guard mutableManagedObjects.count != 0 else {
+            completion([], nil)
+            return
+        }
+        var result: [T] = []
+        let remainingCount = DispatchSemaphore(value: mutableManagedObjects.count)
+        var lastError: CombinedError? = nil
+        for mutableManagedObject in mutableManagedObjects {
+            do {
+                try storeChangeFrom(mutableManagedObject: mutableManagedObject) {
+                    (updatedManagedObject, error) in
+                    if let updatedManagedObject = updatedManagedObject {
+                        result.append(updatedManagedObject)
+                    }
+                    else {
+                        lastError = error ?? CombinedError(swiftError: nil, cocoaError: nil) // TODO: result type
+                    }
+                }
+            }
+            catch {
+                lastError = CombinedError(swiftError: error, cocoaError: nil)
+            }
+            remainingCount.signal()
+        }
+        DispatchQueue.global().async {
+            remainingCount.wait()
+            completion(result, lastError)
         }
     }
     

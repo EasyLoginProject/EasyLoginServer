@@ -108,8 +108,10 @@ public class ManagedUser: ManagedObject {
             shortname = try container.decode(String.self, forKey: .shortname)
             principalName = try container.decode(String.self, forKey: .principalName)
             fullName = try container.decode(String.self, forKey: .fullName)
+            
+        case .apiEncoding(_)?:
+            throw EasyLoginError.debug("not implemented")
         }
-        
         
         try super.init(from: decoder)
     }
@@ -135,6 +137,9 @@ public class ManagedUser: ManagedObject {
             try container.encode(shortname, forKey: .shortname)
             try container.encode(principalName, forKey: .principalName)
             try container.encode(fullName, forKey: .fullName)
+            
+        case .apiEncoding(let view)?:
+            break; // TODO: implement
         }
         try super.encode(to: encoder)
     }

@@ -33,7 +33,7 @@ let package = Package(
             dependencies: ["CloudConfiguration", "CouchDB", "Cryptor", "Kitura", "Extensions"]),
         .target(
             name: "EasyLoginDirectoryService",
-            dependencies: ["Extensions", "NotificationService"]),
+            dependencies: ["Extensions", "NotificationService", "DataProvider"]),
         .target(
             name: "EasyLoginLDAPGatewayAPI",
             dependencies: ["Extensions", "NotificationService", "DataProvider"]),
@@ -46,5 +46,9 @@ let package = Package(
         .target(
             name: "EasyLogin",
             dependencies: ["Application"]),
+        .testTarget(
+            name: "EasyLoginTests",
+            dependencies: ["Extensions", "EasyLoginDirectoryService", "NotificationService", "EasyLoginLDAPGatewayAPI", "EasyLoginAdminAPI", "Application"],
+            path: "Tests"),
     ]
 )

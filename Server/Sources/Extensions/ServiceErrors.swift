@@ -10,6 +10,7 @@ public enum EasyLoginError: Swift.Error {
     case validation(String)
     case databaseNotAvailable
     case invalidDocument(String)
+    case internalServerError
     case debug(String?)
 }
 
@@ -24,7 +25,7 @@ extension EasyLoginError {
             return .preconditionFailed
         case .missingField, .validation:
             return .unprocessableEntity
-        case .databaseNotAvailable, .invalidDocument:
+        case .databaseNotAvailable, .invalidDocument, .internalServerError:
             return .internalServerError
         default:
             return .internalServerError
@@ -43,6 +44,8 @@ extension EasyLoginError {
             return "Database not available"
         case .invalidDocument(let fieldName):
             return "Database returned invalid document, offending field = \(fieldName)."
+        case .internalServerError:
+            return "Internal error"
         case .debug(let message):
             return message ?? "Internal error"
         default:

@@ -15,6 +15,7 @@ import Configuration
 import CloudFoundryConfig
 import CouchDB
 import Extensions
+import DataProvider
 import EasyLoginDirectoryService
 import NotificationService
 import EasyLoginLDAPGatewayAPI
@@ -71,7 +72,8 @@ public func initialize() throws {
     }
     
     if let database = database {
-        let directoryService = EasyLoginDirectoryService(database: database)
+        let dataProvider = try DataProvider.singleton() // FIXME: provide database
+        let directoryService = EasyLoginDirectoryService(database: database, dataProvider: dataProvider)
         router.all(middleware: EasyLoginAuthenticator(userProvider: database))
         router.all("/db", middleware: directoryService.router())
         

@@ -11,10 +11,13 @@
             "map" : "function(doc) { if (doc.type === 'user' && doc.deleted != true) { emit(doc.shortname, {\"uuid\":doc._id, \"type\":doc.type, \"numericID\":doc.numericID, \"shortname\":doc.shortname, \"principalName\":doc.principalName, \"fullName\":doc.fullName}); } }"
         },
         "user_brief_by_principalName": {
-            "map" : "function(doc) { if (doc.type === 'user' && doc.deleted != true) { emit(doc.principalName,{\"uuid\":doc._id, \"type\":doc.type, \"numericID\":doc.numericID, \"shortname\":doc.shortname, \"principalName\":doc.principalName, \"fullName\":doc.fullName}); } }"
+            "map" : "function(doc) { if (doc.type === 'user' && doc.deleted != true) { emit(doc.principalName, {\"uuid\":doc._id, \"type\":doc.type, \"numericID\":doc.numericID, \"shortname\":doc.shortname, \"principalName\":doc.principalName, \"fullName\":doc.fullName}); } }"
         },
         "all_devices": {
             "map" : "function(doc) { if (doc.type === 'device') { emit(doc._id, {\"uuid\":doc._id, \"serialNumber\":doc.serialNumber, \"deviceName\":doc.deviceName, \"hardwareUUID\":doc.hardwareUUID}); } }"
+        },
+        "all_usergroups": {
+            "map" : "function(doc) { if (doc.type === 'usergroup' && doc.deleted != true) { emit(doc._id, {\"uuid\":doc._id, \"type\":doc.type, \"numericID\":doc.numericID, \"shortname\":doc.shortname, \"commonName\":doc.commonName}); } }"
         },
         "users_numeric_id": {
             "map" : "function(doc) { if (doc.type === 'user') { emit(null, doc.numericID); } }",
