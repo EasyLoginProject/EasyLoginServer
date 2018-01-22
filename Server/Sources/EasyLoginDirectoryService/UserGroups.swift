@@ -54,15 +54,16 @@ class UserGroups {
         }
     }
     
-    fileprivate func updateUserGroupHandler(request: RouterRequest, response: RouterResponse, next: ()->Void) -> Void {
-        defer { next() }
+    fileprivate func updateUserGroupHandler(request: RouterRequest, response: RouterResponse, next: @escaping ()->Void) -> Void {
         guard let uuid = request.parameters["uuid"] else {
             sendError(.missingField("uuid"), to:response)
+            next()
             return
         }
         guard let jsonBody = request.body?.asJSON else {
             Log.error("body parsing failure")
             sendError(.malformedBody, to:response)
+            next()
             return
         }
         dataProvider.completeManagedObject(ofType: MutableManagedUserGroup.self, withUUID: uuid, completion: {
@@ -70,6 +71,7 @@ class UserGroups {
             guard let retrievedUserGroup = retrievedUserGroup else {
                 sendError(.debug("\(String(describing: error))"), to: response)
                 // TODO: decode error
+                next()
                 return
             }
             do {
@@ -81,17 +83,30 @@ class UserGroups {
                         guard error == nil else {
                             Log.error("database may be inconsistent!")
                             sendError(.internalServerError, to:response)
+                            next()
                             return
                         }
                         // error --> internal server error, database is inconsistent
-                        NotificationService.notifyAllClients()
-                        // send view to response
+                        let jsonEncoder = JSONEncoder()
+                        jsonEncoder.userInfo[.managedObjectCodingStrategy] = ManagedObjectCodingStrategy.apiEncoding(.full)
+                        if let jsonData = try? jsonEncoder.encode(retrievedUserGroup) {
+                            NotificationService.notifyAllClients()
+                            response.send(data: jsonData)
+                            response.headers.setType("json")
+                            response.status(.OK)
+                        }
+                        else {
+                            sendError(.debug("Internal error"), to: response) // TODO: decode error
+                        }
+                        next()
+                        return
                     }
                 })
             }
             catch {
                 sendError(.debug("\(String(describing: error))"), to: response)
                 // TODO: decode error
+                next()
                 return
             }
         })
@@ -165,34 +180,41 @@ class UserGroups {
         }
     }
     
-    fileprivate func deleteUserGroupHandler(request: RouterRequest, response: RouterResponse, next: ()->Void) -> Void {
-        defer { next() }
+    fileprivate func deleteUserGroupHandler(request: RouterRequest, response: RouterResponse, next: @escaping ()->Void) -> Void {
         guard let uuid = request.parameters["uuid"] else {
             sendError(.missingField("uuid"), to:response)
+            next()
             return
         }
         dataProvider.completeManagedObject(ofType: ManagedUserGroup.self, withUUID: uuid) {
             retrievedUserGroup, error in
             if let retrievedUserGroup = retrievedUserGroup {
-                do {
-                    try self.dataProvider.delete(managedObject: retrievedUserGroup) {
-                        error in
-                        guard error == nil else {
-                            sendError(.debug("Internal error"), to: response) // TODO: decode error
+                self.updateRelationships(initial: retrievedUserGroup, final: nil) {
+                    error in
+                    do {
+                        try self.dataProvider.delete(managedObject: retrievedUserGroup) {
+                            error in
+                            guard error == nil else {
+                                sendError(.debug("Internal error"), to: response) // TODO: decode error
+                                next()
+                                return
+                            }
+                            NotificationService.notifyAllClients()
+                            response.status(.noContent)
+                            next()
                             return
                         }
-                        NotificationService.notifyAllClients()
-                        response.status(.noContent)
+                    }
+                    catch {
+                        sendError(.debug("Internal error"), to: response) // TODO: decode error
+                        next()
                         return
                     }
-                }
-                catch {
-                    sendError(.debug("Internal error"), to: response) // TODO: decode error
-                    return
                 }
             }
             else {
                 sendError(.notFound, to: response)
+                next()
                 return
             }
         }
@@ -220,11 +242,9 @@ class UserGroups {
         let initialOwners = initial?.memberOf ?? []
         let finalOwners = final?.memberOf ?? []
         let (addedOwnerIDs, removedOwnerIDs) = diffArrays(initial: initialOwners, final: finalOwners)
-        // update
         let initialNestedGroups = initial?.nestedGroups ?? []
         let finalNestedGroups = final?.nestedGroups ?? []
         let (addedNestedGroupIDs, removedNestedGroupIDs) = diffArrays(initial: initialNestedGroups, final: finalNestedGroups)
-        // update
         let initialMembers = initial?.members ?? []
         let finalMembers = final?.members ?? []
         let (addedMemberIDs, removedMemberIDs) = diffArrays(initial: initialMembers, final: finalMembers)
@@ -283,9 +303,25 @@ class UserGroups {
 }
 
 extension MutableManagedUserGroup {
-    func update(withJSON json: [String: Any]) throws {
-        // TODO: implement
-        // !!! difference between no key and key: null
+    func update(withJSON jsonBody: [String: Any]) throws {
+        if let commonName = jsonBody["commonName"] as? String {
+            self.setCommonName(commonName)
+        }
+        if let email = jsonBody["email"] as? String {
+            try self.setEmail(email)
+        }
+        else if jsonBody["email"] is NSNull {
+            self.clearEmail()
+        }
+        if let memberOf = jsonBody["memberOf"] as? [String] {
+            self.setOwners(memberOf)
+        }
+        if let nestedGroups = jsonBody["nestedGroups"] as? [String] {
+            self.setNestedGroups(nestedGroups)
+        }
+        if let members = jsonBody["members"] as? [String] {
+            self.setMembers(members)
+        }
     }
 }
 

@@ -81,7 +81,7 @@ public class ManagedUserGroup: ManagedObject {
             numericID = try container.decode(Int.self, forKey: .numericID)
             shortname = try container.decode(String.self, forKey: .shortname)
             commonName = try container.decode(String.self, forKey: .commonName)
-            email = try container.decode(String.self, forKey: .email)
+            email = try container.decode(String?.self, forKey: .email)
             memberOf = try container.decode([String].self, forKey: .memberOf)
             nestedGroups = try container.decode([String].self, forKey: .nestedGroups)
             members = try container.decode([String].self, forKey: .members)
@@ -184,7 +184,7 @@ public class MutableManagedUserGroup : ManagedUserGroup, MutableManagedObject {
         hasBeenEdited = true
     }
     
-    public func setCommonName(_ value:String) throws {
+    public func setCommonName(_ value:String) {
         guard value != commonName else {
             return
         }
@@ -203,6 +203,14 @@ public class MutableManagedUserGroup : ManagedUserGroup, MutableManagedObject {
         }
         
         email = value
+        hasBeenEdited = true
+    }
+    
+    public func clearEmail() {
+        guard email != nil else {
+            return
+        }
+        email = nil
         hasBeenEdited = true
     }
     
