@@ -151,6 +151,10 @@ public class DataProvider {
     }
     
     public func completeManagedObjects<T: ManagedObject>(ofType:T.Type, withUUIDs uuids:[String], completion: @escaping ([String:T], CombinedError?) -> Void) -> Void {
+        guard uuids.count != 0 else {
+            completion([:], nil)
+            return
+        }
         var result: [String:T] = [:]
         let remainingCount = DispatchSemaphore(value: uuids.count)
         var lastError: CombinedError? = nil
@@ -325,6 +329,10 @@ public class DataProvider {
     }
     
     public func storeChangesFrom<T: ManagedObject>(mutableManagedObjects:[T], completion: @escaping ([T], CombinedError?) -> Void) where T: MutableManagedObject {
+        guard mutableManagedObjects.count != 0 else {
+            completion([], nil)
+            return
+        }
         var result: [T] = []
         let remainingCount = DispatchSemaphore(value: mutableManagedObjects.count)
         var lastError: CombinedError? = nil
