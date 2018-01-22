@@ -97,45 +97,70 @@ class UserGroups {
         })
     }
     
-    fileprivate func createUserGroupHandler(request: RouterRequest, response: RouterResponse, next: ()->Void) -> Void {
-        defer { next() } // FIXME: defer to closure, or call explicitly
+    fileprivate func createUserGroupHandler(request: RouterRequest, response: RouterResponse, next: @escaping ()->Void) -> Void {
         Log.debug("handling POST")
         guard let jsonBody = request.body?.asJSON else {
             Log.error("body parsing failure")
             sendError(.malformedBody, to:response)
+            next()
             return
         }
         guard let shortname = jsonBody["shortname"] as? String else {
             sendError(.missingField("shortname"), to:response)
+            next()
             return
         }
         guard let commonName = jsonBody["commonName"] as? String else {
             sendError(.missingField("commonName"), to:response)
+            next()
             return
         }
         let email = jsonBody["email"] as? String
+        let memberOf = jsonBody["memberOf"] as? [String] ?? []
+        let nestedGroups = jsonBody["nestedGroups"] as? [String] ?? []
+        let members = jsonBody["members"] as? [String] ?? []
         numericIDGenerator.nextValue() { // TODO: generateNextValue()
             numericID in
             guard let numericID = numericID else {
                 sendError(.debug("failed to get next numericID"), to:response)
+                next()
                 return
             }
-            let usergroup = MutableManagedUserGroup(withNumericID: numericID, shortname: shortname, commonName: commonName, email: email)
-            do {
-                try self.dataProvider.insert(mutableManagedObject: usergroup) {
-                    (insertedUsergroup, error) in
-                    guard let insertedUsergroup = insertedUsergroup else {
-                        sendError(.debug("failed to insert"), to:response)
-                        return
-                    }
-                    NotificationService.notifyAllClients()
-                    response.statusCode = .created
-                    response.headers.setLocation("/db/usergroups/\(insertedUsergroup.uuid)")
-                    // send view to response
+            let usergroup = MutableManagedUserGroup(withNumericID: numericID, shortname: shortname, commonName: commonName, email: email, memberOf: memberOf, nestedGroups: nestedGroups, members: members)
+            self.updateRelationships(initial: nil, final: usergroup) {
+                error in
+                guard error == nil else {
+                    sendError(.debug("failed to update relationships: \(String(describing: error))"), to:response)
+                    next()
+                    return
                 }
-            }
-            catch {
-                sendError(.debug("failed to insert: \(error)"), to:response)
+                do {
+                    try self.dataProvider.insert(mutableManagedObject: usergroup) {
+                        (insertedUsergroup, error) in
+                        guard let insertedUsergroup = insertedUsergroup else {
+                            sendError(.debug("failed to insert"), to:response)
+                            next()
+                            return
+                        }
+                        NotificationService.notifyAllClients()
+                        let jsonEncoder = JSONEncoder()
+                        jsonEncoder.userInfo[.managedObjectCodingStrategy] = ManagedObjectCodingStrategy.apiEncoding(.full)
+                        if let jsonData = try? jsonEncoder.encode(insertedUsergroup) {
+                            response.send(data: jsonData)
+                            response.headers.setType("json")
+                            response.statusCode = .created
+                            response.headers.setLocation("/db/usergroups/\(insertedUsergroup.uuid)")
+                        }
+                        else {
+                            sendError(.debug("Internal error"), to: response) // TODO: decode error
+                        }
+                        next()
+                    }
+                }
+                catch {
+                    sendError(.debug("failed to insert: \(error)"), to:response)
+                    next()
+                }
             }
         }
     }
@@ -191,7 +216,7 @@ class UserGroups {
         }
     }
     
-    fileprivate func updateRelationships(initial: ManagedUserGroup?, final: ManagedUserGroup?, completion: (Error?) -> Void) {
+    fileprivate func updateRelationships(initial: ManagedUserGroup?, final: ManagedUserGroup?, completion: @escaping (Error?) -> Void) {
         let initialOwners = initial?.memberOf ?? []
         let finalOwners = final?.memberOf ?? []
         let (addedOwnerIDs, removedOwnerIDs) = diffArrays(initial: initialOwners, final: finalOwners)
@@ -203,7 +228,57 @@ class UserGroups {
         let initialMembers = initial?.members ?? []
         let finalMembers = final?.members ?? []
         let (addedMemberIDs, removedMemberIDs) = diffArrays(initial: initialMembers, final: finalMembers)
-        // update
+        let groupUUIDsToUpdate = Array(Set(addedOwnerIDs + removedOwnerIDs + addedNestedGroupIDs + removedNestedGroupIDs))
+        let userUUIDsToUpdate = Array(Set(addedMemberIDs + removedMemberIDs))
+        dataProvider.completeManagedObjects(ofType: MutableManagedUserGroup.self, withUUIDs: groupUUIDsToUpdate) {
+            (dict, error) in
+            guard error == nil else {
+                completion(EasyLoginError.debug(String.init(describing: error)))
+                return
+            }
+            addedOwnerIDs.forEach {
+                uuid in
+                if let nested = dict[uuid]?.nestedGroups {
+                    dict[uuid]!.setNestedGroups(nested + [final!.uuid])
+                }
+            }
+            removedOwnerIDs.forEach {
+                uuid in
+                if var nested = dict[uuid]?.nestedGroups {
+                    if let found = nested.index(of: initial!.uuid) {
+                        nested.remove(at: found)
+                    }
+                    dict[uuid]!.setNestedGroups(nested)
+                }
+            }
+            addedNestedGroupIDs.forEach {
+                uuid in
+                if let owners = dict[uuid]?.memberOf {
+                    dict[uuid]!.setOwners(owners + [final!.uuid])
+                }
+            }
+            removedNestedGroupIDs.forEach {
+                uuid in
+                if var owners = dict[uuid]?.memberOf {
+                    if let found = owners.index(of: initial!.uuid) {
+                        owners.remove(at: found)
+                    }
+                    dict[uuid]!.setOwners(owners)
+                }
+            }
+            // TODO: same with members when Users are moved to DataProvider
+            let list = dict.map { $1 }
+            self.dataProvider.storeChangesFrom(mutableManagedObjects: list) {
+                (updatedList, error) in
+                print("done! error = \(String(describing: error)), updated = \(updatedList)")
+                if let error = error {
+                    completion(EasyLoginError.debug(String.init(describing: error)))
+                }
+                else {
+                    completion(nil)
+                }
+            }
+        }
     }
 }
 

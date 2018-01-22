@@ -206,6 +206,30 @@ public class MutableManagedUserGroup : ManagedUserGroup, MutableManagedObject {
         hasBeenEdited = true
     }
     
+    public func setOwners(_ value: [String]) {
+        guard value != memberOf else {
+            return
+        }
+        memberOf = value
+        hasBeenEdited = true
+    }
+    
+    public func setNestedGroups(_ value: [String]) {
+        guard value != nestedGroups else {
+            return
+        }
+        nestedGroups = value
+        hasBeenEdited = true
+    }
+    
+    public func setMembers(_ value: [String]) {
+        guard value != members else {
+            return
+        }
+        members = value
+        hasBeenEdited = true
+    }
+    
     override class func requireFullObject() -> Bool {
         return true
     }
