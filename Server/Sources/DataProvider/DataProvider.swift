@@ -6,6 +6,7 @@
 //
 
 import Foundation
+import Dispatch
 import CouchDB
 import Kitura
 import LoggerAPI
