@@ -47,7 +47,7 @@ class LDAPGatewayAPIv1 {
     
 
     
-    // MARK: Handler and subhandlers neededs for LDAP search of all kinds.
+    // MARK: Handler and subhandlers needed for LDAP search of all kinds.
     func loadRecordsForLDAPSearch(request: RouterRequest, response: RouterResponse, next: @escaping ()->Void) -> Void {
         guard let contentType = request.headers["Content-Type"] else {
             response.status(.unsupportedMediaType)
@@ -255,7 +255,7 @@ class LDAPGatewayAPIv1 {
                         completion(managedUser, error)
                     })
                 } else {
-                    // Could be improved to support search by alternate field, some LDAP server support this.
+                    // Could be improved to support search by alternate field, some LDAP servers support this.
                     completion(nil, .swiftError(LDAPGatewayError.dnFieldNotSupported))
                 }
             } else {

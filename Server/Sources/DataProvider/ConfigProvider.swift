@@ -11,14 +11,14 @@ import CloudFoundryConfig
 
 public class ConfigProvider {
     public static let pathForResources: String = {
-        let ressourcePath: String
+        let resourcePath: String
         if let environmentVariable = getenv("RESOURCES"), let envResourcePath = String(validatingUTF8: environmentVariable) {
-            ressourcePath = envResourcePath
+            resourcePath = envResourcePath
         }
         else {
-            ressourcePath = "Resources"
+            resourcePath = "Resources"
         }
-        return ressourcePath
+        return resourcePath
     }()
     
     public static let manager: ConfigurationManager = {
@@ -38,7 +38,7 @@ public class ConfigProvider {
         
     }
     
-    public static func pathForRessource(_ ressourceSubPath: String) -> String {
-        return "\(pathForResources)/\(ressourceSubPath)"
+    public static func pathForResource(_ resourceSubPath: String) -> String {
+        return "\(pathForResources)/\(resourceSubPath)"
     }
 }

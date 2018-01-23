@@ -71,7 +71,7 @@ public class DataProvider {
             throw DataProviderError.missingDatabaseInfo
         }
         
-        database = couchDBClient.createOrOpenDatabase(name: databaseName, designFile: ConfigProvider.pathForRessource("main_design.json"))
+        database = couchDBClient.createOrOpenDatabase(name: databaseName, designFile: ConfigProvider.pathForResource("main_design.json"))
         numericIDGenerator = PersistentCounter(database: database, name: "users.numericID", initialValue: 1789)
         Log.info("Connected to CouchDB, client = \(couchDBClient), database name = \(databaseName)")
         
