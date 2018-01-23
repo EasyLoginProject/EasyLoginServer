@@ -14,14 +14,6 @@ import SwiftyJSON
 import Extensions
 import NotificationService
 
-// WARNING: Should no be necessary, don't know why Xcode can't see the original declaration comming from CouchDB
-#if os(Linux)
-    typealias KeyType = Any
-#else
-    /// Typealias used for building query parameters in view functions.
-    typealias KeyType = AnyObject
-#endif
-
 public struct CombinedError {
     public let swiftError: Error?
     public let cocoaError: NSError?
@@ -261,7 +253,7 @@ public class DataProvider {
         } else {
             guessedView = "user_brief_by_shortname"
         }
-        jsonData(fromView: guessedView, ofDesign: "main_design", usingParameters: [.keys([login as KeyType])], completion: { (jsonData, jsonError) in
+        jsonData(fromView: guessedView, ofDesign: "main_design", usingParameters: [.keys([login as Database.KeyType])], completion: { (jsonData, jsonError) in
             if let jsonData = jsonData {
                 do {
                     let viewResults = try CouchDBViewResult<ManagedUser>.objectFromJSON(data: jsonData, withCodingStrategy: ManagedObjectCodingStrategy.briefEncoding)
@@ -286,7 +278,7 @@ public class DataProvider {
         } else {
             guessedView = "user_brief_by_shortname"
         }
-        jsonData(fromView: guessedView, ofDesign: "main_design", usingParameters: [.keys([login as KeyType]), .includeDocs(true)], completion: { (jsonData, jsonError) in
+        jsonData(fromView: guessedView, ofDesign: "main_design", usingParameters: [.keys([login as Database.KeyType]), .includeDocs(true)], completion: { (jsonData, jsonError) in
             if let jsonData = jsonData {
                 do {
                     let viewResults = try CouchDBViewResult<ManagedUser>.objectFromJSON(data: jsonData, withCodingStrategy: ManagedObjectCodingStrategy.databaseEncoding)
