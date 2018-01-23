@@ -256,10 +256,10 @@ class LDAPGatewayAPIv1 {
                     })
                 } else {
                     // Could be improved to support search by alternate field, some LDAP server support this.
-                    completion(nil, CombinedError(swiftError:LDAPGatewayError.dnFieldNotSupported, cocoaError:nil))
+                    completion(nil, .swiftError(LDAPGatewayError.dnFieldNotSupported))
                 }
             } else {
-                completion(nil, CombinedError(swiftError:LDAPGatewayError.invalidDNSyntax, cocoaError:nil))
+                completion(nil, .swiftError(LDAPGatewayError.invalidDNSyntax))
             }
         } else {
             dataProvider.completeManagedUser(withLogin: usernameOrDN) { (managedUser, error) in
