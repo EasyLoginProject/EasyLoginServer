@@ -35,8 +35,8 @@ class LDAPGatewayAPIv1 {
     
     // MARK: Class management
     
-    init() throws {
-        dataProvider = try DataProvider.singleton()
+    init(dataProvider: DataProvider) {
+        self.dataProvider = dataProvider
     }
     
     // MARK: - Handler and handler management

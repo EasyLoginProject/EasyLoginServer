@@ -106,8 +106,8 @@ struct UserForAdminAPI: Codable {
 public class AdminAPI {
     let dataProvider: DataProvider
     
-    public init() throws {
-        dataProvider = try DataProvider.singleton()
+    public init(dataProvider: DataProvider) {
+        self.dataProvider = dataProvider
     }
     
     public func router() -> Router {

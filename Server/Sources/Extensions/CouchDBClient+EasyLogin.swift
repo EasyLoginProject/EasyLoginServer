@@ -1,16 +1,32 @@
 import Foundation
 import CouchDB
+import Configuration
 import CloudFoundryConfig
 import SwiftyJSON
 import LoggerAPI
 
-public enum RuntimeError: Error {
-    case databaseNotFound
-    case resourceNotFound
-}
-
 public extension CouchDBClient {
 
+    public enum Error: Swift.Error {
+        case configurationNotAvailable
+        case databaseNotFound
+        case resourceNotFound
+    }
+    
+    public convenience init(configurationManager: ConfigurationManager) throws {
+        if let dictionary = configurationManager.getManualConfiguration() {
+            // When manual database settings have been provided, we use them
+            self.init(dictionary: dictionary)
+        }
+        else if let cloudantService = configurationManager.getCloudantConfiguration() {
+            // If no manual config is provided and if we found CloudFoundry based settings, we use them
+            self.init(service: cloudantService)
+        }
+        else {
+            throw Error.configurationNotAvailable
+        }
+    }
+    
     public convenience init(service: CloudantService) {
         
         let connProperties = ConnectionProperties(host: service.host,
@@ -18,8 +34,8 @@ public extension CouchDBClient {
                                                   secured: true,
                                                   username: service.username,
                                                   password: service.password)
-        Log.debug("Initializing CouchDBClient with connection properties \(connProperties)")
         
+        Log.debug("Initializing CouchDBClient with CloudFoundry information: \(connProperties)")
         self.init(connectionProperties: connProperties)
     }
     
@@ -30,12 +46,14 @@ public extension CouchDBClient {
         let username = dictionary["username"] as? String
         let password = dictionary["password"] as? String
         let secured = dictionary["secured"] as? Bool ?? false
+        
         let connProperties = ConnectionProperties(host: host,
                                                   port: port,
                                                   secured: secured,
                                                   username: username,
                                                   password: password)
         
+        Log.debug("Initializing CouchDBClient with manual/default configuration \(connProperties)")
         self.init(connectionProperties: connProperties)
     }
     

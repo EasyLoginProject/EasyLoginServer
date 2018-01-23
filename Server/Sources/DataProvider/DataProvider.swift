@@ -27,54 +27,12 @@ public enum DataProviderError: Error {
 }
 
 public class DataProvider {
-    private let couchDBClient: CouchDBClient
     private let database: Database
     public let numericIDGenerator: PersistentCounter
     
-    static private var privateSingleton: DataProvider?
-    public static func singleton() throws -> DataProvider {
-        guard let existigSingleton = privateSingleton else {
-            privateSingleton = try DataProvider()
-            return privateSingleton!
-        }
-        return existigSingleton
-    }
-    
-    private init() throws {
-        var databaseName = "easy_login"
-        if let dictionary = ConfigProvider.manager["database"] as? [String:Any] {
-            // When manual database settings has been provided, we use them
-            
-            databaseName = dictionary["name"] as? String ?? "easylogin"
-            
-            let host = dictionary["host"] as? String ?? "127.0.0.1"
-            let port = dictionary["port"] as? Int16 ?? 5984
-            let username = dictionary["username"] as? String
-            let password = dictionary["password"] as? String
-            let secured = dictionary["secured"] as? Bool ?? false
-            
-            let connProperties = ConnectionProperties(host: host,
-                                                      port: port,
-                                                      secured: secured,
-                                                      username: username,
-                                                      password: password)
-            
-            Log.debug("Using manual plus default settings, CouchDB info \(connProperties)")
-            couchDBClient = CouchDBClient(connectionProperties: connProperties)
-        }
-        else if let cloudantService = try? ConfigProvider.manager.getCloudantService(name: "EasyLogin-Cloudant") {
-            // If not manual config is here and if we found a CloudFoundry based settings, we use them
-            
-            Log.debug("Using CloudFroundry based information, CouchDB at \(cloudantService.host):\(cloudantService.port) as \(cloudantService.username)")
-            couchDBClient = CouchDBClient(service: cloudantService)
-        } else {
-            throw DataProviderError.missingDatabaseInfo
-        }
-        
-        database = couchDBClient.createOrOpenDatabase(name: databaseName, designFile: ConfigProvider.pathForResource("main_design.json"))
+    public init(database: Database) {
+        self.database = database
         numericIDGenerator = PersistentCounter(database: database, name: "users.numericID", initialValue: 1789)
-        Log.info("Connected to CouchDB, client = \(couchDBClient), database name = \(databaseName)")
-        
     }
     
     // MARK: Database SPI
