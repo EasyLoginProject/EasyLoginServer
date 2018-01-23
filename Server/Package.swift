@@ -30,7 +30,7 @@ let package = Package(
             dependencies: ["CloudConfiguration", "CouchDB", "Cryptor", "Kitura", "Kitura-WebSocket"]),
         .target(
             name: "DataProvider",
-            dependencies: ["CloudConfiguration", "CouchDB", "Cryptor", "Kitura", "Extensions"]),
+            dependencies: ["CloudConfiguration", "CouchDB", "Cryptor", "Kitura", "Extensions", "NotificationService"]),
         .target(
             name: "EasyLoginDirectoryService",
             dependencies: ["Extensions", "NotificationService", "DataProvider"]),
