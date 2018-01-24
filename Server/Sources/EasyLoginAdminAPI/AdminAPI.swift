@@ -381,33 +381,33 @@ public class AdminAPI {
                 
                 do {
                     try desiredUserFromAdminAPI.update(mutableManagedUser: mutableManagedUser)
-                    try self.dataProvider.storeChangeFrom(mutableManagedObject: mutableManagedUser, completion: { (managedUser, error) in
-                        if let managedUser = managedUser {
-                            let userForAdminAPI = UserForAdminAPI(managedUser: managedUser)
-                            
-                            if let jsonData = try? JSONEncoder().encode(userForAdminAPI) {
-                                response.headers.setType("json")
-                                response.send(data: jsonData)
-                                response.status(.OK)
-                                next()
-                                return
-                            } else {
-                                response.status(.internalServerError)
-                                next()
-                                return
-                            }
-                            
-                        } else {
-                            response.status(.internalServerError)
-                            next()
-                            return
-                        }
-                    })
                 } catch {
                     response.status(.badRequest)
                     next()
                     return
                 }
+                self.dataProvider.storeChangeFrom(mutableManagedObject: mutableManagedUser, completion: { (managedUser, error) in
+                    if let managedUser = managedUser {
+                        let userForAdminAPI = UserForAdminAPI(managedUser: managedUser)
+                        
+                        if let jsonData = try? JSONEncoder().encode(userForAdminAPI) {
+                            response.headers.setType("json")
+                            response.send(data: jsonData)
+                            response.status(.OK)
+                            next()
+                            return
+                        } else {
+                            response.status(.internalServerError)
+                            next()
+                            return
+                        }
+                        
+                    } else {
+                        response.status(.internalServerError)
+                        next()
+                        return
+                    }
+                })
             }
         } else {
             response.status(.internalServerError)
@@ -437,28 +437,22 @@ public class AdminAPI {
         
         dataProvider.completeManagedObject(ofType: ManagedUser.self, withUUID: recordUUID) { (managedUser, error) in
             if let managedUser = managedUser {
-                do {
-                    try self.dataProvider.delete(managedObject: managedUser, completion: { (error) in
-                        if error != nil {
-                            response.status(.internalServerError)
-                            next()
-                            return
-                        } else {
-                            if let jsonData = try? JSONEncoder().encode([String:String]()) {
-                                response.headers.setType("json")
-                                response.send(data: jsonData)
-                            }
-                            
-                            response.status(.OK)
-                            next()
-                            return
+                self.dataProvider.delete(managedObject: managedUser, completion: { (error) in
+                    if error != nil {
+                        response.status(.internalServerError)
+                        next()
+                        return
+                    } else {
+                        if let jsonData = try? JSONEncoder().encode([String:String]()) {
+                            response.headers.setType("json")
+                            response.send(data: jsonData)
                         }
-                    })
-                } catch {
-                    response.status(.internalServerError)
-                    next()
-                    return
-                }
+                        
+                        response.status(.OK)
+                        next()
+                        return
+                    }
+                })
             } else {
                 response.status(.notFound)
                 next()
@@ -489,34 +483,28 @@ public class AdminAPI {
                     return
                 }
                 
-                do {
-                    try self.dataProvider.insert(mutableManagedObject: mutableManagedUser, completion: { (managedUser, error) in
-                        if let managedUser = managedUser {
-                            let userForAdminAPI = UserForAdminAPI(managedUser: managedUser)
-                            
-                            if let jsonData = try? JSONEncoder().encode(userForAdminAPI) {
-                                response.headers.setType("json")
-                                response.send(data: jsonData)
-                                response.status(.OK)
-                                next()
-                                return
-                            } else {
-                                response.status(.internalServerError)
-                                next()
-                                return
-                            }
-                            
+                self.dataProvider.insert(mutableManagedObject: mutableManagedUser, completion: { (managedUser, error) in
+                    if let managedUser = managedUser {
+                        let userForAdminAPI = UserForAdminAPI(managedUser: managedUser)
+                        
+                        if let jsonData = try? JSONEncoder().encode(userForAdminAPI) {
+                            response.headers.setType("json")
+                            response.send(data: jsonData)
+                            response.status(.OK)
+                            next()
+                            return
                         } else {
                             response.status(.internalServerError)
                             next()
                             return
                         }
-                    })
-                } catch {
-                    response.status(.badRequest)
-                    next()
-                    return
-                }
+                        
+                    } else {
+                        response.status(.internalServerError)
+                        next()
+                        return
+                    }
+                })
             }
         } else {
             response.status(.internalServerError)

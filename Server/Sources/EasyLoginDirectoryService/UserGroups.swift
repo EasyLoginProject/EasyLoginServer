@@ -74,34 +74,9 @@ class UserGroups {
                 next()
                 return
             }
-            do {
                 let initialUserGroup = MutableManagedUserGroup(withNumericID: retrievedUserGroup.numericID, shortname: retrievedUserGroup.shortname, commonName: retrievedUserGroup.commonName, email: retrievedUserGroup.email, memberOf: retrievedUserGroup.memberOf, nestedGroups: retrievedUserGroup.nestedGroups, members: retrievedUserGroup.members)
+            do {
                 try retrievedUserGroup.update(withJSON: jsonBody)
-                try self.dataProvider.storeChangeFrom(mutableManagedObject: retrievedUserGroup, completion: { (updatedUsergroup, error) in
-                    self.updateRelationships(initial: initialUserGroup, final: retrievedUserGroup) {
-                        error in
-                        guard error == nil else {
-                            Log.error("database may be inconsistent!")
-                            sendError(.internalServerError, to:response)
-                            next()
-                            return
-                        }
-                        // error --> internal server error, database is inconsistent
-                        let jsonEncoder = JSONEncoder()
-                        jsonEncoder.userInfo[.managedObjectCodingStrategy] = ManagedObjectCodingStrategy.apiEncoding(.full)
-                        if let jsonData = try? jsonEncoder.encode(retrievedUserGroup) {
-                            NotificationService.notifyAllClients()
-                            response.send(data: jsonData)
-                            response.headers.setType("json")
-                            response.status(.OK)
-                        }
-                        else {
-                            sendError(.debug("Internal error"), to: response) // TODO: decode error
-                        }
-                        next()
-                        return
-                    }
-                })
             }
             catch {
                 sendError(.debug("\(String(describing: error))"), to: response)
@@ -109,6 +84,31 @@ class UserGroups {
                 next()
                 return
             }
+            self.dataProvider.storeChangeFrom(mutableManagedObject: retrievedUserGroup, completion: { (updatedUsergroup, error) in
+                self.updateRelationships(initial: initialUserGroup, final: retrievedUserGroup) {
+                    error in
+                    guard error == nil else {
+                        Log.error("database may be inconsistent!")
+                        sendError(.internalServerError, to:response)
+                        next()
+                        return
+                    }
+                    // error --> internal server error, database is inconsistent
+                    let jsonEncoder = JSONEncoder()
+                    jsonEncoder.userInfo[.managedObjectCodingStrategy] = ManagedObjectCodingStrategy.apiEncoding(.full)
+                    if let jsonData = try? jsonEncoder.encode(retrievedUserGroup) {
+                        NotificationService.notifyAllClients()
+                        response.send(data: jsonData)
+                        response.headers.setType("json")
+                        response.status(.OK)
+                    }
+                    else {
+                        sendError(.debug("Internal error"), to: response) // TODO: decode error
+                    }
+                    next()
+                    return
+                }
+            })
         })
     }
     
@@ -149,31 +149,25 @@ class UserGroups {
                     next()
                     return
                 }
-                do {
-                    try self.dataProvider.insert(mutableManagedObject: usergroup) {
-                        (insertedUsergroup, error) in
-                        guard let insertedUsergroup = insertedUsergroup else {
-                            sendError(.debug("failed to insert"), to:response)
-                            next()
-                            return
-                        }
-                        NotificationService.notifyAllClients()
-                        let jsonEncoder = JSONEncoder()
-                        jsonEncoder.userInfo[.managedObjectCodingStrategy] = ManagedObjectCodingStrategy.apiEncoding(.full)
-                        if let jsonData = try? jsonEncoder.encode(insertedUsergroup) {
-                            response.send(data: jsonData)
-                            response.headers.setType("json")
-                            response.statusCode = .created
-                            response.headers.setLocation("/db/usergroups/\(insertedUsergroup.uuid)")
-                        }
-                        else {
-                            sendError(.debug("Internal error"), to: response) // TODO: decode error
-                        }
+                self.dataProvider.insert(mutableManagedObject: usergroup) {
+                    (insertedUsergroup, error) in
+                    guard let insertedUsergroup = insertedUsergroup else {
+                        sendError(.debug("failed to insert"), to:response)
                         next()
+                        return
                     }
-                }
-                catch {
-                    sendError(.debug("failed to insert: \(error)"), to:response)
+                    NotificationService.notifyAllClients()
+                    let jsonEncoder = JSONEncoder()
+                    jsonEncoder.userInfo[.managedObjectCodingStrategy] = ManagedObjectCodingStrategy.apiEncoding(.full)
+                    if let jsonData = try? jsonEncoder.encode(insertedUsergroup) {
+                        response.send(data: jsonData)
+                        response.headers.setType("json")
+                        response.statusCode = .created
+                        response.headers.setLocation("/db/usergroups/\(insertedUsergroup.uuid)")
+                    }
+                    else {
+                        sendError(.debug("Internal error"), to: response) // TODO: decode error
+                    }
                     next()
                 }
             }
@@ -191,22 +185,20 @@ class UserGroups {
             if let retrievedUserGroup = retrievedUserGroup {
                 self.updateRelationships(initial: retrievedUserGroup, final: nil) {
                     error in
-                    do {
-                        try self.dataProvider.delete(managedObject: retrievedUserGroup) {
-                            error in
-                            guard error == nil else {
-                                sendError(.debug("Internal error"), to: response) // TODO: decode error
-                                next()
-                                return
-                            }
-                            NotificationService.notifyAllClients()
-                            response.status(.noContent)
+                    guard error == nil else {
+                        sendError(.debug("Internal error"), to: response) // TODO: decode error
+                        next()
+                        return
+                    }
+                    self.dataProvider.delete(managedObject: retrievedUserGroup) {
+                        error in
+                        guard error == nil else {
+                            sendError(.debug("Internal error"), to: response) // TODO: decode error
                             next()
                             return
                         }
-                    }
-                    catch {
-                        sendError(.debug("Internal error"), to: response) // TODO: decode error
+                        NotificationService.notifyAllClients()
+                        response.status(.noContent)
                         next()
                         return
                     }

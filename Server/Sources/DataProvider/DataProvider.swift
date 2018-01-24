@@ -249,17 +249,25 @@ public class DataProvider {
         })
     }
     
-    public func storeChangeFrom<T: ManagedObject>(mutableManagedObject:T, completion: @escaping (T?, CombinedError?) -> Void) throws  where T: MutableManagedObject {
+    public func storeChangeFrom<T: ManagedObject>(mutableManagedObject:T, completion: @escaping (T?, CombinedError?) -> Void) where T: MutableManagedObject {
         guard mutableManagedObject.hasBeenEdited == true else {
             completion(mutableManagedObject, nil)
             return
         }
         
         guard let revision = mutableManagedObject.revision else {
-            throw DataProviderError.tryingToUpdateNonExistingObject
+            completion(nil, .swiftError(DataProviderError.tryingToUpdateNonExistingObject))
+            return
         }
         
-        let jsonData = try mutableManagedObject.jsonData(withCodingStrategy: .databaseEncoding)
+        let jsonData: Data
+        do {
+            jsonData = try mutableManagedObject.jsonData(withCodingStrategy: .databaseEncoding)
+        }
+        catch {
+            completion(nil, .swiftError(error))
+            return
+        }
         
         update(recordID: mutableManagedObject.uuid, atRev: revision, with: jsonData) { (revision, updatedJSONData, error) in
             if let updatedJSONData = updatedJSONData {
@@ -290,19 +298,14 @@ public class DataProvider {
         let remainingCount = DispatchSemaphore(value: mutableManagedObjects.count)
         var lastError: CombinedError? = nil
         for mutableManagedObject in mutableManagedObjects {
-            do {
-                try storeChangeFrom(mutableManagedObject: mutableManagedObject) {
-                    (updatedManagedObject, error) in
-                    if let updatedManagedObject = updatedManagedObject {
-                        result.append(updatedManagedObject)
-                    }
-                    else {
-                        lastError = error ?? .cocoaError(NSError()) // TODO: result type
-                    }
+            storeChangeFrom(mutableManagedObject: mutableManagedObject) {
+                (updatedManagedObject, error) in
+                if let updatedManagedObject = updatedManagedObject {
+                    result.append(updatedManagedObject)
                 }
-            }
-            catch {
-                lastError = .swiftError(error)
+                else {
+                    lastError = error ?? .cocoaError(NSError()) // TODO: result type
+                }
             }
             remainingCount.signal()
         }
@@ -312,13 +315,20 @@ public class DataProvider {
         }
     }
     
-    public func insert<T: ManagedObject>(mutableManagedObject:T, completion: @escaping (T?, CombinedError?) -> Void) throws  where T: MutableManagedObject {
+    public func insert<T: ManagedObject>(mutableManagedObject:T, completion: @escaping (T?, CombinedError?) -> Void) where T: MutableManagedObject {
         guard mutableManagedObject.hasBeenEdited == true else {
             completion(mutableManagedObject, nil)
             return
         }
         
-        let jsonData = try mutableManagedObject.jsonData(withCodingStrategy: .databaseEncoding)
+        let jsonData: Data
+        do {
+            jsonData = try mutableManagedObject.jsonData(withCodingStrategy: .databaseEncoding)
+        }
+        catch {
+            completion(nil, .swiftError(error))
+            return
+        }
         
         create(recordWithJSONData: jsonData) { (jsonData, error) in
             if let jsonData = jsonData {
@@ -340,13 +350,21 @@ public class DataProvider {
         }
     }
     
-    public func delete<T: ManagedObject>(managedObject:T, completion: @escaping (CombinedError?) -> Void) throws {
+    public func delete<T: ManagedObject>(managedObject:T, completion: @escaping (CombinedError?) -> Void) {
         guard let revision = managedObject.revision else {
-            throw DataProviderError.tryingToUpdateNonExistingObject
+            completion(.swiftError(DataProviderError.tryingToUpdateNonExistingObject))
+            return
         }
         
         managedObject.markAsDeleted()
-        let jsonData = try managedObject.jsonData(withCodingStrategy: .databaseEncoding)
+        let jsonData: Data
+        do {
+            jsonData = try managedObject.jsonData(withCodingStrategy: .databaseEncoding)
+        }
+        catch {
+            completion(.swiftError(error))
+            return
+        }
         
         update(recordID: managedObject.uuid, atRev: revision, with: jsonData) { (revision, updatedJSONData, error) in
             if let updatedJSONData = updatedJSONData {
