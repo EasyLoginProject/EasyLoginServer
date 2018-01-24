@@ -49,7 +49,8 @@ struct DesiredUserFromAdminAPI: Codable {
     
     func createNewMutableManagedUser(withDataProvider dataProvider:DataProvider, completion: @escaping (MutableManagedUser?) -> Void) {
         if let shortname = shortname, let principalName = principalName, let clearTextPassword = clearTextPassword {
-            dataProvider.numericIDGenerator.nextValue(completion: { (numericID) in
+            let numericIDGenerator = dataProvider.persistentCounter(name: "users.numericID")
+            numericIDGenerator.nextValue(completion: { (numericID) in
                 if let numericID = numericID {
                     let newUser = MutableManagedUser(withNumericID: numericID, shortname: shortname, principalName: principalName, email: self.email, givenName: self.givenName, surname: self.surname, fullName: self.fullName)
                     do {

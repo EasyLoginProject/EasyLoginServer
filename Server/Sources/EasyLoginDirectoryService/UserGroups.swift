@@ -6,23 +6,19 @@
 //
 
 import Foundation
-import CouchDB
 import DataProvider
 import Kitura
 import LoggerAPI
-import SwiftyJSON
 import Extensions
 import NotificationService
 
 class UserGroups {
-    let database: Database
     let dataProvider: DataProvider
     let numericIDGenerator: PersistentCounter
     
-    init(database: Database, dataProvider: DataProvider) {
-        self.database = database
+    init(dataProvider: DataProvider) {
         self.dataProvider = dataProvider
-        self.numericIDGenerator = PersistentCounter(database: database, name: "usergroups.numericID", initialValue: 1789)
+        self.numericIDGenerator = dataProvider.persistentCounter(name: "usergroups.numericID")
     }
     
     func installHandlers(to router: Router) {

@@ -28,11 +28,20 @@ public enum DataProviderError: Error {
 
 public class DataProvider {
     private let database: Database
-    public let numericIDGenerator: PersistentCounter
+    private var persistentCounters: [String: PersistentCounter]
     
     public init(database: Database) {
         self.database = database
-        numericIDGenerator = PersistentCounter(database: database, name: "users.numericID", initialValue: 1789)
+        self.persistentCounters = [:]
+    }
+    
+    public func persistentCounter(name: String) -> PersistentCounter {
+        if let persistentCounter = persistentCounters[name] {
+            return persistentCounter
+        }
+        let persistentCounter = PersistentCounter(database: database, name: name, initialValue: 1789) // TODO: initial value for each counter will be set by bootstrap application
+        persistentCounters[name] = persistentCounter
+        return persistentCounter
     }
     
     // MARK: Database SPI
