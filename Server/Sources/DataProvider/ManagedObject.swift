@@ -8,13 +8,10 @@
 import Foundation
 import Extensions
 
+public typealias ManagedObjectRecordID = String
+
 public extension CodingUserInfoKey {
     static let managedObjectCodingStrategy = CodingUserInfoKey(rawValue: "managedObjectCodingStrategy")!
-}
-
-public enum APIView {
-    case full
-    case list
 }
 
 public enum ManagedObjectCodingStrategy {
@@ -27,7 +24,7 @@ public protocol MutableManagedObject {
 }
 
 public class ManagedObject : Codable, Equatable, CustomDebugStringConvertible {
-    public let uuid: String
+    public let uuid: ManagedObjectRecordID
     public fileprivate(set) var deleted: Bool
     public fileprivate(set) var revision: String?
     var recordType: String
@@ -80,7 +77,7 @@ public class ManagedObject : Codable, Equatable, CustomDebugStringConvertible {
         switch codingStrategy {
         case .databaseEncoding?, .none:
             let container = try decoder.container(keyedBy: ManagedObjectDatabaseCodingKeys.self)
-            uuid = try container.decode(String.self, forKey: .uuid)
+            uuid = try container.decode(ManagedObjectRecordID.self, forKey: .uuid)
             revision = try container.decode(String.self, forKey: .revision)
             recordType = try container.decode(String.self, forKey: .recordType)
             isPartialRepresentation = false
@@ -92,7 +89,7 @@ public class ManagedObject : Codable, Equatable, CustomDebugStringConvertible {
         case .briefEncoding?:
             let container = try decoder.container(keyedBy: ManagedObjectPartialDatabaseCodingKeys.self)
             recordType = try container.decode(String.self, forKey: .recordType)
-            uuid = try container.decode(String.self, forKey: .uuid)
+            uuid = try container.decode(ManagedObjectRecordID.self, forKey: .uuid)
             isPartialRepresentation = true
             if let deletedMark = try? container.decode(Bool.self, forKey: .deleted) {
                 deleted = deletedMark

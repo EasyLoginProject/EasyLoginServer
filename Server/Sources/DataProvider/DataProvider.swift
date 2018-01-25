@@ -21,8 +21,6 @@ public enum CombinedError {
 
 public enum DataProviderError: Error {
     case none
-    case missingDatabaseInfo
-    case singletonMissing
     case tryingToUpdateNonExistingObject
 }
 
@@ -46,7 +44,7 @@ public class DataProvider {
     
     // MARK: Database SPI
     
-    private func jsonData(forRecordWithID recordID: String, completion: @escaping (Data?, NSError?) -> Void) {
+    private func jsonData(forRecordWithID recordID: ManagedObjectRecordID, completion: @escaping (Data?, NSError?) -> Void) {
         database.retrieve(recordID, callback: { (document: JSON?, error: NSError?) in
             guard let document = document else {
                 completion(nil, error)
@@ -70,7 +68,7 @@ public class DataProvider {
         }
     }
     
-    private func update(recordID: String, atRev rev:String, with jsonData:Data, completion: @escaping (String?, Data?, NSError?) -> Void) {
+    private func update(recordID: ManagedObjectRecordID, atRev rev:String, with jsonData:Data, completion: @escaping (String?, Data?, NSError?) -> Void) {
         let document = JSON(data:jsonData)
         database.update(recordID, rev: rev, document: document) { (rev, updatedDocument, error) in
             if let updatedDocument = updatedDocument {
@@ -96,7 +94,7 @@ public class DataProvider {
     
     // MARK: Managed Object API
     
-    public func completeManagedObject<T: ManagedObject>(ofType:T.Type, withUUID uuid:String, completion: @escaping (T?, CombinedError?) -> Void) -> Void {
+    public func completeManagedObject<T: ManagedObject>(ofType:T.Type, withUUID uuid:ManagedObjectRecordID, completion: @escaping (T?, CombinedError?) -> Void) -> Void {
         jsonData(forRecordWithID: uuid) { (jsonData, jsonError) in
             if let jsonData = jsonData {
                 do {
@@ -114,12 +112,12 @@ public class DataProvider {
         }
     }
     
-    public func completeManagedObjects<T: ManagedObject>(ofType:T.Type, withUUIDs uuids:[String], completion: @escaping ([String:T], CombinedError?) -> Void) -> Void {
+    public func completeManagedObjects<T: ManagedObject>(ofType:T.Type, withUUIDs uuids:[ManagedObjectRecordID], completion: @escaping ([ManagedObjectRecordID:T], CombinedError?) -> Void) -> Void {
         guard uuids.count != 0 else {
             completion([:], nil)
             return
         }
-        var result: [String:T] = [:]
+        var result: [ManagedObjectRecordID:T] = [:]
         let remainingCount = DispatchSemaphore(value: uuids.count)
         var lastError: CombinedError? = nil
         for uuid in uuids {
