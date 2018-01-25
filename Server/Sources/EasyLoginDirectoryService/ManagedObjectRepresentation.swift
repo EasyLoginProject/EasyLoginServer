@@ -10,10 +10,10 @@ import DataProvider
 
 extension ManagedObject {
     
-    class Representation: Encodable {
-        let mo: ManagedObject
+    class Representation<T: ManagedObject>: Encodable {
+        let mo: T
         
-        init(_ managedObject: ManagedObject) {
+        init(_ managedObject: T) {
             mo = managedObject
         }
         

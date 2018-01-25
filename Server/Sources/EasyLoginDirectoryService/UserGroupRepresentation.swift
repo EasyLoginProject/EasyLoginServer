@@ -10,7 +10,7 @@ import DataProvider
 
 extension ManagedUserGroup {
     
-    class Representation: ManagedObject.Representation {
+    class Representation: ManagedObject.Representation<ManagedUserGroup> {
         enum UserGroupAPICodingKeys: String, CodingKey {
             case numericID
             case shortname
@@ -21,25 +21,18 @@ extension ManagedUserGroup {
             case members
         }
         
-        let mug: ManagedUserGroup
-        
-        init(_ managedObject: ManagedUserGroup) {
-            mug = managedObject
-            super.init(managedObject)
-        }
-        
         override func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: UserGroupAPICodingKeys.self)
-            try container.encode(mug.numericID, forKey: .numericID)
-            try container.encode(mug.shortname, forKey: .shortname)
+            try container.encode(mo.numericID, forKey: .numericID)
+            try container.encode(mo.shortname, forKey: .shortname)
             if encoder.managedObjectViewFormat() == .full {
-                try container.encode(mug.commonName, forKey: .commonName)
-                if let email = mug.email {
+                try container.encode(mo.commonName, forKey: .commonName)
+                if let email = mo.email {
                     try container.encode(email, forKey: .email)
                 }
-                try container.encode(mug.memberOf, forKey: .memberOf)
-                try container.encode(mug.nestedGroups, forKey: .nestedGroups)
-                try container.encode(mug.members, forKey: .members)
+                try container.encode(mo.memberOf, forKey: .memberOf)
+                try container.encode(mo.nestedGroups, forKey: .nestedGroups)
+                try container.encode(mo.members, forKey: .members)
             }
             try super.encode(to: encoder)
         }
