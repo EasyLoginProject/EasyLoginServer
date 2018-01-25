@@ -6,23 +6,20 @@
 //
 
 import Foundation
-import CouchDB
 import DataProvider
 import Kitura
 import LoggerAPI
-import SwiftyJSON
 import Extensions
 import NotificationService
 
 class UserGroups {
-    let database: Database
     let dataProvider: DataProvider
     let numericIDGenerator: PersistentCounter
+    let viewFormatter = ManagedObjectFormatter(type: ManagedUserGroup.self, generator: {ManagedUserGroup.Representation($0)})
     
-    init(database: Database, dataProvider: DataProvider) {
-        self.database = database
+    init(dataProvider: DataProvider) {
         self.dataProvider = dataProvider
-        self.numericIDGenerator = PersistentCounter(database: database, name: "usergroups.numericID", initialValue: 1789)
+        self.numericIDGenerator = dataProvider.persistentCounter(name: "usergroups.numericID")
     }
     
     func installHandlers(to router: Router) {
@@ -41,9 +38,7 @@ class UserGroups {
         }
         dataProvider.completeManagedObject(ofType: ManagedUserGroup.self, withUUID: uuid) {
             retrievedUserGroup, error in
-            let jsonEncoder = JSONEncoder()
-            jsonEncoder.userInfo[.managedObjectCodingStrategy] = ManagedObjectCodingStrategy.apiEncoding(.full)
-            if let retrievedUserGroup = retrievedUserGroup, retrievedUserGroup.deleted == false, let jsonData = try? jsonEncoder.encode(retrievedUserGroup) {
+            if let retrievedUserGroup = retrievedUserGroup, retrievedUserGroup.deleted == false, let jsonData = try? self.viewFormatter.viewAsJSONData(retrievedUserGroup) {
                 response.send(data: jsonData)
                 response.headers.setType("json")
                 response.status(.OK)
@@ -74,34 +69,9 @@ class UserGroups {
                 next()
                 return
             }
-            do {
                 let initialUserGroup = MutableManagedUserGroup(withNumericID: retrievedUserGroup.numericID, shortname: retrievedUserGroup.shortname, commonName: retrievedUserGroup.commonName, email: retrievedUserGroup.email, memberOf: retrievedUserGroup.memberOf, nestedGroups: retrievedUserGroup.nestedGroups, members: retrievedUserGroup.members)
+            do {
                 try retrievedUserGroup.update(withJSON: jsonBody)
-                try self.dataProvider.storeChangeFrom(mutableManagedObject: retrievedUserGroup, completion: { (updatedUsergroup, error) in
-                    self.updateRelationships(initial: initialUserGroup, final: retrievedUserGroup) {
-                        error in
-                        guard error == nil else {
-                            Log.error("database may be inconsistent!")
-                            sendError(.internalServerError, to:response)
-                            next()
-                            return
-                        }
-                        // error --> internal server error, database is inconsistent
-                        let jsonEncoder = JSONEncoder()
-                        jsonEncoder.userInfo[.managedObjectCodingStrategy] = ManagedObjectCodingStrategy.apiEncoding(.full)
-                        if let jsonData = try? jsonEncoder.encode(retrievedUserGroup) {
-                            NotificationService.notifyAllClients()
-                            response.send(data: jsonData)
-                            response.headers.setType("json")
-                            response.status(.OK)
-                        }
-                        else {
-                            sendError(.debug("Internal error"), to: response) // TODO: decode error
-                        }
-                        next()
-                        return
-                    }
-                })
             }
             catch {
                 sendError(.debug("\(String(describing: error))"), to: response)
@@ -109,6 +79,28 @@ class UserGroups {
                 next()
                 return
             }
+            self.dataProvider.storeChangeFrom(mutableManagedObject: retrievedUserGroup, completion: { (updatedUsergroup, error) in
+                self.updateRelationships(initial: initialUserGroup, final: retrievedUserGroup) {
+                    error in
+                    guard error == nil else {
+                        // error --> internal server error, database is inconsistent
+                        Log.error("database may be inconsistent!")
+                        sendError(.internalServerError, to:response)
+                        next()
+                        return
+                    }
+                    if let jsonData = try? self.viewFormatter.viewAsJSONData(retrievedUserGroup) {
+                        response.send(data: jsonData)
+                        response.headers.setType("json")
+                        response.status(.OK)
+                    }
+                    else {
+                        sendError(.debug("Internal error"), to: response) // TODO: decode error
+                    }
+                    next()
+                    return
+                }
+            })
         })
     }
     
@@ -149,31 +141,23 @@ class UserGroups {
                     next()
                     return
                 }
-                do {
-                    try self.dataProvider.insert(mutableManagedObject: usergroup) {
-                        (insertedUsergroup, error) in
-                        guard let insertedUsergroup = insertedUsergroup else {
-                            sendError(.debug("failed to insert"), to:response)
-                            next()
-                            return
-                        }
-                        NotificationService.notifyAllClients()
-                        let jsonEncoder = JSONEncoder()
-                        jsonEncoder.userInfo[.managedObjectCodingStrategy] = ManagedObjectCodingStrategy.apiEncoding(.full)
-                        if let jsonData = try? jsonEncoder.encode(insertedUsergroup) {
-                            response.send(data: jsonData)
-                            response.headers.setType("json")
-                            response.statusCode = .created
-                            response.headers.setLocation("/db/usergroups/\(insertedUsergroup.uuid)")
-                        }
-                        else {
-                            sendError(.debug("Internal error"), to: response) // TODO: decode error
-                        }
+                self.dataProvider.insert(mutableManagedObject: usergroup) {
+                    (insertedUsergroup, error) in
+                    guard let insertedUsergroup = insertedUsergroup else {
+                        sendError(.debug("failed to insert"), to:response)
                         next()
+                        return
                     }
-                }
-                catch {
-                    sendError(.debug("failed to insert: \(error)"), to:response)
+                    NotificationService.notifyAllClients()
+                    if let jsonData = try? self.viewFormatter.viewAsJSONData(insertedUsergroup) {
+                        response.send(data: jsonData)
+                        response.headers.setType("json")
+                        response.statusCode = .created
+                        response.headers.setLocation("/db/usergroups/\(insertedUsergroup.uuid)")
+                    }
+                    else {
+                        sendError(.debug("Internal error"), to: response) // TODO: decode error
+                    }
                     next()
                 }
             }
@@ -191,22 +175,20 @@ class UserGroups {
             if let retrievedUserGroup = retrievedUserGroup {
                 self.updateRelationships(initial: retrievedUserGroup, final: nil) {
                     error in
-                    do {
-                        try self.dataProvider.delete(managedObject: retrievedUserGroup) {
-                            error in
-                            guard error == nil else {
-                                sendError(.debug("Internal error"), to: response) // TODO: decode error
-                                next()
-                                return
-                            }
-                            NotificationService.notifyAllClients()
-                            response.status(.noContent)
+                    guard error == nil else {
+                        sendError(.debug("Internal error"), to: response) // TODO: decode error
+                        next()
+                        return
+                    }
+                    self.dataProvider.delete(managedObject: retrievedUserGroup) {
+                        error in
+                        guard error == nil else {
+                            sendError(.debug("Internal error"), to: response) // TODO: decode error
                             next()
                             return
                         }
-                    }
-                    catch {
-                        sendError(.debug("Internal error"), to: response) // TODO: decode error
+                        NotificationService.notifyAllClients()
+                        response.status(.noContent)
                         next()
                         return
                     }
@@ -224,9 +206,7 @@ class UserGroups {
         defer { next() }
         self.dataProvider.managedObjects(ofType: ManagedUserGroup.self) {
             list, error in
-            let jsonEncoder = JSONEncoder()
-            jsonEncoder.userInfo[.managedObjectCodingStrategy] = ManagedObjectCodingStrategy.apiEncoding(.list)
-            if let list = list, let jsonData = try? jsonEncoder.encode(list) {
+            if let list = list, let jsonData = try? self.viewFormatter.summaryAsJSONData(list) {
                 response.send(data: jsonData)
                 response.headers.setType("json")
                 response.status(.OK)
@@ -290,7 +270,6 @@ class UserGroups {
             let list = dict.map { $1 }
             self.dataProvider.storeChangesFrom(mutableManagedObjects: list) {
                 (updatedList, error) in
-                print("done! error = \(String(describing: error)), updated = \(updatedList)")
                 if let error = error {
                     completion(EasyLoginError.debug(String.init(describing: error)))
                 }

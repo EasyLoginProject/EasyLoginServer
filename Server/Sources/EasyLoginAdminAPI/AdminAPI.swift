@@ -49,7 +49,8 @@ struct DesiredUserFromAdminAPI: Codable {
     
     func createNewMutableManagedUser(withDataProvider dataProvider:DataProvider, completion: @escaping (MutableManagedUser?) -> Void) {
         if let shortname = shortname, let principalName = principalName, let clearTextPassword = clearTextPassword {
-            dataProvider.numericIDGenerator.nextValue(completion: { (numericID) in
+            let numericIDGenerator = dataProvider.persistentCounter(name: "users.numericID")
+            numericIDGenerator.nextValue(completion: { (numericID) in
                 if let numericID = numericID {
                     let newUser = MutableManagedUser(withNumericID: numericID, shortname: shortname, principalName: principalName, email: self.email, givenName: self.givenName, surname: self.surname, fullName: self.fullName)
                     do {
@@ -106,8 +107,8 @@ struct UserForAdminAPI: Codable {
 public class AdminAPI {
     let dataProvider: DataProvider
     
-    public init() throws {
-        dataProvider = try DataProvider.singleton()
+    public init(dataProvider: DataProvider) {
+        self.dataProvider = dataProvider
     }
     
     public func router() -> Router {
@@ -381,33 +382,33 @@ public class AdminAPI {
                 
                 do {
                     try desiredUserFromAdminAPI.update(mutableManagedUser: mutableManagedUser)
-                    try self.dataProvider.storeChangeFrom(mutableManagedObject: mutableManagedUser, completion: { (managedUser, error) in
-                        if let managedUser = managedUser {
-                            let userForAdminAPI = UserForAdminAPI(managedUser: managedUser)
-                            
-                            if let jsonData = try? JSONEncoder().encode(userForAdminAPI) {
-                                response.headers.setType("json")
-                                response.send(data: jsonData)
-                                response.status(.OK)
-                                next()
-                                return
-                            } else {
-                                response.status(.internalServerError)
-                                next()
-                                return
-                            }
-                            
-                        } else {
-                            response.status(.internalServerError)
-                            next()
-                            return
-                        }
-                    })
                 } catch {
                     response.status(.badRequest)
                     next()
                     return
                 }
+                self.dataProvider.storeChangeFrom(mutableManagedObject: mutableManagedUser, completion: { (managedUser, error) in
+                    if let managedUser = managedUser {
+                        let userForAdminAPI = UserForAdminAPI(managedUser: managedUser)
+                        
+                        if let jsonData = try? JSONEncoder().encode(userForAdminAPI) {
+                            response.headers.setType("json")
+                            response.send(data: jsonData)
+                            response.status(.OK)
+                            next()
+                            return
+                        } else {
+                            response.status(.internalServerError)
+                            next()
+                            return
+                        }
+                        
+                    } else {
+                        response.status(.internalServerError)
+                        next()
+                        return
+                    }
+                })
             }
         } else {
             response.status(.internalServerError)
@@ -437,28 +438,22 @@ public class AdminAPI {
         
         dataProvider.completeManagedObject(ofType: ManagedUser.self, withUUID: recordUUID) { (managedUser, error) in
             if let managedUser = managedUser {
-                do {
-                    try self.dataProvider.delete(managedObject: managedUser, completion: { (error) in
-                        if error != nil {
-                            response.status(.internalServerError)
-                            next()
-                            return
-                        } else {
-                            if let jsonData = try? JSONEncoder().encode([String:String]()) {
-                                response.headers.setType("json")
-                                response.send(data: jsonData)
-                            }
-                            
-                            response.status(.OK)
-                            next()
-                            return
+                self.dataProvider.delete(managedObject: managedUser, completion: { (error) in
+                    if error != nil {
+                        response.status(.internalServerError)
+                        next()
+                        return
+                    } else {
+                        if let jsonData = try? JSONEncoder().encode([String:String]()) {
+                            response.headers.setType("json")
+                            response.send(data: jsonData)
                         }
-                    })
-                } catch {
-                    response.status(.internalServerError)
-                    next()
-                    return
-                }
+                        
+                        response.status(.OK)
+                        next()
+                        return
+                    }
+                })
             } else {
                 response.status(.notFound)
                 next()
@@ -489,34 +484,28 @@ public class AdminAPI {
                     return
                 }
                 
-                do {
-                    try self.dataProvider.insert(mutableManagedObject: mutableManagedUser, completion: { (managedUser, error) in
-                        if let managedUser = managedUser {
-                            let userForAdminAPI = UserForAdminAPI(managedUser: managedUser)
-                            
-                            if let jsonData = try? JSONEncoder().encode(userForAdminAPI) {
-                                response.headers.setType("json")
-                                response.send(data: jsonData)
-                                response.status(.OK)
-                                next()
-                                return
-                            } else {
-                                response.status(.internalServerError)
-                                next()
-                                return
-                            }
-                            
+                self.dataProvider.insert(mutableManagedObject: mutableManagedUser, completion: { (managedUser, error) in
+                    if let managedUser = managedUser {
+                        let userForAdminAPI = UserForAdminAPI(managedUser: managedUser)
+                        
+                        if let jsonData = try? JSONEncoder().encode(userForAdminAPI) {
+                            response.headers.setType("json")
+                            response.send(data: jsonData)
+                            response.status(.OK)
+                            next()
+                            return
                         } else {
                             response.status(.internalServerError)
                             next()
                             return
                         }
-                    })
-                } catch {
-                    response.status(.badRequest)
-                    next()
-                    return
-                }
+                        
+                    } else {
+                        response.status(.internalServerError)
+                        next()
+                        return
+                    }
+                })
             }
         } else {
             response.status(.internalServerError)

@@ -19,7 +19,7 @@ public class EasyLoginDirectoryService {
     public init(database: Database, dataProvider: DataProvider) {
         users = Users(database: database)
         devices = Devices(database: database)
-        usergroups = UserGroups(database: database, dataProvider: dataProvider)
+        usergroups = UserGroups(dataProvider: dataProvider)
     }
     
     public func router() -> Router {

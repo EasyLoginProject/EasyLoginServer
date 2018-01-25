@@ -8,11 +8,12 @@
 
 import Foundation
 import Kitura
+import DataProvider
 
 public class LDAPGatewayAPI {
     let v1Gateway: LDAPGatewayAPIv1
-    public init() throws {
-        v1Gateway = try LDAPGatewayAPIv1()
+    public init(dataProvider: DataProvider) {
+        v1Gateway = LDAPGatewayAPIv1(dataProvider: dataProvider)
     }
     
     public func router() -> Router {

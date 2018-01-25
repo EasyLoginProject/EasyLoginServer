@@ -11,8 +11,8 @@ import DataProvider
 // MARK: - Codable objects for LDAP authentication requests
 
 /**
- Represent an LDAP authentication request once converted to LDAP by the Perl gateway.
- Support only simple authentication at this time.
+ Represents an LDAP authentication request once converted to LDAP by the Perl gateway.
+ Supports only simple authentication at this time.
  */
 struct LDAPAuthRequest: Codable {
     struct LDAPAuthScheme: Codable {
@@ -25,12 +25,12 @@ struct LDAPAuthRequest: Codable {
 }
 
 /**
- Represent all kind of complex filter request provided by the Perl gateway.
- Filter can be nested and agregated via an operator (and, or, not),
- so LDAPFilter need to be a class that can reference other instances.
+ Represents all kinds of complex filter requests provided by the Perl gateway.
+ Filters can be nested and agregated via an operator (and, or, not),
+ so LDAPFilter needs to be a class that can reference other instances.
  
- LDAPFilter aren't provided directly by the LDAP gateway, it come via a LDAPSearchRequest
- that provide context information for the lookup.
+ LDAPFilter aren't provided directly by the LDAP gateway, they come via a LDAPSearchRequest
+ that provides context information for the lookup.
  */
 class LDAPFilter: Codable {
     struct LDAPFilterSettingEqualityMatch: Codable {
@@ -63,8 +63,8 @@ class LDAPFilter: Codable {
     }
     
     /**
-     Return an enum based value representing the filter type.
-     All operation having different use case based on the filter type must use this value
+     Returns an enum-based value representing the filter type.
+     All operation having different use cases based on the filter type must use this value
      and must avoid directly testing the properties' existence.
      
      Using the enum will allow compiler to warn us to update all dependent code if we add a filter type.
@@ -98,7 +98,7 @@ class LDAPFilter: Codable {
      Recursive method that will filter provided records based on the complete filter tree represented by this object.
      
      - parameter records: an array of record to filter
-     - returns: a new array representing all records who passed all the tests.
+     - returns: a new array representing all records which passed all the tests.
      */
     func filter(records: [LDAPAbstractRecord]) -> [LDAPAbstractRecord]? {
         switch nodeType() {
@@ -215,10 +215,10 @@ class LDAPFilter: Codable {
 }
 
 /**
- An LDAPSearchRequest represent the root object sent via the Perl gateway when
+ An LDAPSearchRequest represents the root object sent via the Perl gateway when
  looking for a record.
  
- Filters needs to be applied to all objects grabbed by the combinaison of the baseObject and the scope.
+ Filters need to be applied to all objects grabbed by the combination of the baseObject and the scope.
  */
 struct LDAPSearchRequest: Codable {
     let filter: LDAPFilter?
@@ -248,7 +248,7 @@ extension CodingUserInfoKey {
 }
 
 /**
- Base object for all record that can be requested by the client. Provide some basics for DN construction, object comparaison, filtering process…
+ Base object for all records that can be requested by the client. Provides some basics for DN construction, object comparison, filtering process…
  */
 class LDAPAbstractRecord : Codable, Equatable {
     let entryUUID: String
@@ -281,7 +281,7 @@ class LDAPAbstractRecord : Codable, Equatable {
         return lhs.entryUUID == rhs.entryUUID
     }
     
-    // MARK: Part that need to be extended by subclasses
+    // MARK: Part that needs to be extended by subclasses
     var hasSubordinates: String {
         get {
             return privateHasSubordinates
@@ -563,7 +563,7 @@ class LDAPDomainRecord: LDAPAbstractRecord {
 
 /**
  An LDAP container is a node object in the tree (when records are the leaf).
- Containers has basic class and dn plus a common name. This is usually used
+ Containers have basic class and dn plus a common name. This is usually used
  to split groups and users.
  */
 class LDAPContainerRecord: LDAPAbstractRecord {
@@ -780,7 +780,7 @@ class LDAPUserRecord: LDAPAbstractRecord {
     }
 }
 
-// MARK: Langage extension to sapre some time
+// MARK: Langage extension to save some time
 
 func iterateEnum<T: Hashable>(_: T.Type) -> AnyIterator<T> {
     var i = 0

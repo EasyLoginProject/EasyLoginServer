@@ -10,7 +10,7 @@ import Extensions
 
 enum ManagedUserError: Error {
     case validatingPasswordAgainstPartialRepresentation
-    case noAppropriaiteAuthenticationMethodFound
+    case noAppropriateAuthenticationMethodFound
 }
 
 enum AuthenticationScheme: String {
@@ -108,9 +108,6 @@ public class ManagedUser: ManagedObject {
             shortname = try container.decode(String.self, forKey: .shortname)
             principalName = try container.decode(String.self, forKey: .principalName)
             fullName = try container.decode(String.self, forKey: .fullName)
-            
-        case .apiEncoding(_)?:
-            throw EasyLoginError.debug("not implemented")
         }
         
         try super.init(from: decoder)
@@ -137,9 +134,6 @@ public class ManagedUser: ManagedObject {
             try container.encode(shortname, forKey: .shortname)
             try container.encode(principalName, forKey: .principalName)
             try container.encode(fullName, forKey: .fullName)
-            
-        case .apiEncoding(let view)?:
-            break; // TODO: implement
         }
         try super.encode(to: encoder)
     }
@@ -160,7 +154,7 @@ public class ManagedUser: ManagedObject {
             if let authMethods = authMethods, let modularString = authMethods[AuthenticationScheme.pbkdf2.rawValue] {
                 return PBKDF2.verifyPassword(clearTextPassword, withString: modularString)
             } else {
-                throw ManagedUserError.noAppropriaiteAuthenticationMethodFound
+                throw ManagedUserError.noAppropriateAuthenticationMethodFound
             }
         }
     }
@@ -198,6 +192,7 @@ public class MutableManagedUser : ManagedUser, MutableManagedObject {
     enum MutableManagedUserUpdateError: Error {
         case invalidShortname
         case invalidPrincipalName
+        case invalidEmail
     }
     
     public override init(withNumericID numericID:Int, shortname:String, principalName:String, email:String?, givenName:String?, surname:String?, fullName:String?) {
@@ -244,7 +239,7 @@ public class MutableManagedUser : ManagedUser, MutableManagedObject {
             email = value
             hasBeenEdited = true
         } else {
-            throw MutableManagedUserUpdateError.invalidPrincipalName
+            throw MutableManagedUserUpdateError.invalidEmail
         }
     }
     

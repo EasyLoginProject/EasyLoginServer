@@ -34,22 +34,6 @@ struct CouchDBViewKey: Codable {
             throw CouchDBViewKeyError.unsupportedKeyType
         }
     }
-    
-    func keyType() -> CouchDBViewKeyType {
-        if let _ = intValue {
-            return .int
-        } else {
-            return .string
-        }
-    }
-    
-    func forcedAsString() -> String {
-        return stringValue!
-    }
-    
-    func forcedAsInt() -> Int {
-        return intValue!
-    }
 }
 
 struct CouchDBViewKeys: Codable {

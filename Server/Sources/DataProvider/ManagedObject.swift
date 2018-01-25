@@ -8,32 +8,15 @@
 import Foundation
 import Extensions
 
+public typealias ManagedObjectRecordID = String
+
 public extension CodingUserInfoKey {
     static let managedObjectCodingStrategy = CodingUserInfoKey(rawValue: "managedObjectCodingStrategy")!
 }
 
-public enum APIView {
-    case full
-    case list
-}
-
-public enum ManagedObjectCodingStrategy : Equatable {
+public enum ManagedObjectCodingStrategy {
     case databaseEncoding
     case briefEncoding
-    case apiEncoding(APIView)
-}
-
-public func ==(lhs: ManagedObjectCodingStrategy, rhs: ManagedObjectCodingStrategy) -> Bool {
-    switch (lhs, rhs) {
-    case (.databaseEncoding, .databaseEncoding):
-        return true
-    case (.briefEncoding, .briefEncoding):
-        return true
-    case (let .apiEncoding(view1), let .apiEncoding(view2)):
-        return view1 == view2
-    default:
-        return false
-    }
 }
 
 public protocol MutableManagedObject {
@@ -41,7 +24,7 @@ public protocol MutableManagedObject {
 }
 
 public class ManagedObject : Codable, Equatable, CustomDebugStringConvertible {
-    public let uuid: String
+    public let uuid: ManagedObjectRecordID
     public fileprivate(set) var deleted: Bool
     public fileprivate(set) var revision: String?
     var recordType: String
@@ -81,10 +64,6 @@ public class ManagedObject : Codable, Equatable, CustomDebugStringConvertible {
         case recordType = "type"
     }
     
-    enum ManagedObjectAPICodingKeys: String, CodingKey {
-        case uuid
-    }
-    
     init() {
         uuid = UUID().uuidString
         isPartialRepresentation = false
@@ -98,7 +77,7 @@ public class ManagedObject : Codable, Equatable, CustomDebugStringConvertible {
         switch codingStrategy {
         case .databaseEncoding?, .none:
             let container = try decoder.container(keyedBy: ManagedObjectDatabaseCodingKeys.self)
-            uuid = try container.decode(String.self, forKey: .uuid)
+            uuid = try container.decode(ManagedObjectRecordID.self, forKey: .uuid)
             revision = try container.decode(String.self, forKey: .revision)
             recordType = try container.decode(String.self, forKey: .recordType)
             isPartialRepresentation = false
@@ -110,15 +89,13 @@ public class ManagedObject : Codable, Equatable, CustomDebugStringConvertible {
         case .briefEncoding?:
             let container = try decoder.container(keyedBy: ManagedObjectPartialDatabaseCodingKeys.self)
             recordType = try container.decode(String.self, forKey: .recordType)
-            uuid = try container.decode(String.self, forKey: .uuid)
+            uuid = try container.decode(ManagedObjectRecordID.self, forKey: .uuid)
             isPartialRepresentation = true
             if let deletedMark = try? container.decode(Bool.self, forKey: .deleted) {
                 deleted = deletedMark
             } else {
                 deleted = false
             }
-        case .apiEncoding?:
-            throw EasyLoginError.debug("not implemented")
         }
     }
     
@@ -141,10 +118,6 @@ public class ManagedObject : Codable, Equatable, CustomDebugStringConvertible {
             if deleted {
                 try container.encode(deleted, forKey: .deleted)
             }
-            
-        case .apiEncoding(_)?:
-            var container = encoder.container(keyedBy: ManagedObjectAPICodingKeys.self)
-            try container.encode(uuid, forKey: .uuid)
         }
     }
     
@@ -156,10 +129,10 @@ public class ManagedObject : Codable, Equatable, CustomDebugStringConvertible {
     }
     
     func jsonData(withCodingStrategy strategy:ManagedObjectCodingStrategy) throws -> Data {
-        let jsonEconder = JSONEncoder()
-        jsonEconder.userInfo[.managedObjectCodingStrategy] = strategy
+        let jsonEncoder = JSONEncoder()
+        jsonEncoder.userInfo[.managedObjectCodingStrategy] = strategy
         
-        return try jsonEconder.encode(self)
+        return try jsonEncoder.encode(self)
     }
     
     class func requireFullObject() -> Bool {

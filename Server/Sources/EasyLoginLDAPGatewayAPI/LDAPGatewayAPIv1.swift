@@ -35,8 +35,8 @@ class LDAPGatewayAPIv1 {
     
     // MARK: Class management
     
-    init() throws {
-        dataProvider = try DataProvider.singleton()
+    init(dataProvider: DataProvider) {
+        self.dataProvider = dataProvider
     }
     
     // MARK: - Handler and handler management
@@ -47,7 +47,7 @@ class LDAPGatewayAPIv1 {
     
 
     
-    // MARK: Handler and subhandlers neededs for LDAP search of all kinds.
+    // MARK: Handler and subhandlers needed for LDAP search of all kinds.
     func loadRecordsForLDAPSearch(request: RouterRequest, response: RouterResponse, next: @escaping ()->Void) -> Void {
         guard let contentType = request.headers["Content-Type"] else {
             response.status(.unsupportedMediaType)
@@ -255,11 +255,11 @@ class LDAPGatewayAPIv1 {
                         completion(managedUser, error)
                     })
                 } else {
-                    // Could be improved to support search by alternate field, some LDAP server support this.
-                    completion(nil, CombinedError(swiftError:LDAPGatewayError.dnFieldNotSupported, cocoaError:nil))
+                    // Could be improved to support search by alternate field, some LDAP servers support this.
+                    completion(nil, .swiftError(LDAPGatewayError.dnFieldNotSupported))
                 }
             } else {
-                completion(nil, CombinedError(swiftError:LDAPGatewayError.invalidDNSyntax, cocoaError:nil))
+                completion(nil, .swiftError(LDAPGatewayError.invalidDNSyntax))
             }
         } else {
             dataProvider.completeManagedUser(withLogin: usernameOrDN) { (managedUser, error) in
