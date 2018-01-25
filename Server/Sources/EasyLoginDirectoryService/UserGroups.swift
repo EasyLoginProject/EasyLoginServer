@@ -15,6 +15,7 @@ import NotificationService
 class UserGroups {
     let dataProvider: DataProvider
     let numericIDGenerator: PersistentCounter
+    let viewFormatter = ManagedObjectFormatter(type: ManagedUserGroup.self, generator: {ManagedUserGroup.Representation($0)})
     
     init(dataProvider: DataProvider) {
         self.dataProvider = dataProvider
@@ -37,9 +38,7 @@ class UserGroups {
         }
         dataProvider.completeManagedObject(ofType: ManagedUserGroup.self, withUUID: uuid) {
             retrievedUserGroup, error in
-            let jsonEncoder = JSONEncoder()
-            jsonEncoder.userInfo[.managedObjectCodingStrategy] = ManagedObjectCodingStrategy.apiEncoding(.full)
-            if let retrievedUserGroup = retrievedUserGroup, retrievedUserGroup.deleted == false, let jsonData = try? jsonEncoder.encode(retrievedUserGroup) {
+            if let retrievedUserGroup = retrievedUserGroup, retrievedUserGroup.deleted == false, let jsonData = try? self.viewFormatter.viewAsJSONData(retrievedUserGroup) {
                 response.send(data: jsonData)
                 response.headers.setType("json")
                 response.status(.OK)
@@ -84,16 +83,13 @@ class UserGroups {
                 self.updateRelationships(initial: initialUserGroup, final: retrievedUserGroup) {
                     error in
                     guard error == nil else {
+                        // error --> internal server error, database is inconsistent
                         Log.error("database may be inconsistent!")
                         sendError(.internalServerError, to:response)
                         next()
                         return
                     }
-                    // error --> internal server error, database is inconsistent
-                    let jsonEncoder = JSONEncoder()
-                    jsonEncoder.userInfo[.managedObjectCodingStrategy] = ManagedObjectCodingStrategy.apiEncoding(.full)
-                    if let jsonData = try? jsonEncoder.encode(retrievedUserGroup) {
-                        NotificationService.notifyAllClients()
+                    if let jsonData = try? self.viewFormatter.viewAsJSONData(retrievedUserGroup) {
                         response.send(data: jsonData)
                         response.headers.setType("json")
                         response.status(.OK)
@@ -153,9 +149,7 @@ class UserGroups {
                         return
                     }
                     NotificationService.notifyAllClients()
-                    let jsonEncoder = JSONEncoder()
-                    jsonEncoder.userInfo[.managedObjectCodingStrategy] = ManagedObjectCodingStrategy.apiEncoding(.full)
-                    if let jsonData = try? jsonEncoder.encode(insertedUsergroup) {
+                    if let jsonData = try? self.viewFormatter.viewAsJSONData(insertedUsergroup) {
                         response.send(data: jsonData)
                         response.headers.setType("json")
                         response.statusCode = .created
@@ -212,9 +206,7 @@ class UserGroups {
         defer { next() }
         self.dataProvider.managedObjects(ofType: ManagedUserGroup.self) {
             list, error in
-            let jsonEncoder = JSONEncoder()
-            jsonEncoder.userInfo[.managedObjectCodingStrategy] = ManagedObjectCodingStrategy.apiEncoding(.list)
-            if let list = list, let jsonData = try? jsonEncoder.encode(list) {
+            if let list = list, let jsonData = try? self.viewFormatter.summaryAsJSONData(list) {
                 response.send(data: jsonData)
                 response.headers.setType("json")
                 response.status(.OK)
