@@ -17,23 +17,9 @@ public enum APIView {
     case list
 }
 
-public enum ManagedObjectCodingStrategy : Equatable {
+public enum ManagedObjectCodingStrategy {
     case databaseEncoding
     case briefEncoding
-    case apiEncoding(APIView)
-}
-
-public func ==(lhs: ManagedObjectCodingStrategy, rhs: ManagedObjectCodingStrategy) -> Bool {
-    switch (lhs, rhs) {
-    case (.databaseEncoding, .databaseEncoding):
-        return true
-    case (.briefEncoding, .briefEncoding):
-        return true
-    case (let .apiEncoding(view1), let .apiEncoding(view2)):
-        return view1 == view2
-    default:
-        return false
-    }
 }
 
 public protocol MutableManagedObject {
@@ -81,10 +67,6 @@ public class ManagedObject : Codable, Equatable, CustomDebugStringConvertible {
         case recordType = "type"
     }
     
-    enum ManagedObjectAPICodingKeys: String, CodingKey {
-        case uuid
-    }
-    
     init() {
         uuid = UUID().uuidString
         isPartialRepresentation = false
@@ -117,8 +99,6 @@ public class ManagedObject : Codable, Equatable, CustomDebugStringConvertible {
             } else {
                 deleted = false
             }
-        case .apiEncoding?:
-            throw EasyLoginError.debug("not implemented")
         }
     }
     
@@ -141,10 +121,6 @@ public class ManagedObject : Codable, Equatable, CustomDebugStringConvertible {
             if deleted {
                 try container.encode(deleted, forKey: .deleted)
             }
-            
-        case .apiEncoding(_)?:
-            var container = encoder.container(keyedBy: ManagedObjectAPICodingKeys.self)
-            try container.encode(uuid, forKey: .uuid)
         }
     }
     
