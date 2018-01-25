@@ -156,10 +156,10 @@ public class ManagedObject : Codable, Equatable, CustomDebugStringConvertible {
     }
     
     func jsonData(withCodingStrategy strategy:ManagedObjectCodingStrategy) throws -> Data {
-        let jsonEconder = JSONEncoder()
-        jsonEconder.userInfo[.managedObjectCodingStrategy] = strategy
+        let jsonEncoder = JSONEncoder()
+        jsonEncoder.userInfo[.managedObjectCodingStrategy] = strategy
         
-        return try jsonEconder.encode(self)
+        return try jsonEncoder.encode(self)
     }
     
     class func requireFullObject() -> Bool {
