@@ -32,7 +32,6 @@ class ManagedObjectFormatter<T: ManagedObject> {
         summaryJSONEncoder = JSONEncoder()
         summaryJSONEncoder.userInfo[.viewFormat] = ManagedObjectViewFormat.summary
         self.generator = generator
-        //self.generator = { T.Representation($0) }
     }
     
     func summaryAsJSONData(_ object: T) throws -> Data {
@@ -49,7 +48,6 @@ class ManagedObjectFormatter<T: ManagedObject> {
         let jsonEncoder = JSONEncoder()
         jsonEncoder.userInfo[.viewFormat] = ManagedObjectViewFormat.full
         let representation = generator(object)
-        //let representation = T.Representation(object)
         return try jsonEncoder.encode(representation)
     }
 }
