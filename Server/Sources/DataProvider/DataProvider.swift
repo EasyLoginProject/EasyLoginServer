@@ -105,8 +105,11 @@ public class DataProvider {
                 } catch {
                     completion(nil, .swiftError(error))
                 }
-            } else {
-                completion(nil, .cocoaError(jsonError ?? NSError()))
+            } else if let jsonError = jsonError {
+                completion(nil, .cocoaError(jsonError))
+            }
+            else {
+                completion(nil, .swiftError(DataProviderError.none))
             }
         }
     }
@@ -131,8 +134,11 @@ public class DataProvider {
                         lastError = .swiftError(error)
                     }
                 }
+                else if let jsonError = jsonError {
+                    lastError = .cocoaError(jsonError)
+                }
                 else {
-                    lastError = .cocoaError(jsonError ?? NSError())
+                    lastError = .swiftError(DataProviderError.none)
                 }
                 remainingCount.signal()
             }
@@ -153,8 +159,11 @@ public class DataProvider {
                     } catch {
                         completion(nil, .swiftError(error))
                     }
-                } else {
-                    completion(nil, .cocoaError(jsonError ?? NSError()))
+                } else if let jsonError = jsonError {
+                    completion(nil, .cocoaError(jsonError))
+                }
+                else {
+                    completion(nil, .swiftError(DataProviderError.none))
                 }
             }
         } else {
@@ -179,8 +188,11 @@ public class DataProvider {
                 } catch {
                     completion(nil, .swiftError(error))
                 }
-            } else {
-                completion(nil, .cocoaError(jsonError ?? NSError()))
+            } else if let jsonError = jsonError {
+                completion(nil, .cocoaError(jsonError))
+            }
+            else {
+                completion(nil, .swiftError(DataProviderError.none))
             }
         }
     }
@@ -202,8 +214,11 @@ public class DataProvider {
                 } catch {
                     completion(nil, .swiftError(error))
                 }
-            } else {
-                completion(nil, .cocoaError(jsonError ?? NSError()))
+            } else if let jsonError = jsonError {
+                completion(nil, .cocoaError(jsonError))
+            }
+            else {
+                completion(nil, .swiftError(DataProviderError.none))
             }
         }
     }
@@ -227,8 +242,11 @@ public class DataProvider {
                 } catch {
                     completion(nil, .swiftError(error))
                 }
-            } else {
-                completion(nil, .cocoaError(jsonError ?? NSError()))
+            } else if let jsonError = jsonError {
+                completion(nil, .cocoaError(jsonError))
+            }
+            else {
+                completion(nil, .swiftError(DataProviderError.none))
             }
         })
     }
@@ -252,8 +270,11 @@ public class DataProvider {
                 } catch {
                     completion(nil, .swiftError(error))
                 }
-            } else {
-                completion(nil, .cocoaError(jsonError ?? NSError()))
+            } else if let jsonError = jsonError {
+                completion(nil, .cocoaError(jsonError))
+            }
+            else {
+                completion(nil, .swiftError(DataProviderError.none))
             }
         })
     }
@@ -286,14 +307,20 @@ public class DataProvider {
                     if updateResult.ok {
                         self.completeManagedObject(ofType: T.self, withUUID: updateResult.id, completion: completion)
                         NotificationService.notifyAllClients()
-                    } else {
-                        completion(nil, .cocoaError(error ?? NSError()))
+                    } else if let error = error {
+                        completion(nil, .cocoaError(error))
+                    }
+                    else {
+                        completion(nil, .swiftError(DataProviderError.none))
                     }
                 } catch {
                     completion(nil, .swiftError(error))
                 }
-            } else {
-                completion(nil, .cocoaError(error ?? NSError()))
+            } else if let error = error {
+                completion(nil, .cocoaError(error))
+            }
+            else {
+                completion(nil, .swiftError(DataProviderError.none))
             }
         }
     }
@@ -313,7 +340,7 @@ public class DataProvider {
                     result.append(updatedManagedObject)
                 }
                 else {
-                    lastError = error ?? .cocoaError(NSError()) // TODO: result type
+                    lastError = error ?? .swiftError(DataProviderError.none)
                 }
             }
             remainingCount.signal()
@@ -347,14 +374,20 @@ public class DataProvider {
                     if updateResult.ok {
                         self.completeManagedObject(ofType: T.self, withUUID: updateResult.id, completion: completion)
                         NotificationService.notifyAllClients()
-                    } else {
-                        completion(nil, .cocoaError(error ?? NSError()))
+                    } else if let error = error {
+                        completion(nil, .cocoaError(error))
+                    }
+                    else {
+                        completion(nil, .swiftError(DataProviderError.none))
                     }
                 } catch {
                     completion(nil, .swiftError(error))
                 }
-            } else {
-                completion(nil, .cocoaError(error ?? NSError()))
+            } else if let error = error {
+                completion(nil, .cocoaError(error))
+            }
+            else {
+                completion(nil, .swiftError(DataProviderError.none))
             }
         }
     }
@@ -383,14 +416,20 @@ public class DataProvider {
                     if updateResult.ok {
                         completion(nil)
                         NotificationService.notifyAllClients()
-                    } else {
-                        completion(.cocoaError(error ?? NSError()))
+                    } else if let error = error {
+                        completion(.cocoaError(error))
+                    }
+                    else {
+                        completion(.swiftError(DataProviderError.none))
                     }
                 } catch {
                     completion(.swiftError(error))
                 }
-            } else {
-                completion(.cocoaError(error ?? NSError()))
+            } else if let error = error {
+                completion(.cocoaError(error))
+            }
+            else {
+                completion(.swiftError(DataProviderError.none))
             }
         }
     }
