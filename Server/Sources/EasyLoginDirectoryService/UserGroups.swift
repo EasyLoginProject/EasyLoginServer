@@ -270,7 +270,6 @@ class UserGroups {
             let list = dict.map { $1 }
             self.dataProvider.storeChangesFrom(mutableManagedObjects: list) {
                 (updatedList, error) in
-                print("done! error = \(String(describing: error)), updated = \(updatedList)")
                 if let error = error {
                     completion(EasyLoginError.debug(String.init(describing: error)))
                 }
