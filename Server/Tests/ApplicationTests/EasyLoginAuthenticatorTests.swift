@@ -35,12 +35,19 @@ struct MockUserProvider: UserRecordProvider {
 class EasyLoginAuthenticatorTests: XCTestCase {
     static var allTests = [
         ("testEmptyBasicAuthenticationReturnsNil", testEmptyBasicAuthenticationReturnsNil),
+        ("testInvalidBase64StringReturnsNil", testInvalidBase64StringReturnsNil),
         ("testValidBasicAuthenticationReturnsTuple", testValidBasicAuthenticationReturnsTuple),
     ]
     
     func testEmptyBasicAuthenticationReturnsNil() throws {
         let authenticator = try mockAuthenticator()
         let auth = authenticator.decodeBasicCredentials("Basic ")
+        XCTAssertNil(auth)
+    }
+    
+    func testInvalidBase64StringReturnsNil() throws {
+        let authenticator = try mockAuthenticator()
+        let auth = authenticator.decodeBasicCredentials("Basic whatever_invalid_base64!")
         XCTAssertNil(auth)
     }
     
