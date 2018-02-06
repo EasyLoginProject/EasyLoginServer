@@ -18,10 +18,6 @@
         },
         "all_usergroups": {
             "map" : "function(doc) { if (doc.type === 'usergroup' && doc.deleted != true) { emit(doc._id, {\"uuid\":doc._id, \"type\":doc.type, \"numericID\":doc.numericID, \"shortname\":doc.shortname, \"commonName\":doc.commonName}); } }"
-        },
-        "users_numeric_id": {
-            "map" : "function(doc) { if (doc.type === 'user') { emit(null, doc.numericID); } }",
-            "reduce" : "_stats"
         }
     },
     "language": "javascript"
