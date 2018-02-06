@@ -175,6 +175,7 @@ public class DataProvider {
                 do {
                     let strategy: ManagedObjectCodingStrategy = T.requireFullObject() ? .databaseEncoding : T.viewToListThemAllReturnPartialResult() ? .briefEncoding : .databaseEncoding
                     let jsonDecoder = JSONDecoder()
+                    jsonDecoder.dateDecodingStrategy = .iso8601
                     jsonDecoder.userInfo[.managedObjectCodingStrategy] = strategy
                     let viewResults = try jsonDecoder.decode(CouchDBViewResult<T>.self, from: jsonData)
                     
@@ -201,6 +202,7 @@ public class DataProvider {
                 do {
                     let strategy: ManagedObjectCodingStrategy = .databaseEncoding
                     let jsonDecoder = JSONDecoder()
+                    jsonDecoder.dateDecodingStrategy = .iso8601
                     jsonDecoder.userInfo[.managedObjectCodingStrategy] = strategy
                     let viewResults = try jsonDecoder.decode(CouchDBViewResult<T>.self, from: jsonData)
                     
@@ -287,6 +289,8 @@ public class DataProvider {
             completion(nil, .swiftError(DataProviderError.tryingToUpdateNonExistingObject))
             return
         }
+        
+        mutableManagedObject.markAsModified()
         
         let jsonData: Data
         do {

@@ -17,7 +17,7 @@
             "map" : "function(doc) { if (doc.type === 'device') { emit(doc._id, {\"uuid\":doc._id, \"serialNumber\":doc.serialNumber, \"deviceName\":doc.deviceName, \"hardwareUUID\":doc.hardwareUUID}); } }"
         },
         "all_usergroups": {
-            "map" : "function(doc) { if (doc.type === 'usergroup' && doc.deleted != true) { emit(doc._id, {\"uuid\":doc._id, \"type\":doc.type, \"numericID\":doc.numericID, \"shortname\":doc.shortname, \"commonName\":doc.commonName}); } }"
+            "map" : "function(doc) { if (doc.type === 'usergroup' && doc.deleted != true) { emit(doc._id, {\"uuid\":doc._id, \"type\":doc.type, \"numericID\":doc.numericID, \"modified\":doc.modified,  \"shortname\":doc.shortname, \"commonName\":doc.commonName}); } }"
         }
     },
     "language": "javascript"

@@ -25,6 +25,8 @@ public protocol MutableManagedObject {
 
 public class ManagedObject : Codable, Equatable, CustomDebugStringConvertible {
     public let uuid: ManagedObjectRecordID
+    public fileprivate(set) var created: Date
+    public fileprivate(set) var modified: Date
     public fileprivate(set) var deleted: Bool
     public fileprivate(set) var revision: String?
     var recordType: String
@@ -54,12 +56,15 @@ public class ManagedObject : Codable, Equatable, CustomDebugStringConvertible {
     enum ManagedObjectDatabaseCodingKeys: String, CodingKey {
         case uuid = "_id"
         case revision = "_rev"
+        case created
+        case modified
         case deleted
         case recordType = "type"
     }
     
     enum ManagedObjectPartialDatabaseCodingKeys: String, CodingKey {
         case uuid = "uuid"
+        case modified
         case deleted
         case recordType = "type"
     }
@@ -69,6 +74,8 @@ public class ManagedObject : Codable, Equatable, CustomDebugStringConvertible {
         isPartialRepresentation = false
         deleted = false
         recordType = "abstract"
+        created = Date()
+        modified = created
     }
     
     required public init(from decoder: Decoder) throws {
@@ -86,6 +93,8 @@ public class ManagedObject : Codable, Equatable, CustomDebugStringConvertible {
             } else {
                 deleted = false
             }
+            created = try container.decode(Date.self, forKey: .created)
+            modified = try container.decode(Date.self, forKey: .modified)
         case .briefEncoding?:
             let container = try decoder.container(keyedBy: ManagedObjectPartialDatabaseCodingKeys.self)
             recordType = try container.decode(String.self, forKey: .recordType)
@@ -96,6 +105,8 @@ public class ManagedObject : Codable, Equatable, CustomDebugStringConvertible {
             } else {
                 deleted = false
             }
+            created = Date.distantPast
+            modified = try container.decode(Date.self, forKey: .modified)
         }
     }
     
@@ -110,6 +121,8 @@ public class ManagedObject : Codable, Equatable, CustomDebugStringConvertible {
             if deleted {
                 try container.encode(deleted, forKey: .deleted)
             }
+            try container.encode(created, forKey: .created)
+            try container.encode(modified, forKey: .modified)
             
         case .briefEncoding?:
             var container = encoder.container(keyedBy: ManagedObjectPartialDatabaseCodingKeys.self)
@@ -118,11 +131,13 @@ public class ManagedObject : Codable, Equatable, CustomDebugStringConvertible {
             if deleted {
                 try container.encode(deleted, forKey: .deleted)
             }
+            try container.encode(modified, forKey: .modified)
         }
     }
     
     static func objectFromJSON(data jsonData:Data, withCodingStrategy strategy:ManagedObjectCodingStrategy) throws -> Self {
         let jsonDecoder = JSONDecoder()
+        jsonDecoder.dateDecodingStrategy = .iso8601
         jsonDecoder.userInfo[.managedObjectCodingStrategy] = strategy
         
         return try jsonDecoder.decode(self, from: jsonData)
@@ -130,6 +145,7 @@ public class ManagedObject : Codable, Equatable, CustomDebugStringConvertible {
     
     func jsonData(withCodingStrategy strategy:ManagedObjectCodingStrategy) throws -> Data {
         let jsonEncoder = JSONEncoder()
+        jsonEncoder.dateEncodingStrategy = .iso8601
         jsonEncoder.userInfo[.managedObjectCodingStrategy] = strategy
         
         return try jsonEncoder.encode(self)
@@ -143,5 +159,8 @@ public class ManagedObject : Codable, Equatable, CustomDebugStringConvertible {
         deleted = true
     }
     
+    func markAsModified() {
+        modified = Date()
+    }
 }
 
