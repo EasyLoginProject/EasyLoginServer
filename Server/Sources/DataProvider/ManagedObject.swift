@@ -88,11 +88,8 @@ public class ManagedObject : Codable, Equatable, CustomDebugStringConvertible {
             revision = try container.decode(String.self, forKey: .revision)
             recordType = try container.decode(String.self, forKey: .recordType)
             isPartialRepresentation = false
-            if let deletedMark = try? container.decode(Bool.self, forKey: .deleted) {
-                deleted = deletedMark
-            } else {
-                deleted = false
-            }
+            let deletedMark = try? container.decode(Bool.self, forKey: .deleted)
+            deleted = deletedMark ?? false
             created = try container.decode(Date.self, forKey: .created)
             modified = try container.decode(Date.self, forKey: .modified)
         case .briefEncoding?:
@@ -100,11 +97,8 @@ public class ManagedObject : Codable, Equatable, CustomDebugStringConvertible {
             recordType = try container.decode(String.self, forKey: .recordType)
             uuid = try container.decode(ManagedObjectRecordID.self, forKey: .uuid)
             isPartialRepresentation = true
-            if let deletedMark = try? container.decode(Bool.self, forKey: .deleted) {
-                deleted = deletedMark
-            } else {
-                deleted = false
-            }
+            let deletedMark = try? container.decode(Bool.self, forKey: .deleted)
+            deleted = deletedMark ?? false
             created = Date.distantPast
             modified = try container.decode(Date.self, forKey: .modified)
         }
