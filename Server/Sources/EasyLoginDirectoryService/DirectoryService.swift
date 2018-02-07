@@ -24,11 +24,13 @@ public class EasyLoginDirectoryService {
     
     public func router() -> Router {
         let router = Router()
-        router.post(middleware:BodyParser())
-        router.put(middleware:BodyParser())
-        users.installHandlers(to: router)
-        devices.installHandlers(to: router)
+        let parsingRouter = Router() // temporary -- required only for services not using ManagedObjectRepresentation yet
+        parsingRouter.post(middleware:BodyParser())
+        parsingRouter.put(middleware:BodyParser())
+        users.installHandlers(to: parsingRouter)
+        devices.installHandlers(to: parsingRouter)
         usergroups.installHandlers(to: router)
+        router.all(middleware: parsingRouter)
         return router
     }
 }

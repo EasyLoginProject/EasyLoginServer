@@ -55,8 +55,7 @@ class UserGroups {
             next()
             return
         }
-        guard let jsonBody = request.body?.asJSON else {
-            Log.error("body parsing failure")
+        guard let updateRequest = try? request.read(as: MutableManagedUserGroup.UpdateRequest.self) else {
             sendError(.malformedBody, to:response)
             next()
             return
@@ -69,9 +68,9 @@ class UserGroups {
                 next()
                 return
             }
-                let initialUserGroup = MutableManagedUserGroup(withNumericID: retrievedUserGroup.numericID, shortname: retrievedUserGroup.shortname, commonName: retrievedUserGroup.commonName, email: retrievedUserGroup.email, memberOf: retrievedUserGroup.memberOf, nestedGroups: retrievedUserGroup.nestedGroups, members: retrievedUserGroup.members)
+            let initialUserGroup = MutableManagedUserGroup(withNumericID: retrievedUserGroup.numericID, shortname: retrievedUserGroup.shortname, commonName: retrievedUserGroup.commonName, email: retrievedUserGroup.email, memberOf: retrievedUserGroup.memberOf, nestedGroups: retrievedUserGroup.nestedGroups, members: retrievedUserGroup.members)
             do {
-                try retrievedUserGroup.update(withJSON: jsonBody)
+                try retrievedUserGroup.update(with: updateRequest)
             }
             catch {
                 sendError(.debug("\(String(describing: error))"), to: response)
@@ -105,27 +104,25 @@ class UserGroups {
     }
     
     fileprivate func createUserGroupHandler(request: RouterRequest, response: RouterResponse, next: @escaping ()->Void) -> Void {
-        Log.debug("handling POST")
-        guard let jsonBody = request.body?.asJSON else {
-            Log.error("body parsing failure")
+        guard let updateRequest = try? request.read(as: MutableManagedUserGroup.UpdateRequest.self) else {
             sendError(.malformedBody, to:response)
             next()
             return
         }
-        guard let shortname = jsonBody["shortname"] as? String else {
+        guard let shortname = updateRequest.shortname else {
             sendError(.missingField("shortname"), to:response)
             next()
             return
         }
-        guard let commonName = jsonBody["commonName"] as? String else {
+        guard let commonName = updateRequest.commonName else {
             sendError(.missingField("commonName"), to:response)
             next()
             return
         }
-        let email = jsonBody["email"] as? String
-        let memberOf = jsonBody["memberOf"] as? [String] ?? []
-        let nestedGroups = jsonBody["nestedGroups"] as? [String] ?? []
-        let members = jsonBody["members"] as? [String] ?? []
+        let email = updateRequest.email?.optionalValue
+        let memberOf = updateRequest.memberOf ?? []
+        let nestedGroups = updateRequest.nestedGroups ?? []
+        let members = updateRequest.members ?? []
         numericIDGenerator.nextValue() { // TODO: generateNextValue()
             numericID in
             guard let numericID = numericID else {
@@ -277,29 +274,6 @@ class UserGroups {
                     completion(nil)
                 }
             }
-        }
-    }
-}
-
-extension MutableManagedUserGroup {
-    func update(withJSON jsonBody: [String: Any]) throws {
-        if let commonName = jsonBody["commonName"] as? String {
-            self.setCommonName(commonName)
-        }
-        if let email = jsonBody["email"] as? String {
-            try self.setEmail(email)
-        }
-        else if jsonBody["email"] is NSNull {
-            self.clearEmail()
-        }
-        if let memberOf = jsonBody["memberOf"] as? [String] {
-            self.setOwners(memberOf)
-        }
-        if let nestedGroups = jsonBody["nestedGroups"] as? [String] {
-            self.setNestedGroups(nestedGroups)
-        }
-        if let members = jsonBody["members"] as? [String] {
-            self.setMembers(members)
         }
     }
 }
