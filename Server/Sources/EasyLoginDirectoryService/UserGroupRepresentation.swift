@@ -116,5 +116,4 @@ extension MutableManagedUserGroup {
             self.setMembers(members)
         }
     }
-
 }

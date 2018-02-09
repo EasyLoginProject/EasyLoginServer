@@ -60,7 +60,7 @@ class UserGroups {
             next()
             return
         }
-        dataProvider.completeManagedObject(ofType: MutableManagedUserGroup.self, withUUID: uuid, completion: {
+        dataProvider.completeManagedObject(ofType: MutableManagedUserGroup.self, withUUID: uuid) {
             retrievedUserGroup, error in
             guard let retrievedUserGroup = retrievedUserGroup else {
                 sendError(.debug("\(String(describing: error))"), to: response)
@@ -78,7 +78,13 @@ class UserGroups {
                 next()
                 return
             }
-            self.dataProvider.storeChangeFrom(mutableManagedObject: retrievedUserGroup, completion: { (updatedUsergroup, error) in
+            self.dataProvider.storeChangeFrom(mutableManagedObject: retrievedUserGroup) {
+                updatedUsergroup, error in
+                guard let updatedUsergroup = updatedUsergroup else {
+                    sendError(.internalServerError, to:response)
+                    next()
+                    return
+                }
                 self.updateRelationships(initial: initialUserGroup, final: retrievedUserGroup) {
                     error in
                     guard error == nil else {
@@ -88,7 +94,7 @@ class UserGroups {
                         next()
                         return
                     }
-                    if let jsonData = try? self.viewFormatter.viewAsJSONData(retrievedUserGroup) {
+                    if let jsonData = try? self.viewFormatter.viewAsJSONData(updatedUsergroup) {
                         response.send(data: jsonData)
                         response.headers.setType("json")
                         response.status(.OK)
@@ -99,8 +105,8 @@ class UserGroups {
                     next()
                     return
                 }
-            })
-        })
+            }
+        }
     }
     
     fileprivate func createUserGroupHandler(request: RouterRequest, response: RouterResponse, next: @escaping ()->Void) -> Void {
