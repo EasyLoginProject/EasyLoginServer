@@ -9,6 +9,7 @@
 import Foundation
 import Kitura
 import Extensions
+import DataProvider
 
 class EasyLoginAuthenticator: RouterMiddleware {
     let userProvider: UserRecordProvider
@@ -156,9 +157,6 @@ struct AuthorizationForUser: Authorization {
         guard let user = record as? ManagedUser else {
             return false
         }
-        guard let recordUUID = user.uuid else {
-            return false
-        }
-        return id == recordUUID
+        return id == user.uuid
     }
 }

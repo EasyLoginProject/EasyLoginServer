@@ -2,7 +2,7 @@
     "id": "_design/main_design",
     "views": {
         "all_users": {
-            "map" : "function(doc) { if (doc.type === 'user' && doc.deleted != true) { emit([doc.numericID, doc._id], {\"uuid\":doc._id, \"type\":doc.type, \"numericID\":doc.numericID, \"shortname\":doc.shortname, \"principalName\":doc.principalName, \"fullName\":doc.fullName}); } }"
+            "map" : "function(doc) { if (doc.type === 'user' && doc.deleted != true) { emit([doc.numericID, doc._id], {\"uuid\":doc._id, \"type\":doc.type, \"modified\":doc.modified, \"numericID\":doc.numericID, \"shortname\":doc.shortname, \"principalName\":doc.principalName, \"fullName\":doc.fullName}); } }"
         },
         "user_authMethods_by_shortname": {
             "map" : "function(doc) { if (doc.type === 'user' && doc.deleted != true) { emit(doc.shortname, doc.authMethods); } }"

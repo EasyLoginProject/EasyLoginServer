@@ -21,11 +21,11 @@ public class ManagedUser: ManagedObject {
     public fileprivate(set) var numericID: Int
     public fileprivate(set) var shortname: String
     public fileprivate(set) var principalName: String
-    public fileprivate(set) var email: String?
+    public fileprivate(set) var email: String? // not optional
     public fileprivate(set) var givenName: String?
     public fileprivate(set) var surname: String?
-    public fileprivate(set) var fullName: String?
-    public fileprivate(set) var authMethods: [String: String]?
+    public fileprivate(set) var fullName: String? // not optional
+    public fileprivate(set) var authMethods: [String: String]? // not optional
     
     public override var debugDescription: String {
         let objectAddress = String(format:"%2X", unsafeBitCast(self, to: Int.self))
@@ -83,8 +83,13 @@ public class ManagedUser: ManagedObject {
         self.givenName = givenName
         self.surname = surname
         self.fullName = fullName
+        self.authMethods = [:]
         super.init()
         recordType = "user"
+    }
+    
+    public convenience init(with mo: ManagedUser) {
+        self.init(withNumericID: mo.numericID, shortname: mo.shortname, principalName: mo.principalName, email: mo.email, givenName: mo.givenName, surname: mo.surname, fullName: mo.fullName)
     }
     
     public required init(from decoder: Decoder) throws {
@@ -97,8 +102,8 @@ public class ManagedUser: ManagedObject {
             shortname = try container.decode(String.self, forKey: .shortname)
             principalName = try container.decode(String.self, forKey: .principalName)
             email = try container.decode(String.self, forKey: .email)
-            givenName = try container.decode(String.self, forKey: .givenName)
-            surname = try container.decode(String.self, forKey: .surname)
+            givenName = try container.decodeIfPresent(String.self, forKey: .givenName)
+            surname = try container.decodeIfPresent(String.self, forKey: .surname)
             fullName = try container.decode(String.self, forKey: .fullName)
             authMethods = try container.decode([String:String].self, forKey: .authMethods)
             
@@ -123,8 +128,12 @@ public class ManagedUser: ManagedObject {
             try container.encode(shortname, forKey: .shortname)
             try container.encode(principalName, forKey: .principalName)
             try container.encode(email, forKey: .email)
-            try container.encode(givenName, forKey: .givenName)
-            try container.encode(surname, forKey: .surname)
+            if let givenName = givenName {
+                try container.encode(givenName, forKey: .givenName)
+            }
+            if let surname = surname {
+                try container.encode(surname, forKey: .surname)
+            }
             try container.encode(fullName, forKey: .fullName)
             try container.encode(authMethods, forKey: .authMethods)
             
@@ -139,23 +148,22 @@ public class ManagedUser: ManagedObject {
     }
     
     /**
-     This function validate a clear text password against already loaded authentication infos.
-     This does not work on a partial ManagedUser and will throw an excpetion if started on such an object.
+     This function validates a clear text password against already loaded authentication data.
+     This does not work on a partial ManagedUser and will throw an exception if started on such an object.
      
-     If for any reason, no authentication methods can be found, another excpetion will be thrown
+     If for any reason, no authentication methods can be found, another exception will be thrown.
      
      - parameter clearTextPassword: the password in clear text
-     - returns: a boolean state indicating the check restult
+     - returns: a boolean state indicating the check result
      */
     public func verify(clearTextPassword:String) throws -> Bool {
-        if isPartialRepresentation {
+        guard !isPartialRepresentation else {
             throw ManagedUserError.validatingPasswordAgainstPartialRepresentation
+        }
+        if let authMethods = authMethods, let modularString = authMethods[AuthenticationScheme.pbkdf2.rawValue] {
+            return PBKDF2.verifyPassword(clearTextPassword, withString: modularString)
         } else {
-            if let authMethods = authMethods, let modularString = authMethods[AuthenticationScheme.pbkdf2.rawValue] {
-                return PBKDF2.verifyPassword(clearTextPassword, withString: modularString)
-            } else {
-                throw ManagedUserError.noAppropriateAuthenticationMethodFound
-            }
+            throw ManagedUserError.noAppropriateAuthenticationMethodFound
         }
     }
 }
@@ -208,42 +216,36 @@ public class MutableManagedUser : ManagedUser, MutableManagedObject {
         guard value != shortname else {
             return
         }
-        
-        if value.range(of: "^[a-z_][a-z0-9_-]{0,30}$", options: .regularExpression, range: nil, locale: nil) != nil {
-            shortname = value
-            hasBeenEdited = true
-        } else {
+        guard value.range(of: "^[a-z_][a-z0-9_-]{0,30}$", options: .regularExpression, range: nil, locale: nil) != nil else {
             throw MutableManagedUserUpdateError.invalidShortname
         }
+        shortname = value
+        hasBeenEdited = true
     }
     
     public func setPrincipalName(_ value:String) throws {
         guard value != principalName else {
             return
         }
-        
-        if value.range(of: "^[a-z0-9_.-]+@[A-Za-z0-9.-]+$", options: .regularExpression, range: nil, locale: nil) != nil {
-            principalName = value
-            hasBeenEdited = true
-        } else {
+        guard value.range(of: "^[a-z0-9_.-]+@[A-Za-z0-9.-]+$", options: .regularExpression, range: nil, locale: nil) != nil else {
             throw MutableManagedUserUpdateError.invalidPrincipalName
         }
+        principalName = value
+        hasBeenEdited = true
     }
     
     public func setEmail(_ value:String) throws {
         guard value != email else {
             return
         }
-        
-        if value.range(of: "^[a-z0-9_.-]+@[A-Za-z0-9.-]+$", options: .regularExpression, range: nil, locale: nil) != nil {
-            email = value
-            hasBeenEdited = true
-        } else {
+        guard value.range(of: "^[a-z0-9_.-]+@[A-Za-z0-9.-]+$", options: .regularExpression, range: nil, locale: nil) != nil else {
             throw MutableManagedUserUpdateError.invalidEmail
         }
+        email = value
+        hasBeenEdited = true
     }
     
-    public func setGivenName(_ value:String) throws {
+    public func setGivenName(_ value:String?) {
         guard value != givenName else {
             return
         }
@@ -252,7 +254,7 @@ public class MutableManagedUser : ManagedUser, MutableManagedObject {
         hasBeenEdited = true
     }
     
-    public func setSurname(_ value:String) throws {
+    public func setSurname(_ value:String?) {
         guard value != surname else {
             return
         }
@@ -261,7 +263,7 @@ public class MutableManagedUser : ManagedUser, MutableManagedObject {
         hasBeenEdited = true
     }
     
-    public func setFullName(_ value:String) throws {
+    public func setFullName(_ value:String) {
         guard value != fullName else {
             return
         }
