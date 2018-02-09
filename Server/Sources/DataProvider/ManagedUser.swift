@@ -75,7 +75,7 @@ public class ManagedUser: ManagedObject {
     }
     
     
-    fileprivate init(withNumericID numericID:Int, shortname:String, principalName:String, email:String?, givenName:String?, surname:String?, fullName:String?) {
+    fileprivate init(withNumericID numericID:Int, shortname:String, principalName:String, email:String?, givenName:String?, surname:String?, fullName:String?, authMethods:[String:String] = [:]) {
         self.numericID = numericID
         self.shortname = shortname
         self.principalName = principalName
@@ -83,13 +83,13 @@ public class ManagedUser: ManagedObject {
         self.givenName = givenName
         self.surname = surname
         self.fullName = fullName
-        self.authMethods = [:]
+        self.authMethods = authMethods
         super.init()
         recordType = "user"
     }
     
     public convenience init(with mo: ManagedUser) {
-        self.init(withNumericID: mo.numericID, shortname: mo.shortname, principalName: mo.principalName, email: mo.email, givenName: mo.givenName, surname: mo.surname, fullName: mo.fullName)
+        self.init(withNumericID: mo.numericID, shortname: mo.shortname, principalName: mo.principalName, email: mo.email, givenName: mo.givenName, surname: mo.surname, fullName: mo.fullName, authMethods: mo.authMethods ?? [:])
     }
     
     public required init(from decoder: Decoder) throws {
@@ -203,9 +203,9 @@ public class MutableManagedUser : ManagedUser, MutableManagedObject {
         case invalidEmail
     }
     
-    public override init(withNumericID numericID:Int, shortname:String, principalName:String, email:String?, givenName:String?, surname:String?, fullName:String?) {
+    public override init(withNumericID numericID:Int, shortname:String, principalName:String, email:String?, givenName:String?, surname:String?, fullName:String?, authMethods:[String:String] = [:]) {
         hasBeenEdited = true
-        super.init(withNumericID: numericID, shortname: shortname, principalName: principalName, email: email, givenName: givenName, surname: surname, fullName: fullName)
+        super.init(withNumericID: numericID, shortname: shortname, principalName: principalName, email: email, givenName: givenName, surname: surname, fullName: fullName, authMethods: authMethods)
     }
     
     public required init(from decoder: Decoder) throws {
@@ -269,6 +269,15 @@ public class MutableManagedUser : ManagedUser, MutableManagedObject {
         }
         
         fullName = value
+        hasBeenEdited = true
+    }
+    
+    public func setAuthMethods(_ value: [String:String]) {
+        guard authMethods == nil || value != authMethods! else {
+            return
+        }
+        
+        authMethods = value
         hasBeenEdited = true
     }
     

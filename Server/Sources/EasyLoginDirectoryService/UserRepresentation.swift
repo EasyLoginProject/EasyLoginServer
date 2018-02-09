@@ -7,6 +7,7 @@
 
 import Foundation
 import DataProvider
+import Extensions
 
 extension ManagedUser {
     
@@ -80,6 +81,7 @@ extension MutableManagedUser {
         let givenName: NullableString?
         let surname: NullableString?
         let fullName: String?
+        let authMethods: [String:String]?
         //let memberOf: [ManagedObjectRecordID]?
         
         init(from decoder: Decoder) throws {
@@ -100,11 +102,12 @@ extension MutableManagedUser {
                 surname = nil
             }
             fullName = try container.decodeIfPresent(String.self, forKey: .fullName)
+            authMethods = try container.decodeIfPresent([String:String].self, forKey: .authMethods)
             //memberOf = try container.decodeIfPresent(Array.self, forKey: .memberOf)
         }
     }
     
-    func update(with updateRequest: UpdateRequest) throws {
+    func update(with updateRequest: UpdateRequest, authMethodGenerator: AuthMethodGenerator) throws {
         if let shortname = updateRequest.shortname {
             try self.setShortname(shortname)
         }
@@ -122,6 +125,10 @@ extension MutableManagedUser {
         }
         if let fullName = updateRequest.fullName {
             self.setFullName(fullName)
+        }
+        if let authMethods = updateRequest.authMethods {
+            let filteredAuthMethods = try authMethodGenerator.generate(authMethods)
+            self.setAuthMethods(filteredAuthMethods)
         }
 //        if let memberOf = updateRequest.memberOf {
 //            self.setOwners(memberOf)

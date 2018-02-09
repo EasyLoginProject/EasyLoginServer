@@ -16,13 +16,13 @@ import NotificationService
 class Users {
     let dataProvider: DataProvider
     let numericIDGenerator: PersistentCounter
-    //let authMethodGenerator: AuthMethodGenerator
+    let authMethodGenerator: AuthMethodGenerator
     let viewFormatter = ManagedObjectFormatter(type: ManagedUser.self, generator: {ManagedUser.Representation($0)})
     
     init(dataProvider: DataProvider) {
         self.dataProvider = dataProvider
         self.numericIDGenerator = dataProvider.persistentCounter(name: "users.numericID")
-        //self.authMethodGenerator = AuthMethodGenerator()
+        self.authMethodGenerator = AuthMethodGenerator()
     }
     
     func installHandlers(to router: Router) {
@@ -73,7 +73,7 @@ class Users {
             }
             let initialUser = ManagedUser(with: mutableUser)
             do {
-                try mutableUser.update(with: updateRequest)
+                try mutableUser.update(with: updateRequest, authMethodGenerator: self.authMethodGenerator)
             }
             catch {
                 sendError(.debug("\(String(describing: error))"), to: response)
@@ -139,6 +139,20 @@ class Users {
         }
         let givenName = updateRequest.givenName?.optionalValue
         let surname = updateRequest.surname?.optionalValue
+        let authMethods: [String:String]
+        if let authMethodsFromRequest = updateRequest.authMethods {
+            do {
+                authMethods = try authMethodGenerator.generate(authMethodsFromRequest)
+            }
+            catch {
+                sendError(.malformedBody, to: response) // TODO: make error more explicit
+                next()
+                return
+            }
+        }
+        else {
+            authMethods = [:]
+        }
         numericIDGenerator.nextValue() { // TODO: generateNextValue()
             numericID in
             guard let numericID = numericID else {
@@ -146,7 +160,7 @@ class Users {
                 next()
                 return
             }
-            let user = MutableManagedUser(withNumericID: numericID, shortname: shortname, principalName: principalName, email: email, givenName: givenName, surname: surname, fullName: fullName)
+            let user = MutableManagedUser(withNumericID: numericID, shortname: shortname, principalName: principalName, email: email, givenName: givenName, surname: surname, fullName: fullName, authMethods: authMethods)
             self.dataProvider.insert(mutableManagedObject: user) {
                 (insertedUser, error) in
                 guard let insertedUser = insertedUser else {
