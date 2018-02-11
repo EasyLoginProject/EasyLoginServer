@@ -105,28 +105,15 @@ public class ManagedObject : Codable, Equatable, CustomDebugStringConvertible {
     }
     
     public func encode(to encoder: Encoder) throws {
-        let codingStrategy = encoder.userInfo[.managedObjectCodingStrategy] as? ManagedObjectCodingStrategy
-        
-        switch codingStrategy {
-        case .databaseEncoding?, .none:
-            var container = encoder.container(keyedBy: ManagedObjectDatabaseCodingKeys.self)
-            try container.encode(uuid, forKey: .uuid)
-            try container.encode(recordType, forKey: .recordType)
-            if deleted {
-                try container.encode(deleted, forKey: .deleted)
-            }
-            try container.encode(created, forKey: .created)
-            try container.encode(modified, forKey: .modified)
-            
-        case .briefEncoding?:
-            var container = encoder.container(keyedBy: ManagedObjectPartialDatabaseCodingKeys.self)
-            try container.encode(uuid, forKey: .uuid)
-            try container.encode(recordType, forKey: .recordType)
-            if deleted {
-                try container.encode(deleted, forKey: .deleted)
-            }
-            try container.encode(modified, forKey: .modified)
+        assert(encoder.userInfo[.managedObjectCodingStrategy] == nil, "Encoding strategy is not supported when writing to database.")
+        var container = encoder.container(keyedBy: ManagedObjectDatabaseCodingKeys.self)
+        try container.encode(uuid, forKey: .uuid)
+        try container.encode(recordType, forKey: .recordType)
+        if deleted {
+            try container.encode(deleted, forKey: .deleted)
         }
+        try container.encode(created, forKey: .created)
+        try container.encode(modified, forKey: .modified)
     }
     
     static func objectFromJSON(data jsonData:Data, withCodingStrategy strategy:ManagedObjectCodingStrategy) throws -> Self {
@@ -137,10 +124,9 @@ public class ManagedObject : Codable, Equatable, CustomDebugStringConvertible {
         return try jsonDecoder.decode(self, from: jsonData)
     }
     
-    func jsonData(withCodingStrategy strategy:ManagedObjectCodingStrategy) throws -> Data {
+    func jsonData() throws -> Data {
         let jsonEncoder = JSONEncoder()
         jsonEncoder.dateEncodingStrategy = .iso8601
-        jsonEncoder.userInfo[.managedObjectCodingStrategy] = strategy
         
         return try jsonEncoder.encode(self)
     }

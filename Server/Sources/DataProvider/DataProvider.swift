@@ -294,7 +294,7 @@ public class DataProvider {
         
         let jsonData: Data
         do {
-            jsonData = try mutableManagedObject.jsonData(withCodingStrategy: .databaseEncoding)
+            jsonData = try mutableManagedObject.jsonData()
         }
         catch {
             completion(nil, .swiftError(error))
@@ -361,7 +361,7 @@ public class DataProvider {
         
         let jsonData: Data
         do {
-            jsonData = try mutableManagedObject.jsonData(withCodingStrategy: .databaseEncoding)
+            jsonData = try mutableManagedObject.jsonData()
         }
         catch {
             completion(nil, .swiftError(error))
@@ -403,7 +403,7 @@ public class DataProvider {
         managedObject.markAsDeleted()
         let jsonData: Data
         do {
-            jsonData = try managedObject.jsonData(withCodingStrategy: .databaseEncoding)
+            jsonData = try managedObject.jsonData()
         }
         catch {
             completion(.swiftError(error))

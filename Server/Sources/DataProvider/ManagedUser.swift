@@ -124,32 +124,20 @@ public class ManagedUser: ManagedObject {
     }
     
     public override func encode(to encoder: Encoder) throws {
-        let codingStrategy = encoder.userInfo[.managedObjectCodingStrategy] as? ManagedObjectCodingStrategy
-        
-        switch codingStrategy {
-        case .databaseEncoding?, .none:
-            var container = encoder.container(keyedBy: ManagedUserDatabaseCodingKeys.self)
-            try container.encode(numericID, forKey: .numericID)
-            try container.encode(shortname, forKey: .shortname)
-            try container.encode(principalName, forKey: .principalName)
-            try container.encode(email, forKey: .email)
-            if let givenName = givenName {
-                try container.encode(givenName, forKey: .givenName)
-            }
-            if let surname = surname {
-                try container.encode(surname, forKey: .surname)
-            }
-            try container.encode(fullName, forKey: .fullName)
-            try container.encode(authMethods, forKey: .authMethods)
-            try container.encode(memberOf, forKey: .memberOf)
-            
-        case .briefEncoding?:
-            var container = encoder.container(keyedBy: ManagedUserPartialDatabaseCodingKeys.self)
-            try container.encode(numericID, forKey: .numericID)
-            try container.encode(shortname, forKey: .shortname)
-            try container.encode(principalName, forKey: .principalName)
-            try container.encode(fullName, forKey: .fullName)
+        var container = encoder.container(keyedBy: ManagedUserDatabaseCodingKeys.self)
+        try container.encode(numericID, forKey: .numericID)
+        try container.encode(shortname, forKey: .shortname)
+        try container.encode(principalName, forKey: .principalName)
+        try container.encode(email, forKey: .email)
+        if let givenName = givenName {
+            try container.encode(givenName, forKey: .givenName)
         }
+        if let surname = surname {
+            try container.encode(surname, forKey: .surname)
+        }
+        try container.encode(fullName, forKey: .fullName)
+        try container.encode(authMethods, forKey: .authMethods)
+        try container.encode(memberOf, forKey: .memberOf)
         try super.encode(to: encoder)
     }
     

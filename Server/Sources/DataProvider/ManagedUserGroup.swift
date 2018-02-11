@@ -89,24 +89,14 @@ public class ManagedUserGroup: ManagedObject {
     }
     
     public override func encode(to encoder: Encoder) throws {
-        let codingStrategy = encoder.userInfo[.managedObjectCodingStrategy] as? ManagedObjectCodingStrategy
-        
-        switch codingStrategy {
-        case .databaseEncoding?, .none:
-            var container = encoder.container(keyedBy: ManagedUserGroupDatabaseCodingKeys.self)
-            try container.encode(numericID, forKey: .numericID)
-            try container.encode(shortname, forKey: .shortname)
-            try container.encode(commonName, forKey: .commonName)
-            try container.encode(email, forKey: .email)
-            try container.encode(memberOf, forKey: .memberOf)
-            try container.encode(nestedGroups, forKey: .nestedGroups)
-            try container.encode(members, forKey: .members)
-            
-        case .briefEncoding?:
-            var container = encoder.container(keyedBy: ManagedUserGroupPartialDatabaseCodingKeys.self)
-            try container.encode(numericID, forKey: .numericID)
-            try container.encode(shortname, forKey: .shortname)
-        }
+        var container = encoder.container(keyedBy: ManagedUserGroupDatabaseCodingKeys.self)
+        try container.encode(numericID, forKey: .numericID)
+        try container.encode(shortname, forKey: .shortname)
+        try container.encode(commonName, forKey: .commonName)
+        try container.encode(email, forKey: .email)
+        try container.encode(memberOf, forKey: .memberOf)
+        try container.encode(nestedGroups, forKey: .nestedGroups)
+        try container.encode(members, forKey: .members)
         try super.encode(to: encoder)
     }
 }
