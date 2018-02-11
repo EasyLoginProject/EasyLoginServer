@@ -52,7 +52,7 @@ struct DesiredUserFromAdminAPI: Codable {
             let numericIDGenerator = dataProvider.persistentCounter(name: "users.numericID")
             numericIDGenerator.nextValue(completion: { (numericID) in
                 if let numericID = numericID {
-                    let newUser = MutableManagedUser(withNumericID: numericID, shortname: shortname, principalName: principalName, email: self.email, givenName: self.givenName, surname: self.surname, fullName: self.fullName)
+                    let newUser = MutableManagedUser(withDataProvider: dataProvider, numericID: numericID, shortname: shortname, principalName: principalName, email: self.email, givenName: self.givenName, surname: self.surname, fullName: self.fullName)
                     do {
                         try newUser.setClearTextPasssword(clearTextPassword)
                         completion(newUser)

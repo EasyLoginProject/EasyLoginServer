@@ -49,7 +49,7 @@ public class ManagedUserGroup: ManagedObject {
         case shortname
     }
     
-    fileprivate init(withNumericID numericID:Int, shortname:String, commonName:String, email:String?, memberOf:[ManagedObjectRecordID] = [], nestedGroups:[ManagedObjectRecordID] = [], members:[ManagedObjectRecordID] = []) {
+    fileprivate init(withDataProvider dataProvider: DataProvider, numericID:Int, shortname:String, commonName:String, email:String?, memberOf:[ManagedObjectRecordID] = [], nestedGroups:[ManagedObjectRecordID] = [], members:[ManagedObjectRecordID] = []) {
         self.numericID = numericID
         self.shortname = shortname
         self.commonName = commonName
@@ -57,7 +57,7 @@ public class ManagedUserGroup: ManagedObject {
         self.memberOf = memberOf
         self.nestedGroups = nestedGroups
         self.members = members
-        super.init()
+        super.init(withDataProvider: dataProvider)
         recordType = "usergroup"
     }
     
@@ -124,9 +124,9 @@ public class MutableManagedUserGroup : ManagedUserGroup, MutableManagedObject {
         case invalidEmail
     }
     
-    public override init(withNumericID numericID:Int, shortname:String, commonName:String, email:String?, memberOf:[ManagedObjectRecordID] = [], nestedGroups:[ManagedObjectRecordID] = [], members:[ManagedObjectRecordID] = []) {
+    public override init(withDataProvider dataProvider: DataProvider, numericID:Int, shortname:String, commonName:String, email:String?, memberOf:[ManagedObjectRecordID] = [], nestedGroups:[ManagedObjectRecordID] = [], members:[ManagedObjectRecordID] = []) {
         hasBeenEdited = true
-        super.init(withNumericID: numericID, shortname: shortname, commonName: commonName, email: email, memberOf: memberOf, nestedGroups: nestedGroups, members: members)
+        super.init(withDataProvider: dataProvider, numericID: numericID, shortname: shortname, commonName: commonName, email: email, memberOf: memberOf, nestedGroups: nestedGroups, members: members)
     }
     
     public required init(from decoder: Decoder) throws {

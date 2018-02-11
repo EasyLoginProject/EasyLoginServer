@@ -25,6 +25,7 @@ public protocol MutableManagedObject {
 
 public class ManagedObject : Codable, Equatable, CustomDebugStringConvertible {
     public let uuid: ManagedObjectRecordID
+    public fileprivate(set) weak var dataProvider: DataProvider?
     public fileprivate(set) var created: Date
     public fileprivate(set) var modified: Date
     public fileprivate(set) var deleted: Bool
@@ -69,7 +70,7 @@ public class ManagedObject : Codable, Equatable, CustomDebugStringConvertible {
         case recordType = "type"
     }
     
-    init() {
+    init(withDataProvider dataProvider: DataProvider) {
         uuid = UUID().uuidString
         isPartialRepresentation = false
         deleted = false
@@ -116,12 +117,14 @@ public class ManagedObject : Codable, Equatable, CustomDebugStringConvertible {
         try container.encode(modified, forKey: .modified)
     }
     
-    static func objectFromJSON(data jsonData:Data, withCodingStrategy strategy:ManagedObjectCodingStrategy) throws -> Self {
+    static func objectFromJSON(data jsonData:Data, withCodingStrategy strategy:ManagedObjectCodingStrategy, withDataProvider dataProvider: DataProvider) throws -> Self {
         let jsonDecoder = JSONDecoder()
         jsonDecoder.dateDecodingStrategy = .iso8601
         jsonDecoder.userInfo[.managedObjectCodingStrategy] = strategy
         
-        return try jsonDecoder.decode(self, from: jsonData)
+        let mo = try jsonDecoder.decode(self, from: jsonData)
+        mo.dataProvider = dataProvider
+        return mo
     }
     
     func jsonData() throws -> Data {

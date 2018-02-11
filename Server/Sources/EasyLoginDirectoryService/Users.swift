@@ -160,7 +160,7 @@ class Users {
                 next()
                 return
             }
-            let user = MutableManagedUser(withNumericID: numericID, shortname: shortname, principalName: principalName, email: email, givenName: givenName, surname: surname, fullName: fullName, authMethods: authMethods)
+            let user = MutableManagedUser(withDataProvider: self.dataProvider, numericID: numericID, shortname: shortname, principalName: principalName, email: email, givenName: givenName, surname: surname, fullName: fullName, authMethods: authMethods)
             self.dataProvider.insert(mutableManagedObject: user) {
                 (insertedUser, error) in
                 guard let insertedUser = insertedUser else {

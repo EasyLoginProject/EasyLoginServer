@@ -98,7 +98,7 @@ public class DataProvider {
         jsonData(forRecordWithID: uuid) { (jsonData, jsonError) in
             if let jsonData = jsonData {
                 do {
-                    let managedObject = try T.objectFromJSON(data: jsonData, withCodingStrategy: .databaseEncoding)
+                    let managedObject = try T.objectFromJSON(data: jsonData, withCodingStrategy: .databaseEncoding, withDataProvider: self)
                     completion(managedObject, nil)
                 } catch {
                     completion(nil, .swiftError(error))
@@ -125,7 +125,7 @@ public class DataProvider {
                 (jsonData, jsonError) in
                 if let jsonData = jsonData {
                     do {
-                        let managedObject = try T.objectFromJSON(data: jsonData, withCodingStrategy: .databaseEncoding)
+                        let managedObject = try T.objectFromJSON(data: jsonData, withCodingStrategy: .databaseEncoding, withDataProvider: self)
                         result[uuid] = managedObject
                     }
                     catch {
@@ -152,7 +152,7 @@ public class DataProvider {
             jsonData(forRecordWithID: managedObject.uuid) { (jsonData, jsonError) in
                 if let jsonData = jsonData {
                     do {
-                        let managedObject = try T.objectFromJSON(data: jsonData, withCodingStrategy: .databaseEncoding)
+                        let managedObject = try T.objectFromJSON(data: jsonData, withCodingStrategy: .databaseEncoding, withDataProvider: self)
                         completion(managedObject, nil)
                     } catch {
                         completion(nil, .swiftError(error))

@@ -77,7 +77,7 @@ public class ManagedUser: ManagedObject {
     }
     
     
-    fileprivate init(withNumericID numericID:Int, shortname:String, principalName:String, email:String?, givenName:String?, surname:String?, fullName:String?, authMethods:[String:String] = [:], memberOf:[ManagedObjectRecordID] = []) {
+    fileprivate init(withDataProvider dataProvider: DataProvider, numericID:Int, shortname:String, principalName:String, email:String?, givenName:String?, surname:String?, fullName:String?, authMethods:[String:String] = [:], memberOf:[ManagedObjectRecordID] = []) {
         self.numericID = numericID
         self.shortname = shortname
         self.principalName = principalName
@@ -87,12 +87,13 @@ public class ManagedUser: ManagedObject {
         self.fullName = fullName
         self.authMethods = authMethods
         self.memberOf = memberOf
-        super.init()
+        super.init(withDataProvider: dataProvider)
         recordType = "user"
     }
     
     public convenience init(with mo: ManagedUser) {
-        self.init(withNumericID: mo.numericID, shortname: mo.shortname, principalName: mo.principalName, email: mo.email, givenName: mo.givenName, surname: mo.surname, fullName: mo.fullName, authMethods: mo.authMethods ?? [:], memberOf: mo.memberOf)
+        assert(mo.dataProvider != nil, "Copying a temporary object is not supported.")
+        self.init(withDataProvider: mo.dataProvider!, numericID: mo.numericID, shortname: mo.shortname, principalName: mo.principalName, email: mo.email, givenName: mo.givenName, surname: mo.surname, fullName: mo.fullName, authMethods: mo.authMethods ?? [:], memberOf: mo.memberOf)
     }
     
     public required init(from decoder: Decoder) throws {
@@ -197,9 +198,9 @@ public class MutableManagedUser : ManagedUser, MutableManagedObject {
         case invalidEmail
     }
     
-    public override init(withNumericID numericID:Int, shortname:String, principalName:String, email:String?, givenName:String?, surname:String?, fullName:String?, authMethods:[String:String] = [:], memberOf:[ManagedObjectRecordID] = []) {
+    public override init(withDataProvider dataProvider: DataProvider, numericID:Int, shortname:String, principalName:String, email:String?, givenName:String?, surname:String?, fullName:String?, authMethods:[String:String] = [:], memberOf:[ManagedObjectRecordID] = []) {
         hasBeenEdited = true
-        super.init(withNumericID: numericID, shortname: shortname, principalName: principalName, email: email, givenName: givenName, surname: surname, fullName: fullName, authMethods: authMethods, memberOf: memberOf)
+        super.init(withDataProvider: dataProvider, numericID: numericID, shortname: shortname, principalName: principalName, email: email, givenName: givenName, surname: surname, fullName: fullName, authMethods: authMethods, memberOf: memberOf)
     }
     
     public required init(from decoder: Decoder) throws {

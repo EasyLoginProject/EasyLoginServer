@@ -68,7 +68,7 @@ class UserGroups {
                 next()
                 return
             }
-            let initialUserGroup = MutableManagedUserGroup(withNumericID: retrievedUserGroup.numericID, shortname: retrievedUserGroup.shortname, commonName: retrievedUserGroup.commonName, email: retrievedUserGroup.email, memberOf: retrievedUserGroup.memberOf, nestedGroups: retrievedUserGroup.nestedGroups, members: retrievedUserGroup.members)
+            let initialUserGroup = MutableManagedUserGroup(withDataProvider: self.dataProvider, numericID: retrievedUserGroup.numericID, shortname: retrievedUserGroup.shortname, commonName: retrievedUserGroup.commonName, email: retrievedUserGroup.email, memberOf: retrievedUserGroup.memberOf, nestedGroups: retrievedUserGroup.nestedGroups, members: retrievedUserGroup.members)
             do {
                 try retrievedUserGroup.update(with: updateRequest)
             }
@@ -136,7 +136,7 @@ class UserGroups {
                 next()
                 return
             }
-            let usergroup = MutableManagedUserGroup(withNumericID: numericID, shortname: shortname, commonName: commonName, email: email, memberOf: memberOf, nestedGroups: nestedGroups, members: members)
+            let usergroup = MutableManagedUserGroup(withDataProvider: self.dataProvider, numericID: numericID, shortname: shortname, commonName: commonName, email: email, memberOf: memberOf, nestedGroups: nestedGroups, members: members)
             self.updateRelationships(initial: nil, final: usergroup) {
                 error in
                 guard error == nil else {
