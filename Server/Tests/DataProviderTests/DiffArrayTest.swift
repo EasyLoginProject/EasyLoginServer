@@ -38,7 +38,7 @@ class DiffArrayTest: XCTestCase {
     }
     
     func arrayTest(initial: [String], final:[String], expected: ([String], [String])) {
-        let (added, removed) = diffArrays(initial:initial, final:final)
+        let (added, removed) = final.difference(from: initial)
         XCTAssertEqual(Set(added), Set(expected.0))
         XCTAssertEqual(Set(removed), Set(expected.1))
     }

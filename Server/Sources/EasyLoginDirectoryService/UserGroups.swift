@@ -224,16 +224,16 @@ class UserGroups {
     fileprivate func updateRelationships(initial: ManagedUserGroup?, final: ManagedUserGroup?, completion: @escaping (Error?) -> Void) {
         let initialOwners = initial?.memberOf ?? []
         let finalOwners = final?.memberOf ?? []
-        let (addedOwnerIDs, removedOwnerIDs) = diffArrays(initial: initialOwners, final: finalOwners)
+        let (addedOwnerIDs, removedOwnerIDs) = finalOwners.difference(from: initialOwners)
         let initialNestedGroups = initial?.nestedGroups ?? []
         let finalNestedGroups = final?.nestedGroups ?? []
-        let (addedNestedGroupIDs, removedNestedGroupIDs) = diffArrays(initial: initialNestedGroups, final: finalNestedGroups)
+        let (addedNestedGroupIDs, removedNestedGroupIDs) = finalNestedGroups.difference(from: initialNestedGroups)
         let initialMembers = initial?.members ?? []
         let finalMembers = final?.members ?? []
-        let (addedMemberIDs, removedMemberIDs) = diffArrays(initial: initialMembers, final: finalMembers)
-        let groupUUIDsToUpdate = Array(Set(addedOwnerIDs + removedOwnerIDs + addedNestedGroupIDs + removedNestedGroupIDs))
-        let userUUIDsToUpdate = Array(Set(addedMemberIDs + removedMemberIDs))
-        dataProvider.completeManagedObjects(ofType: MutableManagedUserGroup.self, withUUIDs: groupUUIDsToUpdate) {
+        let (addedMemberIDs, removedMemberIDs) = finalMembers.difference(from: initialMembers)
+        let groupUUIDsToUpdate = addedOwnerIDs.union(removedOwnerIDs).union(addedNestedGroupIDs).union(removedNestedGroupIDs)
+        let userUUIDsToUpdate = addedMemberIDs.union(removedMemberIDs)
+        dataProvider.completeManagedObjects(ofType: MutableManagedUserGroup.self, withUUIDs: Array(groupUUIDsToUpdate)) {
             (dict, error) in
             guard error == nil else {
                 completion(EasyLoginError.debug(String.init(describing: error)))
