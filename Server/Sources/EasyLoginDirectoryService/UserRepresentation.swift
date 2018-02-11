@@ -19,7 +19,7 @@ extension ManagedUser {
         case givenName
         case surname
         case fullName
-        //case memberOf
+        case memberOf
         case authMethods
     }
     
@@ -38,7 +38,7 @@ extension ManagedUser {
                 if let surname = mo.surname {
                     try container.encode(surname, forKey: .surname)
                 }
-                //try container.encode(mo.memberOf, forKey: .memberOf)
+                try container.encode(mo.memberOf, forKey: .memberOf)
                 try container.encode(mo.authMethods, forKey: .authMethods)
             }
             try super.encode(to: encoder)
@@ -82,7 +82,7 @@ extension MutableManagedUser {
         let surname: NullableString?
         let fullName: String?
         let authMethods: [String:String]?
-        //let memberOf: [ManagedObjectRecordID]?
+        let memberOf: [ManagedObjectRecordID]?
         
         init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: APICodingKeys.self)
@@ -103,7 +103,7 @@ extension MutableManagedUser {
             }
             fullName = try container.decodeIfPresent(String.self, forKey: .fullName)
             authMethods = try container.decodeIfPresent([String:String].self, forKey: .authMethods)
-            //memberOf = try container.decodeIfPresent(Array.self, forKey: .memberOf)
+            memberOf = try container.decodeIfPresent(Array.self, forKey: .memberOf)
         }
     }
     
@@ -130,8 +130,8 @@ extension MutableManagedUser {
             let filteredAuthMethods = try authMethodGenerator.generate(authMethods)
             self.setAuthMethods(filteredAuthMethods)
         }
-//        if let memberOf = updateRequest.memberOf {
-//            self.setOwners(memberOf)
-//        }
+        if let memberOf = updateRequest.memberOf {
+            self.setOwners(memberOf)
+        }
     }
 }

@@ -230,6 +230,41 @@ class Users {
     }
     
     fileprivate func updateRelationships(initial: ManagedUser?, final: ManagedUser?, completion: @escaping (Error?) -> Void) {
-        completion(nil)
+        let initialOwners = initial?.memberOf ?? []
+        let finalOwners = final?.memberOf ?? []
+        let (addedOwnerIDs, removedOwnerIDs) = finalOwners.difference(from: initialOwners)
+        let groupUUIDsToUpdate = addedOwnerIDs.union(removedOwnerIDs)
+        dataProvider.completeManagedObjects(ofType: MutableManagedUserGroup.self, withUUIDs: Array(groupUUIDsToUpdate)) {
+            (dict, error) in
+            guard error == nil else {
+                completion(EasyLoginError.debug(String.init(describing: error)))
+                return
+            }
+            addedOwnerIDs.forEach {
+                uuid in
+                if let nested = dict[uuid]?.members {
+                    dict[uuid]!.setMembers(nested + [final!.uuid])
+                }
+            }
+            removedOwnerIDs.forEach {
+                uuid in
+                if var nested = dict[uuid]?.members {
+                    if let found = nested.index(of: initial!.uuid) {
+                        nested.remove(at: found)
+                    }
+                    dict[uuid]!.setMembers(nested)
+                }
+            }
+            let list = dict.map { $1 }
+            self.dataProvider.storeChangesFrom(mutableManagedObjects: list) {
+                (updatedList, error) in
+                if let error = error {
+                    completion(EasyLoginError.debug(String.init(describing: error)))
+                }
+                else {
+                    completion(nil)
+                }
+            }
+        }
     }
 }

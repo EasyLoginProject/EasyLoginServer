@@ -73,7 +73,8 @@ class EasyLoginAuthenticatorTests: XCTestCase {
             "principalName": "test@example.easylogin.cloud",
             "email": "test@easylogin.cloud",
             "fullName": "EasyLogin Test",
-            "authMethods": {"pbkdf2": "$pbkdf2-sha512$403225$RLztVE1nadcSiq+4uGfmzXs+gI8i1CNSlDQzTTqAYnI$CmEOEYxAG/0IKx1CX5YGam+ZAqKSPh+Y2L6CNIqgKks"}
+            "authMethods": {"pbkdf2": "$pbkdf2-sha512$403225$RLztVE1nadcSiq+4uGfmzXs+gI8i1CNSlDQzTTqAYnI$CmEOEYxAG/0IKx1CX5YGam+ZAqKSPh+Y2L6CNIqgKks"},
+            "memberOf": []
         }
         """.data(using: .utf8)!
         let jsonDecoder = JSONDecoder()

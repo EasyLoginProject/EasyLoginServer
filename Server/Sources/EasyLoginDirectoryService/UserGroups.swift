@@ -239,56 +239,69 @@ class UserGroups {
                 completion(EasyLoginError.debug(String.init(describing: error)))
                 return
             }
-            addedOwnerIDs.forEach {
-                uuid in
-                if let nested = dict[uuid]?.nestedGroups {
-                    dict[uuid]!.setNestedGroups(nested + [final!.uuid])
-                }
-            }
-            removedOwnerIDs.forEach {
-                uuid in
-                if var nested = dict[uuid]?.nestedGroups {
-                    if let found = nested.index(of: initial!.uuid) {
-                        nested.remove(at: found)
-                    }
-                    dict[uuid]!.setNestedGroups(nested)
-                }
-            }
-            addedNestedGroupIDs.forEach {
-                uuid in
-                if let owners = dict[uuid]?.memberOf {
-                    dict[uuid]!.setOwners(owners + [final!.uuid])
-                }
-            }
-            removedNestedGroupIDs.forEach {
-                uuid in
-                if var owners = dict[uuid]?.memberOf {
-                    if let found = owners.index(of: initial!.uuid) {
-                        owners.remove(at: found)
-                    }
-                    dict[uuid]!.setOwners(owners)
-                }
-            }
-            // TODO: same with members when Users are moved to DataProvider
-            let list = dict.map { $1 }
-            self.dataProvider.storeChangesFrom(mutableManagedObjects: list) {
-                (updatedList, error) in
-                if let error = error {
+            self.dataProvider.completeManagedObjects(ofType: MutableManagedUser.self, withUUIDs: Array(userUUIDsToUpdate)) {
+                userDict, error in
+                guard error == nil else {
                     completion(EasyLoginError.debug(String.init(describing: error)))
+                    return
                 }
-                else {
-                    completion(nil)
+                addedOwnerIDs.forEach {
+                    uuid in
+                    if let nested = dict[uuid]?.nestedGroups {
+                        dict[uuid]!.setNestedGroups(nested + [final!.uuid])
+                    }
+                }
+                removedOwnerIDs.forEach {
+                    uuid in
+                    if var nested = dict[uuid]?.nestedGroups {
+                        if let found = nested.index(of: initial!.uuid) {
+                            nested.remove(at: found)
+                        }
+                        dict[uuid]!.setNestedGroups(nested)
+                    }
+                }
+                addedNestedGroupIDs.forEach {
+                    uuid in
+                    if let owners = dict[uuid]?.memberOf {
+                        dict[uuid]!.setOwners(owners + [final!.uuid])
+                    }
+                }
+                removedNestedGroupIDs.forEach {
+                    uuid in
+                    if var owners = dict[uuid]?.memberOf {
+                        if let found = owners.index(of: initial!.uuid) {
+                            owners.remove(at: found)
+                        }
+                        dict[uuid]!.setOwners(owners)
+                    }
+                }
+                addedMemberIDs.forEach {
+                    uuid in
+                    if let owners = userDict[uuid]?.memberOf {
+                        userDict[uuid]!.setOwners(owners + [final!.uuid])
+                    }
+                }
+                removedMemberIDs.forEach {
+                    uuid in
+                    if var owners = userDict[uuid]?.memberOf {
+                        if let found = owners.index(of: initial!.uuid) {
+                            owners.remove(at: found)
+                        }
+                        dict[uuid]!.setOwners(owners)
+                    }
+                }
+                let list = dict.map { $1 }
+                self.dataProvider.storeChangesFrom(mutableManagedObjects: list) {
+                    (updatedList, error) in
+                    if let error = error {
+                        completion(EasyLoginError.debug(String.init(describing: error)))
+                    }
+                    else {
+                        completion(nil)
+                    }
                 }
             }
         }
     }
-}
-
-func diffArrays(initial: [String], final: [String]) -> (added: [String], removed: [String]) {
-    let initialSet = Set(initial)
-    let finalSet = Set(final)
-    let addedSet = finalSet.subtracting(initialSet)
-    let removedSet = initialSet.subtracting(finalSet)
-    return (Array(addedSet), Array(removedSet))
 }
 

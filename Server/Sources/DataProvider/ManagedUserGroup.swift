@@ -13,9 +13,9 @@ public class ManagedUserGroup: ManagedObject {
     public fileprivate(set) var shortname: String
     public fileprivate(set) var commonName: String
     public fileprivate(set) var email: String?
-    public fileprivate(set) var memberOf: [String]
-    public fileprivate(set) var nestedGroups: [String]
-    public fileprivate(set) var members: [String]
+    public fileprivate(set) var memberOf: [ManagedObjectRecordID]
+    public fileprivate(set) var nestedGroups: [ManagedObjectRecordID]
+    public fileprivate(set) var members: [ManagedObjectRecordID]
     
     public override var debugDescription: String {
         let objectAddress = String(format:"%2X", unsafeBitCast(self, to: Int.self))
@@ -49,7 +49,7 @@ public class ManagedUserGroup: ManagedObject {
         case shortname
     }
     
-    fileprivate init(withNumericID numericID:Int, shortname:String, commonName:String, email:String?, memberOf:[String] = [], nestedGroups:[String] = [], members:[String] = []) {
+    fileprivate init(withNumericID numericID:Int, shortname:String, commonName:String, email:String?, memberOf:[ManagedObjectRecordID] = [], nestedGroups:[ManagedObjectRecordID] = [], members:[ManagedObjectRecordID] = []) {
         self.numericID = numericID
         self.shortname = shortname
         self.commonName = commonName
@@ -71,9 +71,9 @@ public class ManagedUserGroup: ManagedObject {
             shortname = try container.decode(String.self, forKey: .shortname)
             commonName = try container.decode(String.self, forKey: .commonName)
             email = try container.decode(String?.self, forKey: .email)
-            memberOf = try container.decode([String].self, forKey: .memberOf)
-            nestedGroups = try container.decode([String].self, forKey: .nestedGroups)
-            members = try container.decode([String].self, forKey: .members)
+            memberOf = try container.decode([ManagedObjectRecordID].self, forKey: .memberOf)
+            nestedGroups = try container.decode([ManagedObjectRecordID].self, forKey: .nestedGroups)
+            members = try container.decode([ManagedObjectRecordID].self, forKey: .members)
             
         case .briefEncoding?:
             let container = try decoder.container(keyedBy: ManagedUserGroupPartialDatabaseCodingKeys.self)
@@ -134,7 +134,7 @@ public class MutableManagedUserGroup : ManagedUserGroup, MutableManagedObject {
         case invalidEmail
     }
     
-    public override init(withNumericID numericID:Int, shortname:String, commonName:String, email:String?, memberOf:[String] = [], nestedGroups:[String] = [], members:[String] = []) {
+    public override init(withNumericID numericID:Int, shortname:String, commonName:String, email:String?, memberOf:[ManagedObjectRecordID] = [], nestedGroups:[ManagedObjectRecordID] = [], members:[ManagedObjectRecordID] = []) {
         hasBeenEdited = true
         super.init(withNumericID: numericID, shortname: shortname, commonName: commonName, email: email, memberOf: memberOf, nestedGroups: nestedGroups, members: members)
     }

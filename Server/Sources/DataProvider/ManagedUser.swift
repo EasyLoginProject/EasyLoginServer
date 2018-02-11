@@ -26,6 +26,7 @@ public class ManagedUser: ManagedObject {
     public fileprivate(set) var surname: String?
     public fileprivate(set) var fullName: String? // not optional
     public fileprivate(set) var authMethods: [String: String]? // not optional
+    public fileprivate(set) var memberOf: [ManagedObjectRecordID]
     
     public override var debugDescription: String {
         let objectAddress = String(format:"%2X", unsafeBitCast(self, to: Int.self))
@@ -65,6 +66,7 @@ public class ManagedUser: ManagedObject {
         case surname
         case fullName
         case authMethods
+        case memberOf
     }
     
     enum ManagedUserPartialDatabaseCodingKeys: String, CodingKey {
@@ -75,7 +77,7 @@ public class ManagedUser: ManagedObject {
     }
     
     
-    fileprivate init(withNumericID numericID:Int, shortname:String, principalName:String, email:String?, givenName:String?, surname:String?, fullName:String?, authMethods:[String:String] = [:]) {
+    fileprivate init(withNumericID numericID:Int, shortname:String, principalName:String, email:String?, givenName:String?, surname:String?, fullName:String?, authMethods:[String:String] = [:], memberOf:[ManagedObjectRecordID] = []) {
         self.numericID = numericID
         self.shortname = shortname
         self.principalName = principalName
@@ -84,12 +86,13 @@ public class ManagedUser: ManagedObject {
         self.surname = surname
         self.fullName = fullName
         self.authMethods = authMethods
+        self.memberOf = memberOf
         super.init()
         recordType = "user"
     }
     
     public convenience init(with mo: ManagedUser) {
-        self.init(withNumericID: mo.numericID, shortname: mo.shortname, principalName: mo.principalName, email: mo.email, givenName: mo.givenName, surname: mo.surname, fullName: mo.fullName, authMethods: mo.authMethods ?? [:])
+        self.init(withNumericID: mo.numericID, shortname: mo.shortname, principalName: mo.principalName, email: mo.email, givenName: mo.givenName, surname: mo.surname, fullName: mo.fullName, authMethods: mo.authMethods ?? [:], memberOf: mo.memberOf)
     }
     
     public required init(from decoder: Decoder) throws {
@@ -106,6 +109,7 @@ public class ManagedUser: ManagedObject {
             surname = try container.decodeIfPresent(String.self, forKey: .surname)
             fullName = try container.decode(String.self, forKey: .fullName)
             authMethods = try container.decode([String:String].self, forKey: .authMethods)
+            memberOf = try container.decode([ManagedObjectRecordID].self, forKey: .memberOf)
             
         case .briefEncoding?:
             let container = try decoder.container(keyedBy: ManagedUserPartialDatabaseCodingKeys.self)
@@ -113,6 +117,7 @@ public class ManagedUser: ManagedObject {
             shortname = try container.decode(String.self, forKey: .shortname)
             principalName = try container.decode(String.self, forKey: .principalName)
             fullName = try container.decode(String.self, forKey: .fullName)
+            memberOf = []
         }
         
         try super.init(from: decoder)
@@ -136,6 +141,7 @@ public class ManagedUser: ManagedObject {
             }
             try container.encode(fullName, forKey: .fullName)
             try container.encode(authMethods, forKey: .authMethods)
+            try container.encode(memberOf, forKey: .memberOf)
             
         case .briefEncoding?:
             var container = encoder.container(keyedBy: ManagedUserPartialDatabaseCodingKeys.self)
@@ -203,9 +209,9 @@ public class MutableManagedUser : ManagedUser, MutableManagedObject {
         case invalidEmail
     }
     
-    public override init(withNumericID numericID:Int, shortname:String, principalName:String, email:String?, givenName:String?, surname:String?, fullName:String?, authMethods:[String:String] = [:]) {
+    public override init(withNumericID numericID:Int, shortname:String, principalName:String, email:String?, givenName:String?, surname:String?, fullName:String?, authMethods:[String:String] = [:], memberOf:[ManagedObjectRecordID] = []) {
         hasBeenEdited = true
-        super.init(withNumericID: numericID, shortname: shortname, principalName: principalName, email: email, givenName: givenName, surname: surname, fullName: fullName, authMethods: authMethods)
+        super.init(withNumericID: numericID, shortname: shortname, principalName: principalName, email: email, givenName: givenName, surname: surname, fullName: fullName, authMethods: authMethods, memberOf: memberOf)
     }
     
     public required init(from decoder: Decoder) throws {
@@ -278,6 +284,14 @@ public class MutableManagedUser : ManagedUser, MutableManagedObject {
         }
         
         authMethods = value
+        hasBeenEdited = true
+    }
+    
+    public func setOwners(_ value: [String]) {
+        guard value != memberOf else {
+            return
+        }
+        memberOf = value
         hasBeenEdited = true
     }
     
