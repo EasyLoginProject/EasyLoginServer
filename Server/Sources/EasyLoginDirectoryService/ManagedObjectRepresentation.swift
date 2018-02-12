@@ -26,9 +26,9 @@ extension ManagedObject {
         func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: ManagedObjectAPICodingKeys.self)
             try container.encode(mo.uuid, forKey: .uuid)
+            try container.encode(mo.modified, forKey: .modified)
             if encoder.managedObjectViewFormat() == .full {
-                // TODO: encode created/modified
-                //try container.encode("test", forKey: .created)
+                try container.encode(mo.created, forKey: .created)
             }
         }
     }

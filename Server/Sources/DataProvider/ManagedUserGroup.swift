@@ -13,9 +13,9 @@ public class ManagedUserGroup: ManagedObject {
     public fileprivate(set) var shortname: String
     public fileprivate(set) var commonName: String
     public fileprivate(set) var email: String?
-    public fileprivate(set) var memberOf: [String]
-    public fileprivate(set) var nestedGroups: [String]
-    public fileprivate(set) var members: [String]
+    public fileprivate(set) var memberOf: [ManagedObjectRecordID]
+    public fileprivate(set) var nestedGroups: [ManagedObjectRecordID]
+    public fileprivate(set) var members: [ManagedObjectRecordID]
     
     public override var debugDescription: String {
         let objectAddress = String(format:"%2X", unsafeBitCast(self, to: Int.self))
@@ -24,6 +24,10 @@ public class ManagedUserGroup: ManagedObject {
         if let email = email {
             desc += ", email:\(email)"
         }
+        
+        desc += ", memberOf:\(memberOf)"
+        desc += ", nestedGroups:\(nestedGroups)"
+        desc += ", members:\(members)"
         
         desc += ", partialRepresentation:\(isPartialRepresentation)>"
         
@@ -49,7 +53,7 @@ public class ManagedUserGroup: ManagedObject {
         case shortname
     }
     
-    fileprivate init(withNumericID numericID:Int, shortname:String, commonName:String, email:String?, memberOf:[String] = [], nestedGroups:[String] = [], members:[String] = []) {
+    fileprivate init(withDataProvider dataProvider: DataProvider, numericID:Int, shortname:String, commonName:String, email:String?, memberOf:[ManagedObjectRecordID] = [], nestedGroups:[ManagedObjectRecordID] = [], members:[ManagedObjectRecordID] = []) {
         self.numericID = numericID
         self.shortname = shortname
         self.commonName = commonName
@@ -57,7 +61,7 @@ public class ManagedUserGroup: ManagedObject {
         self.memberOf = memberOf
         self.nestedGroups = nestedGroups
         self.members = members
-        super.init()
+        super.init(withDataProvider: dataProvider)
         recordType = "usergroup"
     }
     
@@ -71,9 +75,9 @@ public class ManagedUserGroup: ManagedObject {
             shortname = try container.decode(String.self, forKey: .shortname)
             commonName = try container.decode(String.self, forKey: .commonName)
             email = try container.decode(String?.self, forKey: .email)
-            memberOf = try container.decode([String].self, forKey: .memberOf)
-            nestedGroups = try container.decode([String].self, forKey: .nestedGroups)
-            members = try container.decode([String].self, forKey: .members)
+            memberOf = try container.decode([ManagedObjectRecordID].self, forKey: .memberOf)
+            nestedGroups = try container.decode([ManagedObjectRecordID].self, forKey: .nestedGroups)
+            members = try container.decode([ManagedObjectRecordID].self, forKey: .members)
             
         case .briefEncoding?:
             let container = try decoder.container(keyedBy: ManagedUserGroupPartialDatabaseCodingKeys.self)
@@ -89,24 +93,14 @@ public class ManagedUserGroup: ManagedObject {
     }
     
     public override func encode(to encoder: Encoder) throws {
-        let codingStrategy = encoder.userInfo[.managedObjectCodingStrategy] as? ManagedObjectCodingStrategy
-        
-        switch codingStrategy {
-        case .databaseEncoding?, .none:
-            var container = encoder.container(keyedBy: ManagedUserGroupDatabaseCodingKeys.self)
-            try container.encode(numericID, forKey: .numericID)
-            try container.encode(shortname, forKey: .shortname)
-            try container.encode(commonName, forKey: .commonName)
-            try container.encode(email, forKey: .email)
-            try container.encode(memberOf, forKey: .memberOf)
-            try container.encode(nestedGroups, forKey: .nestedGroups)
-            try container.encode(members, forKey: .members)
-            
-        case .briefEncoding?:
-            var container = encoder.container(keyedBy: ManagedUserGroupPartialDatabaseCodingKeys.self)
-            try container.encode(numericID, forKey: .numericID)
-            try container.encode(shortname, forKey: .shortname)
-        }
+        var container = encoder.container(keyedBy: ManagedUserGroupDatabaseCodingKeys.self)
+        try container.encode(numericID, forKey: .numericID)
+        try container.encode(shortname, forKey: .shortname)
+        try container.encode(commonName, forKey: .commonName)
+        try container.encode(email, forKey: .email)
+        try container.encode(memberOf, forKey: .memberOf)
+        try container.encode(nestedGroups, forKey: .nestedGroups)
+        try container.encode(members, forKey: .members)
         try super.encode(to: encoder)
     }
 }
@@ -123,6 +117,10 @@ public class MutableManagedUserGroup : ManagedUserGroup, MutableManagedObject {
             desc += ", email:\(email)"
         }
         
+        desc += ", memberOf:\(memberOf)"
+        desc += ", nestedGroups:\(nestedGroups)"
+        desc += ", members:\(members)"
+        
         desc += ", partialRepresentation:\(isPartialRepresentation)>"
         desc += ", hasBeenEdited:\(hasBeenEdited)>"
         
@@ -134,9 +132,9 @@ public class MutableManagedUserGroup : ManagedUserGroup, MutableManagedObject {
         case invalidEmail
     }
     
-    public override init(withNumericID numericID:Int, shortname:String, commonName:String, email:String?, memberOf:[String] = [], nestedGroups:[String] = [], members:[String] = []) {
+    public override init(withDataProvider dataProvider: DataProvider, numericID:Int, shortname:String, commonName:String, email:String?, memberOf:[ManagedObjectRecordID] = [], nestedGroups:[ManagedObjectRecordID] = [], members:[ManagedObjectRecordID] = []) {
         hasBeenEdited = true
-        super.init(withNumericID: numericID, shortname: shortname, commonName: commonName, email: email, memberOf: memberOf, nestedGroups: nestedGroups, members: members)
+        super.init(withDataProvider: dataProvider, numericID: numericID, shortname: shortname, commonName: commonName, email: email, memberOf: memberOf, nestedGroups: nestedGroups, members: members)
     }
     
     public required init(from decoder: Decoder) throws {
@@ -186,7 +184,106 @@ public class MutableManagedUserGroup : ManagedUserGroup, MutableManagedObject {
         hasBeenEdited = true
     }
     
-    public func setOwners(_ value: [String]) {
+    public func setRelationships(memberOf: [ManagedObjectRecordID], nestedGroups: [ManagedObjectRecordID], members: [ManagedObjectRecordID], completion: @escaping (Error?) -> Void) {
+        guard let dataProvider = dataProvider else {
+            completion(EasyLoginError.internalServerError)
+            return
+        }
+        let initialOwners = self.memberOf
+        let finalOwners = memberOf
+        let (addedOwnerIDs, removedOwnerIDs) = finalOwners.difference(from: initialOwners)
+        let initialNestedGroups = self.nestedGroups
+        let finalNestedGroups = nestedGroups
+        let (addedNestedGroupIDs, removedNestedGroupIDs) = finalNestedGroups.difference(from: initialNestedGroups)
+        let initialMembers = self.members
+        let finalMembers = members
+        let (addedMemberIDs, removedMemberIDs) = finalMembers.difference(from: initialMembers)
+        let groupUUIDsToUpdate = addedOwnerIDs.union(removedOwnerIDs).union(addedNestedGroupIDs).union(removedNestedGroupIDs)
+        let userUUIDsToUpdate = addedMemberIDs.union(removedMemberIDs)
+        dataProvider.completeManagedObjects(ofType: MutableManagedUserGroup.self, withUUIDs: Array(groupUUIDsToUpdate)) {
+            (groupDict, error) in
+            guard error == nil else {
+                completion(EasyLoginError.debug(String.init(describing: error)))
+                return
+            }
+            dataProvider.completeManagedObjects(ofType: MutableManagedUser.self, withUUIDs: Array(userUUIDsToUpdate)) {
+                userDict, error in
+                guard error == nil else {
+                    completion(EasyLoginError.debug(String.init(describing: error)))
+                    return
+                }
+                // TODO: detect cycles (build trees recursively for owners and nested groups). This implies a citical section.
+                addedOwnerIDs.forEach {
+                    uuid in
+                    if let nested = groupDict[uuid]?.nestedGroups {
+                        groupDict[uuid]!.setNestedGroups(nested + [self.uuid])
+                    }
+                }
+                removedOwnerIDs.forEach {
+                    uuid in
+                    if var nested = groupDict[uuid]?.nestedGroups {
+                        if let found = nested.index(of: self.uuid) {
+                            nested.remove(at: found)
+                        }
+                        groupDict[uuid]!.setNestedGroups(nested)
+                    }
+                }
+                addedNestedGroupIDs.forEach {
+                    uuid in
+                    if let owners = groupDict[uuid]?.memberOf {
+                        groupDict[uuid]!.setOwners(owners + [self.uuid])
+                    }
+                }
+                removedNestedGroupIDs.forEach {
+                    uuid in
+                    if var owners = groupDict[uuid]?.memberOf {
+                        if let found = owners.index(of: self.uuid) {
+                            owners.remove(at: found)
+                        }
+                        groupDict[uuid]!.setOwners(owners)
+                    }
+                }
+                addedMemberIDs.forEach {
+                    uuid in
+                    if let owners = userDict[uuid]?.memberOf {
+                        userDict[uuid]!.setOwners(owners + [self.uuid])
+                    }
+                }
+                removedMemberIDs.forEach {
+                    uuid in
+                    if var owners = userDict[uuid]?.memberOf {
+                        if let found = owners.index(of: self.uuid) {
+                            owners.remove(at: found)
+                        }
+                        userDict[uuid]!.setOwners(owners)
+                    }
+                }
+                let groupList = groupDict.map { $1 }
+                let userList = userDict.map { $1 }
+                // TODO: erase type? We should be able to use [MutableManagedObject]
+                dataProvider.storeChangesFrom(mutableManagedObjects: groupList) {
+                    (_, error) in
+                    guard error == nil else {
+                        completion(EasyLoginError.debug(String.init(describing: error)))
+                        return
+                    }
+                    dataProvider.storeChangesFrom(mutableManagedObjects: userList) {
+                        (_, error) in
+                        guard error == nil else {
+                            completion(EasyLoginError.debug(String.init(describing: error)))
+                            return
+                        }
+                        self.setOwners(memberOf)
+                        self.setNestedGroups(nestedGroups)
+                        self.setMembers(members)
+                        completion(nil)
+                    }
+                }
+            }
+        }
+    }
+    
+    internal func setOwners(_ value: [String]) {
         guard value != memberOf else {
             return
         }
@@ -194,7 +291,7 @@ public class MutableManagedUserGroup : ManagedUserGroup, MutableManagedObject {
         hasBeenEdited = true
     }
     
-    public func setNestedGroups(_ value: [String]) {
+    internal func setNestedGroups(_ value: [String]) {
         guard value != nestedGroups else {
             return
         }
@@ -202,7 +299,7 @@ public class MutableManagedUserGroup : ManagedUserGroup, MutableManagedObject {
         hasBeenEdited = true
     }
     
-    public func setMembers(_ value: [String]) {
+    internal func setMembers(_ value: [String]) {
         guard value != members else {
             return
         }

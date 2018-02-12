@@ -25,6 +25,9 @@ public protocol MutableManagedObject {
 
 public class ManagedObject : Codable, Equatable, CustomDebugStringConvertible {
     public let uuid: ManagedObjectRecordID
+    public fileprivate(set) weak var dataProvider: DataProvider?
+    public fileprivate(set) var created: Date
+    public fileprivate(set) var modified: Date
     public fileprivate(set) var deleted: Bool
     public fileprivate(set) var revision: String?
     var recordType: String
@@ -54,21 +57,27 @@ public class ManagedObject : Codable, Equatable, CustomDebugStringConvertible {
     enum ManagedObjectDatabaseCodingKeys: String, CodingKey {
         case uuid = "_id"
         case revision = "_rev"
+        case created
+        case modified
         case deleted
         case recordType = "type"
     }
     
     enum ManagedObjectPartialDatabaseCodingKeys: String, CodingKey {
         case uuid = "uuid"
+        case modified
         case deleted
         case recordType = "type"
     }
     
-    init() {
+    init(withDataProvider dataProvider: DataProvider) {
+        self.dataProvider = dataProvider
         uuid = UUID().uuidString
         isPartialRepresentation = false
         deleted = false
         recordType = "abstract"
+        created = Date()
+        modified = created
     }
     
     required public init(from decoder: Decoder) throws {
@@ -81,56 +90,47 @@ public class ManagedObject : Codable, Equatable, CustomDebugStringConvertible {
             revision = try container.decode(String.self, forKey: .revision)
             recordType = try container.decode(String.self, forKey: .recordType)
             isPartialRepresentation = false
-            if let deletedMark = try? container.decode(Bool.self, forKey: .deleted) {
-                deleted = deletedMark
-            } else {
-                deleted = false
-            }
+            let deletedMark = try? container.decode(Bool.self, forKey: .deleted)
+            deleted = deletedMark ?? false
+            created = try container.decode(Date.self, forKey: .created)
+            modified = try container.decode(Date.self, forKey: .modified)
         case .briefEncoding?:
             let container = try decoder.container(keyedBy: ManagedObjectPartialDatabaseCodingKeys.self)
             recordType = try container.decode(String.self, forKey: .recordType)
             uuid = try container.decode(ManagedObjectRecordID.self, forKey: .uuid)
             isPartialRepresentation = true
-            if let deletedMark = try? container.decode(Bool.self, forKey: .deleted) {
-                deleted = deletedMark
-            } else {
-                deleted = false
-            }
+            let deletedMark = try? container.decode(Bool.self, forKey: .deleted)
+            deleted = deletedMark ?? false
+            created = Date.distantPast
+            modified = try container.decode(Date.self, forKey: .modified)
         }
     }
     
     public func encode(to encoder: Encoder) throws {
-        let codingStrategy = encoder.userInfo[.managedObjectCodingStrategy] as? ManagedObjectCodingStrategy
-        
-        switch codingStrategy {
-        case .databaseEncoding?, .none:
-            var container = encoder.container(keyedBy: ManagedObjectDatabaseCodingKeys.self)
-            try container.encode(uuid, forKey: .uuid)
-            try container.encode(recordType, forKey: .recordType)
-            if deleted {
-                try container.encode(deleted, forKey: .deleted)
-            }
-            
-        case .briefEncoding?:
-            var container = encoder.container(keyedBy: ManagedObjectPartialDatabaseCodingKeys.self)
-            try container.encode(uuid, forKey: .uuid)
-            try container.encode(recordType, forKey: .recordType)
-            if deleted {
-                try container.encode(deleted, forKey: .deleted)
-            }
+        assert(encoder.userInfo[.managedObjectCodingStrategy] == nil, "Encoding strategy is not supported when writing to database.")
+        var container = encoder.container(keyedBy: ManagedObjectDatabaseCodingKeys.self)
+        try container.encode(uuid, forKey: .uuid)
+        try container.encode(recordType, forKey: .recordType)
+        if deleted {
+            try container.encode(deleted, forKey: .deleted)
         }
+        try container.encode(created, forKey: .created)
+        try container.encode(modified, forKey: .modified)
     }
     
-    static func objectFromJSON(data jsonData:Data, withCodingStrategy strategy:ManagedObjectCodingStrategy) throws -> Self {
+    static func objectFromJSON(data jsonData:Data, withCodingStrategy strategy:ManagedObjectCodingStrategy, withDataProvider dataProvider: DataProvider) throws -> Self {
         let jsonDecoder = JSONDecoder()
+        jsonDecoder.dateDecodingStrategy = .iso8601
         jsonDecoder.userInfo[.managedObjectCodingStrategy] = strategy
         
-        return try jsonDecoder.decode(self, from: jsonData)
+        let mo = try jsonDecoder.decode(self, from: jsonData)
+        mo.dataProvider = dataProvider
+        return mo
     }
     
-    func jsonData(withCodingStrategy strategy:ManagedObjectCodingStrategy) throws -> Data {
+    func jsonData() throws -> Data {
         let jsonEncoder = JSONEncoder()
-        jsonEncoder.userInfo[.managedObjectCodingStrategy] = strategy
+        jsonEncoder.dateEncodingStrategy = .iso8601
         
         return try jsonEncoder.encode(self)
     }
@@ -143,5 +143,8 @@ public class ManagedObject : Codable, Equatable, CustomDebugStringConvertible {
         deleted = true
     }
     
+    func markAsModified() {
+        modified = Date()
+    }
 }
 
