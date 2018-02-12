@@ -410,7 +410,8 @@ public class DataProvider {
             return
         }
         
-        update(recordID: managedObject.uuid, atRev: revision, with: jsonData) { (revision, updatedJSONData, error) in
+        update(recordID: managedObject.uuid, atRev: revision, with: jsonData) {
+            (revision, updatedJSONData, error) in
             if let updatedJSONData = updatedJSONData {
                 do {
                     let updateResult = try JSONDecoder().decode(CouchDBUpdateResult.self, from: updatedJSONData)

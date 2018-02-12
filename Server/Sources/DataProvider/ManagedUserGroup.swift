@@ -283,7 +283,7 @@ public class MutableManagedUserGroup : ManagedUserGroup, MutableManagedObject {
         }
     }
     
-    public func setOwners(_ value: [String]) {
+    internal func setOwners(_ value: [String]) {
         guard value != memberOf else {
             return
         }
@@ -291,7 +291,7 @@ public class MutableManagedUserGroup : ManagedUserGroup, MutableManagedObject {
         hasBeenEdited = true
     }
     
-    public func setNestedGroups(_ value: [String]) {
+    internal func setNestedGroups(_ value: [String]) {
         guard value != nestedGroups else {
             return
         }
@@ -299,7 +299,7 @@ public class MutableManagedUserGroup : ManagedUserGroup, MutableManagedObject {
         hasBeenEdited = true
     }
     
-    public func setMembers(_ value: [String]) {
+    internal func setMembers(_ value: [String]) {
         guard value != members else {
             return
         }

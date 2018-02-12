@@ -324,7 +324,7 @@ public class MutableManagedUser : ManagedUser, MutableManagedObject {
         }
     }
     
-    public func setOwners(_ value: [ManagedObjectRecordID]) {
+    internal func setOwners(_ value: [ManagedObjectRecordID]) {
         guard value != memberOf else {
             return
         }
