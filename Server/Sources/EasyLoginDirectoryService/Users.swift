@@ -71,28 +71,17 @@ class Users {
                 next()
                 return
             }
-            let initialUser = ManagedUser(with: mutableUser)
-            do {
-                try mutableUser.update(with: updateRequest, authMethodGenerator: self.authMethodGenerator)
-            }
-            catch {
-                sendError(.debug("\(String(describing: error))"), to: response)
-                // TODO: decode error
-                next()
-                return
-            }
-            self.dataProvider.storeChangeFrom(mutableManagedObject: mutableUser) {
-                updatedUser, error in
-                guard let updatedUser = updatedUser else {
-                    sendError(.internalServerError, to:response)
+            mutableUser.update(with: updateRequest, authMethodGenerator: self.authMethodGenerator) {
+                error in
+                guard error == nil else {
+                    sendError(.debug("\(String(describing: error))"), to: response)
+                    // TODO: decode error
                     next()
                     return
                 }
-                self.updateRelationships(initial: initialUser, final: mutableUser) {
-                    error in
-                    guard error == nil else {
-                        // error --> internal server error, database is inconsistent
-                        Log.error("database may be inconsistent!")
+                self.dataProvider.storeChangeFrom(mutableManagedObject: mutableUser) {
+                    updatedUser, error in
+                    guard let updatedUser = updatedUser else {
                         sendError(.internalServerError, to:response)
                         next()
                         return
@@ -153,6 +142,7 @@ class Users {
         else {
             authMethods = [:]
         }
+        let memberOf = updateRequest.memberOf ?? []
         numericIDGenerator.nextValue() { // TODO: generateNextValue()
             numericID in
             guard let numericID = numericID else {
@@ -161,24 +151,32 @@ class Users {
                 return
             }
             let user = MutableManagedUser(withDataProvider: self.dataProvider, numericID: numericID, shortname: shortname, principalName: principalName, email: email, givenName: givenName, surname: surname, fullName: fullName, authMethods: authMethods)
-            self.dataProvider.insert(mutableManagedObject: user) {
-                (insertedUser, error) in
-                guard let insertedUser = insertedUser else {
-                    sendError(.debug("failed to insert"), to:response)
+            user.setRelationships(memberOf: memberOf) {
+                error in
+                guard error == nil else {
+                    sendError(.debug("failed to update relationships: \(String(describing: error))"), to:response)
                     next()
                     return
                 }
-                NotificationService.notifyAllClients()
-                if let jsonData = try? self.viewFormatter.viewAsJSONData(insertedUser) {
-                    response.send(data: jsonData)
-                    response.headers.setType("json")
-                    response.statusCode = .created
-                    response.headers.setLocation("/db/users/\(insertedUser.uuid)")
+                self.dataProvider.insert(mutableManagedObject: user) {
+                    (insertedUser, error) in
+                    guard let insertedUser = insertedUser else {
+                        sendError(.debug("failed to insert"), to:response)
+                        next()
+                        return
+                    }
+                    NotificationService.notifyAllClients()
+                    if let jsonData = try? self.viewFormatter.viewAsJSONData(insertedUser) {
+                        response.send(data: jsonData)
+                        response.headers.setType("json")
+                        response.statusCode = .created
+                        response.headers.setLocation("/db/users/\(insertedUser.uuid)")
+                    }
+                    else {
+                        sendError(.debug("Internal error"), to: response) // TODO: decode error
+                    }
+                    next()
                 }
-                else {
-                    sendError(.debug("Internal error"), to: response) // TODO: decode error
-                }
-                next()
             }
         }
     }
@@ -189,20 +187,28 @@ class Users {
             next()
             return
         }
-        dataProvider.completeManagedObject(ofType: ManagedUser.self, withUUID: uuid) {
+        dataProvider.completeManagedObject(ofType: MutableManagedUser.self, withUUID: uuid) {
             retrievedUser, error in
             if let retrievedUser = retrievedUser {
-                self.dataProvider.delete(managedObject: retrievedUser) {
+                retrievedUser.setRelationships(memberOf: []) {
                     error in
                     guard error == nil else {
-                        sendError(.debug("Internal error"), to: response) // TODO: decode error
+                        sendError(.debug("Internal error (delete relationships)"), to: response) // TODO: decode error
                         next()
                         return
                     }
-                    NotificationService.notifyAllClients()
-                    response.status(.noContent)
-                    next()
-                    return
+                    self.dataProvider.delete(managedObject: retrievedUser) {
+                        error in
+                        guard error == nil else {
+                            sendError(.debug("Internal error (delete user)"), to: response) // TODO: decode error
+                            next()
+                            return
+                        }
+                        NotificationService.notifyAllClients()
+                        response.status(.noContent)
+                        next()
+                        return
+                    }
                 }
             }
             else {
@@ -225,45 +231,6 @@ class Users {
             else {
                 let errorMessage = String(describing: error)
                 sendError(.debug("error: \(errorMessage)"), to: response)
-            }
-        }
-    }
-    
-    fileprivate func updateRelationships(initial: ManagedUser?, final: ManagedUser?, completion: @escaping (Error?) -> Void) {
-        let initialOwners = initial?.memberOf ?? []
-        let finalOwners = final?.memberOf ?? []
-        let (addedOwnerIDs, removedOwnerIDs) = finalOwners.difference(from: initialOwners)
-        let groupUUIDsToUpdate = addedOwnerIDs.union(removedOwnerIDs)
-        dataProvider.completeManagedObjects(ofType: MutableManagedUserGroup.self, withUUIDs: Array(groupUUIDsToUpdate)) {
-            (dict, error) in
-            guard error == nil else {
-                completion(EasyLoginError.debug(String.init(describing: error)))
-                return
-            }
-            addedOwnerIDs.forEach {
-                uuid in
-                if let nested = dict[uuid]?.members {
-                    dict[uuid]!.setMembers(nested + [final!.uuid])
-                }
-            }
-            removedOwnerIDs.forEach {
-                uuid in
-                if var nested = dict[uuid]?.members {
-                    if let found = nested.index(of: initial!.uuid) {
-                        nested.remove(at: found)
-                    }
-                    dict[uuid]!.setMembers(nested)
-                }
-            }
-            let list = dict.map { $1 }
-            self.dataProvider.storeChangesFrom(mutableManagedObjects: list) {
-                (updatedList, error) in
-                if let error = error {
-                    completion(EasyLoginError.debug(String.init(describing: error)))
-                }
-                else {
-                    completion(nil)
-                }
             }
         }
     }

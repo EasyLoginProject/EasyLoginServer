@@ -71,6 +71,7 @@ public class ManagedObject : Codable, Equatable, CustomDebugStringConvertible {
     }
     
     init(withDataProvider dataProvider: DataProvider) {
+        self.dataProvider = dataProvider
         uuid = UUID().uuidString
         isPartialRepresentation = false
         deleted = false

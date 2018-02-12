@@ -8,7 +8,7 @@
 import Foundation
 
 extension Sequence where Element: Hashable {
-    func difference(from initial: Self) -> (added: Set<Element>, removed: Set<Element>) {
+    public func difference(from initial: Self) -> (added: Set<Element>, removed: Set<Element>) {
         let initialSet = Set(initial)
         let finalSet = Set(self)
         let addedSet = finalSet.subtracting(initialSet)

@@ -107,31 +107,40 @@ extension MutableManagedUser {
         }
     }
     
-    func update(with updateRequest: UpdateRequest, authMethodGenerator: AuthMethodGenerator) throws {
-        if let shortname = updateRequest.shortname {
-            try self.setShortname(shortname)
+    func update(with updateRequest: UpdateRequest, authMethodGenerator: AuthMethodGenerator, completion: @escaping (Error?) -> Void) {
+        do {
+            if let shortname = updateRequest.shortname {
+                try self.setShortname(shortname)
+            }
+            if let principalName = updateRequest.principalName {
+                try self.setPrincipalName(principalName)
+            }
+            if let email = updateRequest.email {
+                try self.setEmail(email)
+            }
+            if let givenName = updateRequest.givenName {
+                self.setGivenName(givenName.optionalValue)
+            }
+            if let surname = updateRequest.surname {
+                self.setSurname(surname.optionalValue)
+            }
+            if let fullName = updateRequest.fullName {
+                self.setFullName(fullName)
+            }
+            if let authMethods = updateRequest.authMethods {
+                let filteredAuthMethods = try authMethodGenerator.generate(authMethods)
+                self.setAuthMethods(filteredAuthMethods)
+            }
         }
-        if let principalName = updateRequest.principalName {
-            try self.setPrincipalName(principalName)
-        }
-        if let email = updateRequest.email {
-            try self.setEmail(email)
-        }
-        if let givenName = updateRequest.givenName {
-            self.setGivenName(givenName.optionalValue)
-        }
-        if let surname = updateRequest.surname {
-            self.setSurname(surname.optionalValue)
-        }
-        if let fullName = updateRequest.fullName {
-            self.setFullName(fullName)
-        }
-        if let authMethods = updateRequest.authMethods {
-            let filteredAuthMethods = try authMethodGenerator.generate(authMethods)
-            self.setAuthMethods(filteredAuthMethods)
+        catch {
+            completion(error)
+            return
         }
         if let memberOf = updateRequest.memberOf {
-            self.setOwners(memberOf)
+            self.setRelationships(memberOf: memberOf, completion: completion)
+        }
+        else {
+            completion(nil)
         }
     }
 }

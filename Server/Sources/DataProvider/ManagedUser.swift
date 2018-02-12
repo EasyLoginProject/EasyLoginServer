@@ -48,6 +48,8 @@ public class ManagedUser: ManagedObject {
             desc += ", fullName:\(fullName)"
         }
         
+        desc += ", memberOf:\(memberOf)"
+        
         desc += ", partialRepresentation:\(isPartialRepresentation)>"
         
         return desc
@@ -186,6 +188,8 @@ public class MutableManagedUser : ManagedUser, MutableManagedObject {
             desc += ", fullName:\(fullName)"
         }
         
+        desc += ", memberOf:\(memberOf)"
+        
         desc += ", partialRepresentation:\(isPartialRepresentation)"
         desc += ", hasBeenEdited:\(hasBeenEdited)>"
         
@@ -276,7 +280,51 @@ public class MutableManagedUser : ManagedUser, MutableManagedObject {
         hasBeenEdited = true
     }
     
-    public func setOwners(_ value: [String]) {
+    public func setRelationships(memberOf: [ManagedObjectRecordID], completion: @escaping (Error?) -> Void) {
+        guard let dataProvider = dataProvider else {
+            completion(EasyLoginError.internalServerError)
+            return
+        }
+        let initialOwners = self.memberOf
+        let finalOwners = memberOf
+        let (addedOwnerIDs, removedOwnerIDs) = finalOwners.difference(from: initialOwners)
+        let groupUUIDsToUpdate = addedOwnerIDs.union(removedOwnerIDs)
+        dataProvider.completeManagedObjects(ofType: MutableManagedUserGroup.self, withUUIDs: Array(groupUUIDsToUpdate)) {
+            (dict, error) in
+            guard error == nil else {
+                completion(EasyLoginError.debug(String.init(describing: error)))
+                return
+            }
+            addedOwnerIDs.forEach {
+                uuid in
+                if let members = dict[uuid]?.members {
+                    dict[uuid]!.setMembers(members + [self.uuid])
+                }
+            }
+            removedOwnerIDs.forEach {
+                uuid in
+                if var members = dict[uuid]?.members {
+                    if let found = members.index(of: self.uuid) {
+                        members.remove(at: found)
+                    }
+                    dict[uuid]!.setMembers(members)
+                }
+            }
+            let list = dict.map { $1 }
+            dataProvider.storeChangesFrom(mutableManagedObjects: list) {
+                (updatedList, error) in
+                if let error = error {
+                    completion(EasyLoginError.debug(String.init(describing: error)))
+                }
+                else {
+                    self.setOwners(memberOf)
+                    completion(nil)
+                }
+            }
+        }
+    }
+    
+    public func setOwners(_ value: [ManagedObjectRecordID]) {
         guard value != memberOf else {
             return
         }
