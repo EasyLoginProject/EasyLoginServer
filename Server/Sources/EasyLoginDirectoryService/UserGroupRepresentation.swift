@@ -91,29 +91,30 @@ extension MutableManagedUserGroup {
         }
     }
     
-    func update(with updateRequest: UpdateRequest) throws {
-        if let shortname = updateRequest.shortname {
-            try self.setShortname(shortname)
-        }
-        if let commonName = updateRequest.commonName {
-            self.setCommonName(commonName)
-        }
-        if let email = updateRequest.email {
-            switch email {
-            case .null:
-                self.clearEmail()
-            case .value(let email):
-                try self.setEmail(email)
+    func update(with updateRequest: UpdateRequest, completion: @escaping (Error?) -> Void) {
+        do {
+            if let shortname = updateRequest.shortname {
+                try self.setShortname(shortname)
+            }
+            if let commonName = updateRequest.commonName {
+                self.setCommonName(commonName)
+            }
+            if let email = updateRequest.email {
+                switch email {
+                case .null:
+                    self.clearEmail()
+                case .value(let email):
+                    try self.setEmail(email)
+                }
             }
         }
-        if let memberOf = updateRequest.memberOf {
-            self.setOwners(memberOf)
+        catch {
+            completion(error)
+            return
         }
-        if let nestedGroups = updateRequest.nestedGroups {
-            self.setNestedGroups(nestedGroups)
-        }
-        if let members = updateRequest.members {
-            self.setMembers(members)
-        }
+        let memberOf = updateRequest.memberOf ?? self.memberOf
+        let nestedGroups = updateRequest.nestedGroups ?? self.nestedGroups
+        let members = updateRequest.members ?? self.members
+        self.setRelationships(memberOf: memberOf, nestedGroups: nestedGroups, members: members, completion: completion)
     }
 }

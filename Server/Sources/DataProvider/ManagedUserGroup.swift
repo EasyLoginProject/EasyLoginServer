@@ -25,6 +25,10 @@ public class ManagedUserGroup: ManagedObject {
             desc += ", email:\(email)"
         }
         
+        desc += ", memberOf:\(memberOf)"
+        desc += ", nestedGroups:\(nestedGroups)"
+        desc += ", members:\(members)"
+        
         desc += ", partialRepresentation:\(isPartialRepresentation)>"
         
         return desc
@@ -113,6 +117,10 @@ public class MutableManagedUserGroup : ManagedUserGroup, MutableManagedObject {
             desc += ", email:\(email)"
         }
         
+        desc += ", memberOf:\(memberOf)"
+        desc += ", nestedGroups:\(nestedGroups)"
+        desc += ", members:\(members)"
+        
         desc += ", partialRepresentation:\(isPartialRepresentation)>"
         desc += ", hasBeenEdited:\(hasBeenEdited)>"
         
@@ -174,6 +182,105 @@ public class MutableManagedUserGroup : ManagedUserGroup, MutableManagedObject {
         }
         email = nil
         hasBeenEdited = true
+    }
+    
+    public func setRelationships(memberOf: [ManagedObjectRecordID], nestedGroups: [ManagedObjectRecordID], members: [ManagedObjectRecordID], completion: @escaping (Error?) -> Void) {
+        guard let dataProvider = dataProvider else {
+            completion(EasyLoginError.internalServerError)
+            return
+        }
+        let initialOwners = self.memberOf
+        let finalOwners = memberOf
+        let (addedOwnerIDs, removedOwnerIDs) = finalOwners.difference(from: initialOwners)
+        let initialNestedGroups = self.nestedGroups
+        let finalNestedGroups = nestedGroups
+        let (addedNestedGroupIDs, removedNestedGroupIDs) = finalNestedGroups.difference(from: initialNestedGroups)
+        let initialMembers = self.members
+        let finalMembers = members
+        let (addedMemberIDs, removedMemberIDs) = finalMembers.difference(from: initialMembers)
+        let groupUUIDsToUpdate = addedOwnerIDs.union(removedOwnerIDs).union(addedNestedGroupIDs).union(removedNestedGroupIDs)
+        let userUUIDsToUpdate = addedMemberIDs.union(removedMemberIDs)
+        dataProvider.completeManagedObjects(ofType: MutableManagedUserGroup.self, withUUIDs: Array(groupUUIDsToUpdate)) {
+            (groupDict, error) in
+            guard error == nil else {
+                completion(EasyLoginError.debug(String.init(describing: error)))
+                return
+            }
+            dataProvider.completeManagedObjects(ofType: MutableManagedUser.self, withUUIDs: Array(userUUIDsToUpdate)) {
+                userDict, error in
+                guard error == nil else {
+                    completion(EasyLoginError.debug(String.init(describing: error)))
+                    return
+                }
+                // TODO: detect cycles (build trees recursively for owners and nested groups). This implies a citical section.
+                addedOwnerIDs.forEach {
+                    uuid in
+                    if let nested = groupDict[uuid]?.nestedGroups {
+                        groupDict[uuid]!.setNestedGroups(nested + [self.uuid])
+                    }
+                }
+                removedOwnerIDs.forEach {
+                    uuid in
+                    if var nested = groupDict[uuid]?.nestedGroups {
+                        if let found = nested.index(of: self.uuid) {
+                            nested.remove(at: found)
+                        }
+                        groupDict[uuid]!.setNestedGroups(nested)
+                    }
+                }
+                addedNestedGroupIDs.forEach {
+                    uuid in
+                    if let owners = groupDict[uuid]?.memberOf {
+                        groupDict[uuid]!.setOwners(owners + [self.uuid])
+                    }
+                }
+                removedNestedGroupIDs.forEach {
+                    uuid in
+                    if var owners = groupDict[uuid]?.memberOf {
+                        if let found = owners.index(of: self.uuid) {
+                            owners.remove(at: found)
+                        }
+                        groupDict[uuid]!.setOwners(owners)
+                    }
+                }
+                addedMemberIDs.forEach {
+                    uuid in
+                    if let owners = userDict[uuid]?.memberOf {
+                        userDict[uuid]!.setOwners(owners + [self.uuid])
+                    }
+                }
+                removedMemberIDs.forEach {
+                    uuid in
+                    if var owners = userDict[uuid]?.memberOf {
+                        if let found = owners.index(of: self.uuid) {
+                            owners.remove(at: found)
+                        }
+                        userDict[uuid]!.setOwners(owners)
+                    }
+                }
+                let groupList = groupDict.map { $1 }
+                let userList = userDict.map { $1 }
+                // TODO: erase type? We should be able to use [MutableManagedObject]
+                dataProvider.storeChangesFrom(mutableManagedObjects: groupList) {
+                    (_, error) in
+                    guard error == nil else {
+                        completion(EasyLoginError.debug(String.init(describing: error)))
+                        return
+                    }
+                    dataProvider.storeChangesFrom(mutableManagedObjects: userList) {
+                        (_, error) in
+                        guard error == nil else {
+                            completion(EasyLoginError.debug(String.init(describing: error)))
+                            return
+                        }
+                        self.setOwners(memberOf)
+                        self.setNestedGroups(nestedGroups)
+                        self.setMembers(members)
+                        completion(nil)
+                    }
+                }
+            }
+        }
     }
     
     public func setOwners(_ value: [String]) {
