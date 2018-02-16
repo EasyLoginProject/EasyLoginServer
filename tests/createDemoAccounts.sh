@@ -21,7 +21,7 @@ createUserWithGivenNameSurnameFullNameShortnamePrincipalNameEmail "Adriana" "Oca
 createUserWithGivenNameSurnameFullNameShortnamePrincipalNameEmail "Albert" "Einstein" "Albert Einstein" "ae" "ae@eu.storymaker.fr" "a.einstein@storymaker.fr"
 createUserWithGivenNameSurnameFullNameShortnamePrincipalNameEmail "Anna" "Behrensmeyer" "Anna K. Behrensmeyer" "akb" "akb@am.storymaker.fr" "a.behrensmeyer@storymaker.fr"
 createUserWithGivenNameSurnameFullNameShortnamePrincipalNameEmail "Blaise" "Pascal" "Blaise Pascal" "bp" "bp@eu.storymaker.fr" "b.pascal@storymaker.fr"
-createUserWithGivenNameSurnameFullNameShortnamePrincipalNameEmail "Caroline" "Herschel" "Caroline Herschel" "ch@eu.storymaker.fr" "c.herschel@storymaker.fr"
+createUserWithGivenNameSurnameFullNameShortnamePrincipalNameEmail "Caroline" "Herschel" "Caroline Herschel" "ch" "ch@eu.storymaker.fr" "c.herschel@storymaker.fr"
 createUserWithGivenNameSurnameFullNameShortnamePrincipalNameEmail "Cecilia" "Payne-Gaposchkin" "Cecilia Payne-Gaposchkin" "cpg" "cpg@eu.storymaker.fr" "c.payne@storymaker.fr"
 createUserWithGivenNameSurnameFullNameShortnamePrincipalNameEmail "Chien-Shiung" "Wu" "Chien-Shiung Wu" "csw" "csw@ap.storymaker.fr" "c.wu@storymaker.fr"
 createUserWithGivenNameSurnameFullNameShortnamePrincipalNameEmail "Dorothy" "Hodgkin" "Dorothy Hodgkin" "dh" "dh@eu.storymaker.fr" "d.hodgkin@storymaker.fr"
