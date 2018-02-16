@@ -98,7 +98,7 @@ public class DataProvider {
         jsonData(forRecordWithID: uuid) { (jsonData, jsonError) in
             if let jsonData = jsonData {
                 do {
-                    let managedObject = try T.objectFromJSON(data: jsonData, withCodingStrategy: .databaseEncoding)
+                    let managedObject = try T.objectFromJSON(data: jsonData, withCodingStrategy: .databaseEncoding, withDataProvider: self)
                     completion(managedObject, nil)
                 } catch {
                     completion(nil, .swiftError(error))
@@ -125,7 +125,7 @@ public class DataProvider {
                 (jsonData, jsonError) in
                 if let jsonData = jsonData {
                     do {
-                        let managedObject = try T.objectFromJSON(data: jsonData, withCodingStrategy: .databaseEncoding)
+                        let managedObject = try T.objectFromJSON(data: jsonData, withCodingStrategy: .databaseEncoding, withDataProvider: self)
                         result[uuid] = managedObject
                     }
                     catch {
@@ -152,7 +152,7 @@ public class DataProvider {
             jsonData(forRecordWithID: managedObject.uuid) { (jsonData, jsonError) in
                 if let jsonData = jsonData {
                     do {
-                        let managedObject = try T.objectFromJSON(data: jsonData, withCodingStrategy: .databaseEncoding)
+                        let managedObject = try T.objectFromJSON(data: jsonData, withCodingStrategy: .databaseEncoding, withDataProvider: self)
                         completion(managedObject, nil)
                     } catch {
                         completion(nil, .swiftError(error))
@@ -175,6 +175,7 @@ public class DataProvider {
                 do {
                     let strategy: ManagedObjectCodingStrategy = T.requireFullObject() ? .databaseEncoding : T.viewToListThemAllReturnPartialResult() ? .briefEncoding : .databaseEncoding
                     let jsonDecoder = JSONDecoder()
+                    jsonDecoder.dateDecodingStrategy = .iso8601
                     jsonDecoder.userInfo[.managedObjectCodingStrategy] = strategy
                     let viewResults = try jsonDecoder.decode(CouchDBViewResult<T>.self, from: jsonData)
                     
@@ -201,6 +202,7 @@ public class DataProvider {
                 do {
                     let strategy: ManagedObjectCodingStrategy = .databaseEncoding
                     let jsonDecoder = JSONDecoder()
+                    jsonDecoder.dateDecodingStrategy = .iso8601
                     jsonDecoder.userInfo[.managedObjectCodingStrategy] = strategy
                     let viewResults = try jsonDecoder.decode(CouchDBViewResult<T>.self, from: jsonData)
                     
@@ -288,9 +290,11 @@ public class DataProvider {
             return
         }
         
+        mutableManagedObject.markAsModified()
+        
         let jsonData: Data
         do {
-            jsonData = try mutableManagedObject.jsonData(withCodingStrategy: .databaseEncoding)
+            jsonData = try mutableManagedObject.jsonData()
         }
         catch {
             completion(nil, .swiftError(error))
@@ -357,7 +361,7 @@ public class DataProvider {
         
         let jsonData: Data
         do {
-            jsonData = try mutableManagedObject.jsonData(withCodingStrategy: .databaseEncoding)
+            jsonData = try mutableManagedObject.jsonData()
         }
         catch {
             completion(nil, .swiftError(error))
@@ -399,14 +403,15 @@ public class DataProvider {
         managedObject.markAsDeleted()
         let jsonData: Data
         do {
-            jsonData = try managedObject.jsonData(withCodingStrategy: .databaseEncoding)
+            jsonData = try managedObject.jsonData()
         }
         catch {
             completion(.swiftError(error))
             return
         }
         
-        update(recordID: managedObject.uuid, atRev: revision, with: jsonData) { (revision, updatedJSONData, error) in
+        update(recordID: managedObject.uuid, atRev: revision, with: jsonData) {
+            (revision, updatedJSONData, error) in
             if let updatedJSONData = updatedJSONData {
                 do {
                     let updateResult = try JSONDecoder().decode(CouchDBUpdateResult.self, from: updatedJSONData)

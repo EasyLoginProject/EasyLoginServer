@@ -17,7 +17,7 @@ public class AuthMethodGenerator {
     }
     
     public func generate(_ authMethods: [String:String]) throws -> [String:String] {
-        guard authMethods.count != 0 else { throw EasyLoginError.missingField(ManagedUser.Key.authMethods.rawValue) }
+        guard authMethods.count != 0 else { throw EasyLoginError.missingField("authMethods") }
         if let cleartext = authMethods["cleartext"] {
             var generated = authMethods
             generated["cleartext"] = nil

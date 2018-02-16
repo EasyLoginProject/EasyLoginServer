@@ -7,25 +7,21 @@
 //
 
 import Foundation
-import CouchDB
+import DataProvider
 import Kitura
 import LoggerAPI
-import SwiftyJSON
 import Extensions
 import NotificationService
 
-enum UsersError: Error {
-    case databaseFailure
-}
-
 class Users {
-    let database: Database
+    let dataProvider: DataProvider
     let numericIDGenerator: PersistentCounter
     let authMethodGenerator: AuthMethodGenerator
+    let viewFormatter = ManagedObjectFormatter(type: ManagedUser.self, generator: {ManagedUser.Representation($0)})
     
-    init(database: Database) {
-        self.database = database
-        self.numericIDGenerator = PersistentCounter(database: database, name: "users.numericID", initialValue: 1789)
+    init(dataProvider: DataProvider) {
+        self.dataProvider = dataProvider
+        self.numericIDGenerator = dataProvider.persistentCounter(name: "users.numericID")
         self.authMethodGenerator = AuthMethodGenerator()
     }
     
@@ -43,221 +39,199 @@ class Users {
             sendError(.missingField("uuid"), to:response)
             return
         }
-        database.retrieve(uuid, callback: { (document: JSON?, error: NSError?) in
-            guard let document = document else {
-                sendError(.notFound, to: response)
-                return
+        dataProvider.completeManagedObject(ofType: ManagedUser.self, withUUID: uuid) {
+            retrievedUser, error in
+            if let retrievedUser = retrievedUser, retrievedUser.deleted == false, let jsonData = try? self.viewFormatter.viewAsJSONData(retrievedUser) {
+                response.send(data: jsonData)
+                response.headers.setType("json")
+                response.status(.OK)
             }
-            // TODO: verify type == "user"
-            // TODO: verify not deleted
-            do {
-                let retrievedUser = try ManagedUser(databaseRecord:document)
-                response.send(json: try retrievedUser.responseElement())
+            else {
+                sendError(.debug("Internal error"), to: response) // TODO: decode error
             }
-            catch let error as EasyLoginError {
-                sendError(error, to: response)
-            }
-            catch {
-                sendError(.debug("Internal error"), to: response)
-            }
-        })
+        }
     }
     
-    fileprivate func updateUserHandler(request: RouterRequest, response: RouterResponse, next: ()->Void) -> Void {
-        defer { next() }
+    fileprivate func updateUserHandler(request: RouterRequest, response: RouterResponse, next: @escaping ()->Void) -> Void {
         guard let uuid = request.parameters["uuid"] else {
             sendError(.missingField("uuid"), to:response)
+            next()
             return
         }
-        database.retrieve(uuid, callback: { (document: JSON?, error: NSError?) in
-            guard let document = document else {
-                sendError(.notFound, to: response)
+        guard let updateRequest = try? request.read(as: MutableManagedUser.UpdateRequest.self) else {
+            sendError(.malformedBody, to:response)
+            next()
+            return
+        }
+        dataProvider.completeManagedObject(ofType: MutableManagedUser.self, withUUID: uuid) {
+            mutableUser, error in
+            guard let mutableUser = mutableUser else {
+                sendError(.debug("\(String(describing: error))"), to: response)
+                // TODO: decode error
+                next()
                 return
             }
-            // TODO: verify type == "user"
-            // TODO: verify not deleted
-            guard let parsedBody = request.body else {
-                Log.error("body parsing failure")
-                sendError(.malformedBody, to:response)
-                return
-            }
-            switch(parsedBody) {
-            case .json(let jsonBody):
-                do {
-                    let retrievedUser = try ManagedUser(databaseRecord:document)
-                    let updatedUser = try retrievedUser.updated(with: JSON(jsonBody), authMethodGenerator: self.authMethodGenerator) // FIXME: use [String: Any] directly
-                    update(updatedUser, into: self.database) { (writtenUser, error) in
-                        guard writtenUser != nil else {
-                            let errorMessage = error?.localizedDescription ?? "error is nil"
-                            sendError(.debug("Response creation failed: \(errorMessage)"), to: response)
-                            return
-                        }
-                        NotificationService.notifyAllClients()
-                        response.statusCode = .OK
-                        response.headers.setLocation("/db/users/\(String(describing: updatedUser.uuid))")
-                        response.send(json: try! updatedUser.responseElement())
+            mutableUser.update(with: updateRequest, authMethodGenerator: self.authMethodGenerator) {
+                error in
+                guard error == nil else {
+                    sendError(.debug("\(String(describing: error))"), to: response)
+                    // TODO: decode error
+                    next()
+                    return
+                }
+                self.dataProvider.storeChangeFrom(mutableManagedObject: mutableUser) {
+                    updatedUser, error in
+                    guard let updatedUser = updatedUser else {
+                        sendError(.internalServerError, to:response)
+                        next()
+                        return
                     }
+                    if let jsonData = try? self.viewFormatter.viewAsJSONData(updatedUser) {
+                        response.send(data: jsonData)
+                        response.headers.setType("json")
+                        response.status(.OK)
+                    }
+                    else {
+                        sendError(.debug("Internal error"), to: response) // TODO: decode error
+                    }
+                    next()
                 }
-                catch ManagedUserError.nullMandatoryField(let fieldName) {
-                    sendError(.validation(fieldName), to: response)
-                }
-                catch let error as EasyLoginError {
-                    sendError(error, to: response)
-                }
-                catch {
-                    sendError(.debug("Internal error"), to: response)
-                }
-            default:
-                sendError(.malformedBody, to: response)
             }
-        })
+        }
     }
     
-    fileprivate func createUserHandler(request: RouterRequest, response: RouterResponse, next: ()->Void) -> Void {
-        defer { next() } // FIXME: defer to closure, or call explicitly
-        Log.debug("handling POST")
-        guard let parsedBody = request.body else {
-            Log.error("body parsing failure")
+    fileprivate func createUserHandler(request: RouterRequest, response: RouterResponse, next: @escaping ()->Void) -> Void {
+        guard let updateRequest = try? request.read(as: MutableManagedUser.UpdateRequest.self) else {
             sendError(.malformedBody, to:response)
+            next()
             return
         }
-        Log.debug("handling body")
-        switch(parsedBody) {
-        case .json(let jsonBody):
+        guard let shortname = updateRequest.shortname else {
+            sendError(.missingField("shortname"), to:response)
+            next()
+            return
+        }
+        guard let principalName = updateRequest.principalName else {
+            sendError(.missingField("principalName"), to:response)
+            next()
+            return
+        }
+        guard let email = updateRequest.email else {
+            sendError(.missingField("email"), to:response)
+            next()
+            return
+        }
+        guard let fullName = updateRequest.fullName else {
+            sendError(.missingField("fullName"), to:response)
+            next()
+            return
+        }
+        let givenName = updateRequest.givenName?.optionalValue
+        let surname = updateRequest.surname?.optionalValue
+        let authMethods: [String:String]
+        if let authMethodsFromRequest = updateRequest.authMethods {
             do {
-                let user = try ManagedUser(requestElement: JSON(jsonBody), authMethodGenerator: self.authMethodGenerator) // FIXME: use [String: Any] directly
-                insert(user, into: database, generator: numericIDGenerator) {
-                    createdUser, error in
-                    guard let createdUser = createdUser, let createdUUID = createdUser.uuid else {
-                        let errorMessage = error?.localizedDescription ?? "error is nil"
-                        sendError(.debug("Response creation failed: \(errorMessage)"), to: response)
+                authMethods = try authMethodGenerator.generate(authMethodsFromRequest)
+            }
+            catch {
+                sendError(.malformedBody, to: response) // TODO: make error more explicit
+                next()
+                return
+            }
+        }
+        else {
+            authMethods = [:]
+        }
+        let memberOf = updateRequest.memberOf ?? []
+        numericIDGenerator.nextValue() { // TODO: generateNextValue()
+            numericID in
+            guard let numericID = numericID else {
+                sendError(.debug("failed to get next numericID"), to:response)
+                next()
+                return
+            }
+            let user = MutableManagedUser(withDataProvider: self.dataProvider, numericID: numericID, shortname: shortname, principalName: principalName, email: email, givenName: givenName, surname: surname, fullName: fullName, authMethods: authMethods)
+            user.setRelationships(memberOf: memberOf) {
+                error in
+                guard error == nil else {
+                    sendError(.debug("failed to update relationships: \(String(describing: error))"), to:response)
+                    next()
+                    return
+                }
+                self.dataProvider.insert(mutableManagedObject: user) {
+                    (insertedUser, error) in
+                    guard let insertedUser = insertedUser else {
+                        sendError(.debug("failed to insert"), to:response)
+                        next()
                         return
                     }
                     NotificationService.notifyAllClients()
-                    response.statusCode = .created
-                    response.headers.setLocation("/db/users/\(createdUUID)")
-                    response.send(json: try! createdUser.responseElement())
+                    if let jsonData = try? self.viewFormatter.viewAsJSONData(insertedUser) {
+                        response.send(data: jsonData)
+                        response.headers.setType("json")
+                        response.statusCode = .created
+                        response.headers.setLocation("/db/users/\(insertedUser.uuid)")
+                    }
+                    else {
+                        sendError(.debug("Internal error"), to: response) // TODO: decode error
+                    }
+                    next()
                 }
             }
-            catch let error as EasyLoginError {
-                sendError(error, to: response)
-            }
-            catch {
-                sendError(.debug("User creation failed"), to: response)
-            }
-        default:
-            sendError(.malformedBody, to: response)
         }
     }
     
-    fileprivate func deleteUserHandler(request: RouterRequest, response: RouterResponse, next: ()->Void) -> Void {
-        defer { next() }
+    fileprivate func deleteUserHandler(request: RouterRequest, response: RouterResponse, next: @escaping ()->Void) -> Void {
         guard let uuid = request.parameters["uuid"] else {
             sendError(.missingField("uuid"), to:response)
+            next()
             return
         }
-        database.retrieve(uuid, callback: { (document: JSON?, error: NSError?) in
-            guard let document = document else {
-                sendError(.notFound, to: response)
-                return
-            }
-            do {
-                let retrievedUser = try ManagedUser(databaseRecord:document)
-                // This will generate an error when trying to delete a malformed record.
-                // Is this what is expected?
-                markDeleted(retrievedUser, into: self.database) {
-                    success in
-                    if (success) {
-                        response.statusCode = .noContent
+        dataProvider.completeManagedObject(ofType: MutableManagedUser.self, withUUID: uuid) {
+            retrievedUser, error in
+            if let retrievedUser = retrievedUser {
+                retrievedUser.setRelationships(memberOf: []) {
+                    error in
+                    guard error == nil else {
+                        sendError(.debug("Internal error (delete relationships)"), to: response) // TODO: decode error
+                        next()
+                        return
                     }
-                    else {
-                        sendError(.debug("Internal error"), to: response)
+                    self.dataProvider.delete(managedObject: retrievedUser) {
+                        error in
+                        guard error == nil else {
+                            sendError(.debug("Internal error (delete user)"), to: response) // TODO: decode error
+                            next()
+                            return
+                        }
+                        NotificationService.notifyAllClients()
+                        response.status(.noContent)
+                        next()
+                        return
                     }
                 }
             }
-            catch let error as EasyLoginError {
-                sendError(error, to: response)
+            else {
+                sendError(.notFound, to: response)
+                next()
+                return
             }
-            catch {
-                sendError(.debug("Internal error"), to: response)
-            }
-        })
+        }
     }
     
     fileprivate func listUsersHandler(request: RouterRequest, response: RouterResponse, next: ()->Void) -> Void {
         defer { next() }
-        database.queryByView("all_users", ofDesign: "main_design", usingParameters: []) { (databaseResponse, error) in
-            guard let databaseResponse = databaseResponse else {
-                let errorMessage = error?.localizedDescription ?? "error is nil"
-                sendError(.debug("Database request failed: \(errorMessage)"), to: response)
-                return
+        self.dataProvider.managedObjects(ofType: ManagedUser.self) {
+            list, error in
+            if let list = list, let jsonData = try? self.viewFormatter.summaryAsJSONData(list) {
+                response.send(data: jsonData)
+                response.headers.setType("json")
+                response.status(.OK)
             }
-            let userList = databaseResponse["rows"].array?.flatMap { user -> ManagedUserRecap? in
-                do {
-                    return try ManagedUserRecap(databaseRecord:user["value"])
-                }
-                catch {
-                    print("error? \(error)")
-                    return nil
-                }
+            else {
+                let errorMessage = String(describing: error)
+                sendError(.debug("error: \(errorMessage)"), to: response)
             }
-            let result = ["users": userList ?? []]
-            response.send(json: result)
         }
     }
-}
-
-fileprivate func insert(_ user: ManagedUser, into database: Database, generator: PersistentCounter, completion: @escaping (ManagedUser?, NSError?) -> Void) -> Void {
-    // TODO: ensure shortName and principalName are unique
-    generator.nextValue() {
-        numericID in
-        Log.debug("next numeric id = \(String(describing: numericID))")
-        guard let numericID = numericID else {
-            completion(nil, NSError(domain: "EasyLogin", code: 1, userInfo: nil)) // FIXME: define error
-            return
-        }
-        guard let userWithID = try? user.inserted(newNumericID: numericID) else {
-            completion(nil, NSError(domain: "EasyLogin", code: 1, userInfo: nil)) // FIXME: define error
-            return
-        }
-        let document = try! JSON(userWithID.databaseRecord())
-        database.create(document, callback: { (id: String?, rev: String?, createdDocument: JSON?, error: NSError?) in
-            guard createdDocument != nil else {
-                completion(nil, error)
-                return
-            }
-            do {
-                let createdUser = try ManagedUser(databaseRecord:document)
-                completion(createdUser, nil)
-            }
-            catch {
-                completion(nil, nil) // TODO: set error
-            }
-        })
-    }
-}
-
-fileprivate func update(_ user: ManagedUser, into database: Database, completion: @escaping (ManagedUser?, NSError?) -> Void) -> Void {
-    let document = try! JSON(user.databaseRecord())
-    database.update(user.uuid!, rev: user.revision!, document: document, callback: { (rev: String?, updatedDocument: JSON?, error: NSError?) in
-        guard updatedDocument != nil else {
-            completion(nil, error)
-            return
-        }
-        do {
-            let updatedUser = try ManagedUser(databaseRecord:document)
-            completion(updatedUser, nil)
-        }
-        catch {
-            completion(nil, nil) // TODO: set error
-        }
-    })
-}
-
-fileprivate func markDeleted(_ user: ManagedUser, into database: Database, completion: @escaping (Bool) -> Void) -> Void {
-    let document = try! JSON(user.databaseRecord(deleted: true))
-    database.update(user.uuid!, rev: user.revision!, document: document, callback: { (rev: String?, updatedDocument: JSON?, error: NSError?) in
-        let success = updatedDocument != nil
-        completion(success)
-    })
 }

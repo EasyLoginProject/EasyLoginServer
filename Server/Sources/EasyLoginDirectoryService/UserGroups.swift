@@ -55,41 +55,35 @@ class UserGroups {
             next()
             return
         }
-        guard let jsonBody = request.body?.asJSON else {
-            Log.error("body parsing failure")
+        guard let updateRequest = try? request.read(as: MutableManagedUserGroup.UpdateRequest.self) else {
             sendError(.malformedBody, to:response)
             next()
             return
         }
-        dataProvider.completeManagedObject(ofType: MutableManagedUserGroup.self, withUUID: uuid, completion: {
-            retrievedUserGroup, error in
-            guard let retrievedUserGroup = retrievedUserGroup else {
+        dataProvider.completeManagedObject(ofType: MutableManagedUserGroup.self, withUUID: uuid) {
+            mutableUserGroup, error in
+            guard let mutableUserGroup = mutableUserGroup else {
                 sendError(.debug("\(String(describing: error))"), to: response)
                 // TODO: decode error
                 next()
                 return
             }
-                let initialUserGroup = MutableManagedUserGroup(withNumericID: retrievedUserGroup.numericID, shortname: retrievedUserGroup.shortname, commonName: retrievedUserGroup.commonName, email: retrievedUserGroup.email, memberOf: retrievedUserGroup.memberOf, nestedGroups: retrievedUserGroup.nestedGroups, members: retrievedUserGroup.members)
-            do {
-                try retrievedUserGroup.update(withJSON: jsonBody)
-            }
-            catch {
-                sendError(.debug("\(String(describing: error))"), to: response)
-                // TODO: decode error
-                next()
-                return
-            }
-            self.dataProvider.storeChangeFrom(mutableManagedObject: retrievedUserGroup, completion: { (updatedUsergroup, error) in
-                self.updateRelationships(initial: initialUserGroup, final: retrievedUserGroup) {
-                    error in
-                    guard error == nil else {
-                        // error --> internal server error, database is inconsistent
-                        Log.error("database may be inconsistent!")
+            mutableUserGroup.update(with: updateRequest) {
+                error in
+                guard error == nil else {
+                    sendError(.debug("\(String(describing: error))"), to: response)
+                    // TODO: decode error
+                    next()
+                    return
+                }
+                self.dataProvider.storeChangeFrom(mutableManagedObject: mutableUserGroup) {
+                    updatedUsergroup, error in
+                    guard let updatedUsergroup = updatedUsergroup else {
                         sendError(.internalServerError, to:response)
                         next()
                         return
                     }
-                    if let jsonData = try? self.viewFormatter.viewAsJSONData(retrievedUserGroup) {
+                    if let jsonData = try? self.viewFormatter.viewAsJSONData(updatedUsergroup) {
                         response.send(data: jsonData)
                         response.headers.setType("json")
                         response.status(.OK)
@@ -100,32 +94,30 @@ class UserGroups {
                     next()
                     return
                 }
-            })
-        })
+            }
+        }
     }
     
     fileprivate func createUserGroupHandler(request: RouterRequest, response: RouterResponse, next: @escaping ()->Void) -> Void {
-        Log.debug("handling POST")
-        guard let jsonBody = request.body?.asJSON else {
-            Log.error("body parsing failure")
+        guard let updateRequest = try? request.read(as: MutableManagedUserGroup.UpdateRequest.self) else {
             sendError(.malformedBody, to:response)
             next()
             return
         }
-        guard let shortname = jsonBody["shortname"] as? String else {
+        guard let shortname = updateRequest.shortname else {
             sendError(.missingField("shortname"), to:response)
             next()
             return
         }
-        guard let commonName = jsonBody["commonName"] as? String else {
+        guard let commonName = updateRequest.commonName else {
             sendError(.missingField("commonName"), to:response)
             next()
             return
         }
-        let email = jsonBody["email"] as? String
-        let memberOf = jsonBody["memberOf"] as? [String] ?? []
-        let nestedGroups = jsonBody["nestedGroups"] as? [String] ?? []
-        let members = jsonBody["members"] as? [String] ?? []
+        let email = updateRequest.email?.optionalValue
+        let memberOf = updateRequest.memberOf ?? []
+        let nestedGroups = updateRequest.nestedGroups ?? []
+        let members = updateRequest.members ?? []
         numericIDGenerator.nextValue() { // TODO: generateNextValue()
             numericID in
             guard let numericID = numericID else {
@@ -133,8 +125,8 @@ class UserGroups {
                 next()
                 return
             }
-            let usergroup = MutableManagedUserGroup(withNumericID: numericID, shortname: shortname, commonName: commonName, email: email, memberOf: memberOf, nestedGroups: nestedGroups, members: members)
-            self.updateRelationships(initial: nil, final: usergroup) {
+            let usergroup = MutableManagedUserGroup(withDataProvider: self.dataProvider, numericID: numericID, shortname: shortname, commonName: commonName, email: email)
+            usergroup.setRelationships(memberOf: memberOf, nestedGroups: nestedGroups, members: members) {
                 error in
                 guard error == nil else {
                     sendError(.debug("failed to update relationships: \(String(describing: error))"), to:response)
@@ -170,13 +162,13 @@ class UserGroups {
             next()
             return
         }
-        dataProvider.completeManagedObject(ofType: ManagedUserGroup.self, withUUID: uuid) {
+        dataProvider.completeManagedObject(ofType: MutableManagedUserGroup.self, withUUID: uuid) {
             retrievedUserGroup, error in
             if let retrievedUserGroup = retrievedUserGroup {
-                self.updateRelationships(initial: retrievedUserGroup, final: nil) {
+                retrievedUserGroup.setRelationships(memberOf: [], nestedGroups: [], members: []) {
                     error in
                     guard error == nil else {
-                        sendError(.debug("Internal error"), to: response) // TODO: decode error
+                        sendError(.debug("Internal error (delete relationships)"), to: response) // TODO: decode error
                         next()
                         return
                     }
@@ -217,98 +209,5 @@ class UserGroups {
             }
         }
     }
-    
-    fileprivate func updateRelationships(initial: ManagedUserGroup?, final: ManagedUserGroup?, completion: @escaping (Error?) -> Void) {
-        let initialOwners = initial?.memberOf ?? []
-        let finalOwners = final?.memberOf ?? []
-        let (addedOwnerIDs, removedOwnerIDs) = diffArrays(initial: initialOwners, final: finalOwners)
-        let initialNestedGroups = initial?.nestedGroups ?? []
-        let finalNestedGroups = final?.nestedGroups ?? []
-        let (addedNestedGroupIDs, removedNestedGroupIDs) = diffArrays(initial: initialNestedGroups, final: finalNestedGroups)
-        let initialMembers = initial?.members ?? []
-        let finalMembers = final?.members ?? []
-        let (addedMemberIDs, removedMemberIDs) = diffArrays(initial: initialMembers, final: finalMembers)
-        let groupUUIDsToUpdate = Array(Set(addedOwnerIDs + removedOwnerIDs + addedNestedGroupIDs + removedNestedGroupIDs))
-        let userUUIDsToUpdate = Array(Set(addedMemberIDs + removedMemberIDs))
-        dataProvider.completeManagedObjects(ofType: MutableManagedUserGroup.self, withUUIDs: groupUUIDsToUpdate) {
-            (dict, error) in
-            guard error == nil else {
-                completion(EasyLoginError.debug(String.init(describing: error)))
-                return
-            }
-            addedOwnerIDs.forEach {
-                uuid in
-                if let nested = dict[uuid]?.nestedGroups {
-                    dict[uuid]!.setNestedGroups(nested + [final!.uuid])
-                }
-            }
-            removedOwnerIDs.forEach {
-                uuid in
-                if var nested = dict[uuid]?.nestedGroups {
-                    if let found = nested.index(of: initial!.uuid) {
-                        nested.remove(at: found)
-                    }
-                    dict[uuid]!.setNestedGroups(nested)
-                }
-            }
-            addedNestedGroupIDs.forEach {
-                uuid in
-                if let owners = dict[uuid]?.memberOf {
-                    dict[uuid]!.setOwners(owners + [final!.uuid])
-                }
-            }
-            removedNestedGroupIDs.forEach {
-                uuid in
-                if var owners = dict[uuid]?.memberOf {
-                    if let found = owners.index(of: initial!.uuid) {
-                        owners.remove(at: found)
-                    }
-                    dict[uuid]!.setOwners(owners)
-                }
-            }
-            // TODO: same with members when Users are moved to DataProvider
-            let list = dict.map { $1 }
-            self.dataProvider.storeChangesFrom(mutableManagedObjects: list) {
-                (updatedList, error) in
-                if let error = error {
-                    completion(EasyLoginError.debug(String.init(describing: error)))
-                }
-                else {
-                    completion(nil)
-                }
-            }
-        }
-    }
-}
-
-extension MutableManagedUserGroup {
-    func update(withJSON jsonBody: [String: Any]) throws {
-        if let commonName = jsonBody["commonName"] as? String {
-            self.setCommonName(commonName)
-        }
-        if let email = jsonBody["email"] as? String {
-            try self.setEmail(email)
-        }
-        else if jsonBody["email"] is NSNull {
-            self.clearEmail()
-        }
-        if let memberOf = jsonBody["memberOf"] as? [String] {
-            self.setOwners(memberOf)
-        }
-        if let nestedGroups = jsonBody["nestedGroups"] as? [String] {
-            self.setNestedGroups(nestedGroups)
-        }
-        if let members = jsonBody["members"] as? [String] {
-            self.setMembers(members)
-        }
-    }
-}
-
-func diffArrays(initial: [String], final: [String]) -> (added: [String], removed: [String]) {
-    let initialSet = Set(initial)
-    let finalSet = Set(final)
-    let addedSet = finalSet.subtracting(initialSet)
-    let removedSet = initialSet.subtracting(finalSet)
-    return (Array(addedSet), Array(removedSet))
 }
 
