@@ -13,7 +13,6 @@ import json
 import sys
 import time
 
-
 class JSONClient:
 	def __init__(self, host, port):
 		self.connection = httplib.HTTPConnection(host, port)
@@ -75,6 +74,7 @@ class EasyLoginClient:
 	def user_create(self, givenName, surname, fullName, shortname, principalName, email):
 		object = self.user_generate_(givenName, surname, fullName, shortname, principalName, email)
 		result = self.connection.post("/db/users", object)
+		time.sleep(2)
 		return result["uuid"]
 	
 	def user_update(self, uuid, givenName = None, surname = None, fullName = None, shortname = None, principalName = None, email = None):
