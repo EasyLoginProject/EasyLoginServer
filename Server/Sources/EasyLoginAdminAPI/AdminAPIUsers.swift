@@ -8,6 +8,7 @@
 import Foundation
 import DataProvider
 import Kitura
+import Dispatch
 
 struct DesiredUserFromAdminAPI: Codable {
     let shortname: String?
@@ -17,6 +18,8 @@ struct DesiredUserFromAdminAPI: Codable {
     let surname: String?
     let fullName: String?
     let clearTextPassword: String?
+    
+    let memberOf: [String]?
     
     func update(mutableManagedUser:MutableManagedUser) throws {
         if let shortname = shortname {
@@ -39,6 +42,25 @@ struct DesiredUserFromAdminAPI: Codable {
         }
         if let clearTextPassword = clearTextPassword {
             try mutableManagedUser.setClearTextPasssword(clearTextPassword)
+        }
+        
+        if let memberOf = memberOf {
+            let validParentGroupIDs = memberOf.flatMap({ (memberUUID) -> ManagedObjectRecordID? in
+                var finalRecordID: ManagedObjectRecordID? = nil
+                let semaphore = DispatchSemaphore(value: 0)
+                mutableManagedUser.dataProvider!.managedObjectRecordID(forObjectOfType: ManagedUserGroup.self, withSupposedUUID: memberUUID, completion: { (recordID, error) in
+                    finalRecordID = recordID
+                    semaphore.signal()
+                })
+                semaphore.wait()
+                return finalRecordID
+            })
+            
+            let semaphore = DispatchSemaphore(value: 0)
+            mutableManagedUser.setRelationships(memberOf: validParentGroupIDs, completion: { (error) in
+                semaphore.signal()
+            })
+            semaphore.wait()
         }
         
     }
