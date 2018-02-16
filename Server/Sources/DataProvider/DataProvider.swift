@@ -94,6 +94,24 @@ public class DataProvider {
     
     // MARK: Managed Object API
     
+    public func managedObjectRecordID<T: ManagedObject>(forObjectOfType:T.Type, withSupposedUUID uuid:String, completion: @escaping (ManagedObjectRecordID?, CombinedError?) -> Void) -> Void {
+        jsonData(forRecordWithID: uuid) { (jsonData, jsonError) in
+            if let jsonData = jsonData {
+                do {
+                    let managedObject = try T.objectFromJSON(data: jsonData, withCodingStrategy: .databaseEncoding, withDataProvider: self)
+                    completion(managedObject.uuid, nil)
+                } catch {
+                    completion(nil, .swiftError(error))
+                }
+            } else if let jsonError = jsonError {
+                completion(nil, .cocoaError(jsonError))
+            }
+            else {
+                completion(nil, .swiftError(DataProviderError.none))
+            }
+        }
+    }
+    
     public func completeManagedObject<T: ManagedObject>(ofType:T.Type, withUUID uuid:ManagedObjectRecordID, completion: @escaping (T?, CombinedError?) -> Void) -> Void {
         jsonData(forRecordWithID: uuid) { (jsonData, jsonError) in
             if let jsonData = jsonData {
