@@ -8,6 +8,7 @@
 import Foundation
 import DataProvider
 import Kitura
+import Dispatch
 
 struct DesiredUserGroupFromAdminAPI: Codable {
     let shortname: String?
