@@ -14,6 +14,8 @@ struct DesiredUserGroupFromAdminAPI: Codable {
     let email: String?
     let commonName: String?
     let members: [String]?
+    let memberOf: [String]?
+    let nestedGroups: [String]?
     
     func update(mutableManagedUserGroup:MutableManagedUserGroup) throws {
         if let shortname = shortname {
@@ -25,9 +27,53 @@ struct DesiredUserGroupFromAdminAPI: Codable {
         if let email = email {
             try mutableManagedUserGroup.setEmail(email)
         }
-        if let members = members {
-            try mutableManagedUserGroup.setMembers(members)
+        
+        let validMembersIDs = members?.flatMap({ (memberUUID) -> ManagedObjectRecordID? in
+            var finalRecordID: ManagedObjectRecordID? = nil
+            let semaphore = DispatchSemaphore(value: 0)
+            mutableManagedUserGroup.dataProvider!.managedObjectRecordID(forObjectOfType: ManagedUser.self, withSupposedUUID: memberUUID, completion: { (recordID, error) in
+                finalRecordID = recordID
+                semaphore.signal()
+            })
+            semaphore.wait()
+            return finalRecordID
+        })
+        
+        let validParentGroupIDs = memberOf?.flatMap({ (memberUUID) -> ManagedObjectRecordID? in
+            var finalRecordID: ManagedObjectRecordID? = nil
+            let semaphore = DispatchSemaphore(value: 0)
+            mutableManagedUserGroup.dataProvider!.managedObjectRecordID(forObjectOfType: ManagedUserGroup.self, withSupposedUUID: memberUUID, completion: { (recordID, error) in
+                finalRecordID = recordID
+                semaphore.signal()
+            })
+            semaphore.wait()
+            return finalRecordID
+        })
+        
+        let validNestedGroupsIDs = nestedGroups?.flatMap({ (memberUUID) -> ManagedObjectRecordID? in
+            var finalRecordID: ManagedObjectRecordID? = nil
+            let semaphore = DispatchSemaphore(value: 0)
+            mutableManagedUserGroup.dataProvider!.managedObjectRecordID(forObjectOfType: ManagedUserGroup.self, withSupposedUUID: memberUUID, completion: { (recordID, error) in
+                finalRecordID = recordID
+                semaphore.signal()
+            })
+            semaphore.wait()
+            return finalRecordID
+        })
+        
+        let finalMembersIDs = validMembersIDs ?? mutableManagedUserGroup.members
+        let finalParentGroupIDs = validParentGroupIDs ?? mutableManagedUserGroup.memberOf
+        let finalNestedGroupsIDs = validNestedGroupsIDs ?? mutableManagedUserGroup.nestedGroups
+        
+        let semaphore = DispatchSemaphore(value: 0)
+        print("Pre relation update \(mutableManagedUserGroup)")
+        print("Update request finalMembersIDs:\(finalMembersIDs), finalParentGroupIDs:\(finalParentGroupIDs), finalNestedGroupsIDs:\(finalNestedGroupsIDs)")
+        mutableManagedUserGroup.setRelationships(memberOf: finalParentGroupIDs , nestedGroups:finalNestedGroupsIDs , members: finalMembersIDs) { (error) in
+            print("Relationship update error \(String(describing: error))")
+            semaphore.signal()
         }
+        semaphore.wait()
+        print("Post relation update \(mutableManagedUserGroup)")
     }
     
     func createNewMutableManagedUserGroup(withDataProvider dataProvider:DataProvider, completion: @escaping (MutableManagedUserGroup?) -> Void) {
@@ -35,7 +81,7 @@ struct DesiredUserGroupFromAdminAPI: Codable {
             let numericIDGenerator = dataProvider.persistentCounter(name: "userGroups.numericID")
             numericIDGenerator.nextValue(completion: { (numericID) in
                 if let numericID = numericID {
-                    let newUserGroup = MutableManagedUserGroup(withNumericID: numericID, shortname: shortname, commonName: commonName, email: self.email)
+                    let newUserGroup = MutableManagedUserGroup(withDataProvider: dataProvider, numericID: numericID, shortname: shortname, commonName: commonName, email: self.email)
                     completion(newUserGroup)
                 } else {
                     completion(nil)
@@ -57,14 +103,18 @@ struct UserGroupForAdminAPI: Codable {
     let email: String?
     
     let members: [String]
+    let memberOf: [String]
+    let nestedGroups: [String]
     
     enum CodingKeys: String, CodingKey {
         case uuid = "id"
         case numericID
         case shortname
         case commonName
-        case members
         case email
+        case members
+        case memberOf
+        case nestedGroups
     }
     
     init(managedUserGroup: ManagedUserGroup) {
@@ -73,12 +123,9 @@ struct UserGroupForAdminAPI: Codable {
         shortname = managedUserGroup.shortname
         commonName = managedUserGroup.commonName
         email = managedUserGroup.email
-        members = 
-            
-            
-            
-            
-            managedUserGroup.members
+        members = managedUserGroup.members
+        memberOf = managedUserGroup.memberOf
+        nestedGroups = managedUserGroup.nestedGroups
     }
 }
 
@@ -123,7 +170,7 @@ public class AdminAPIUserGroups {
                             }
                         case .numericID:
                             return String(managedUserGroup.numericID).contains(value)
-                        case .members:
+                        case .members, .memberOf, .nestedGroups:
                             //TODO Implement real member nested fetch
                             return false
                         }

@@ -29,17 +29,18 @@ struct DesiredUserFromAdminAPI: Codable {
             try mutableManagedUser.setEmail(email)
         }
         if let givenName = givenName {
-            try mutableManagedUser.setGivenName(givenName)
+            mutableManagedUser.setGivenName(givenName)
         }
         if let surname = surname {
-            try mutableManagedUser.setSurname(surname)
+            mutableManagedUser.setSurname(surname)
         }
         if let fullName = fullName {
-            try mutableManagedUser.setFullName(fullName)
+            mutableManagedUser.setFullName(fullName)
         }
         if let clearTextPassword = clearTextPassword {
             try mutableManagedUser.setClearTextPasssword(clearTextPassword)
         }
+        
     }
     
     func createNewMutableManagedUser(withDataProvider dataProvider:DataProvider, completion: @escaping (MutableManagedUser?) -> Void) {
@@ -47,7 +48,7 @@ struct DesiredUserFromAdminAPI: Codable {
             let numericIDGenerator = dataProvider.persistentCounter(name: "users.numericID")
             numericIDGenerator.nextValue(completion: { (numericID) in
                 if let numericID = numericID {
-                    let newUser = MutableManagedUser(withNumericID: numericID, shortname: shortname, principalName: principalName, email: self.email, givenName: self.givenName, surname: self.surname, fullName: self.fullName)
+                    let newUser = MutableManagedUser(withDataProvider: dataProvider, numericID: numericID, shortname: shortname, principalName: principalName, email: self.email, givenName: self.givenName, surname: self.surname, fullName: self.fullName)
                     do {
                         try newUser.setClearTextPasssword(clearTextPassword)
                         completion(newUser)
@@ -76,6 +77,8 @@ struct UserForAdminAPI: Codable {
     let surname: String?
     let fullName: String?
     
+    let memberOf: [String]
+    
     enum CodingKeys: String, CodingKey {
         case uuid = "id"
         case numericID
@@ -85,6 +88,7 @@ struct UserForAdminAPI: Codable {
         case givenName
         case surname
         case fullName
+        case memberOf
     }
     
     init(managedUser: ManagedUser) {
@@ -96,6 +100,7 @@ struct UserForAdminAPI: Codable {
         givenName = managedUser.givenName
         surname = managedUser.surname
         fullName = managedUser.fullName
+        memberOf = managedUser.memberOf
     }
 }
 
@@ -158,6 +163,8 @@ public class AdminAPIUsers {
                             }
                         case .numericID:
                             return String(managedUser.numericID).contains(value)
+                        case .memberOf:
+                            return false
                         }
                     })
                 }
@@ -252,6 +259,8 @@ public class AdminAPIUsers {
                     }
                 case .numericID:
                     isAscendent = left.numericID < right.numericID
+                case .memberOf:
+                    isAscendent = left.memberOf.count < right.memberOf.count
                 }
                 
                 if ascending {
