@@ -67,14 +67,10 @@ struct DesiredUserGroupFromAdminAPI: Codable {
         let finalNestedGroupsIDs = validNestedGroupsIDs ?? mutableManagedUserGroup.nestedGroups
         
         let semaphore = DispatchSemaphore(value: 0)
-        print("Pre relation update \(mutableManagedUserGroup)")
-        print("Update request finalMembersIDs:\(finalMembersIDs), finalParentGroupIDs:\(finalParentGroupIDs), finalNestedGroupsIDs:\(finalNestedGroupsIDs)")
         mutableManagedUserGroup.setRelationships(memberOf: finalParentGroupIDs , nestedGroups:finalNestedGroupsIDs , members: finalMembersIDs) { (error) in
-            print("Relationship update error \(String(describing: error))")
             semaphore.signal()
         }
         semaphore.wait()
-        print("Post relation update \(mutableManagedUserGroup)")
     }
     
     func createNewMutableManagedUserGroup(withDataProvider dataProvider:DataProvider, completion: @escaping (MutableManagedUserGroup?) -> Void) {
