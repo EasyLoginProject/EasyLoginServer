@@ -220,7 +220,7 @@ class LDAPGatewayAPIv1 {
         }
         
         if let ldapFilter = searchRequest.filter {
-            Log.info("Applying LDAP filter")
+            Log.info("Applying LDAP filter on \(availableRecords.count) record(s)")
             if let filteredRecords = ldapFilter.filter(records: availableRecords) {
                 if let jsonData = try? JSONEncoder().encode(filteredRecords) {
                     response.headers.setType("json")

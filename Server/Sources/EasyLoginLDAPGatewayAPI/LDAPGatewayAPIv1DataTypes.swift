@@ -239,7 +239,7 @@ class LDAPFilter: Codable {
         case .present:
             Log.info("Present operation")
             if let mustBePresent = present {
-                Log.debug("Check if record as value for field")
+                Log.debug("Check if record as value for field \(mustBePresent)")
                 return records.filter({ (recordToCheck) -> Bool in
                     if let _ = recordToCheck.valuesForField(mustBePresent){
                         return true
