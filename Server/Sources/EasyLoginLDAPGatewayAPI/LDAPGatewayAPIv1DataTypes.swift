@@ -664,6 +664,8 @@ class LDAPContainerRecord: LDAPAbstractRecord {
  and Encodable to LDAP Gateway JSON
  */
 class LDAPUserRecord: LDAPAbstractRecord {
+    let managedUser: ManagedUser
+    
     // Record properties
     let uid: String
     let userPrincipalName: String
@@ -673,6 +675,68 @@ class LDAPUserRecord: LDAPAbstractRecord {
     let givenName: String?
     let sn: String?
     let cn: String?
+    
+    lazy var memberOfByDN = try? managedUser.memberOf.map { (recordID) -> String in
+        let semaphore = DispatchSemaphore(value: 0)
+        var relatedUserGroup: ManagedUserGroup?
+        managedUser.dataProvider!.completeManagedObject(ofType: ManagedUserGroup.self, withUUID: recordID, completion: { (userGroup, error) in
+            relatedUserGroup = userGroup
+            semaphore.signal()
+        })
+        semaphore.wait()
+        
+        if let relatedUserGroup = relatedUserGroup {
+            return LDAPUserGroupRecord(managedUserGroup: relatedUserGroup).dn
+        } else {
+            throw LDAPAPIError.recordNotFound
+        }
+    }
+    
+    lazy var memberOfByShortname = try? managedUser.memberOf.map { (recordID) -> String in
+        let semaphore = DispatchSemaphore(value: 0)
+        var relatedUserGroup: ManagedUserGroup?
+        managedUser.dataProvider!.completeManagedObject(ofType: ManagedUserGroup.self, withUUID: recordID, completion: { (userGroup, error) in
+            relatedUserGroup = userGroup
+            semaphore.signal()
+        })
+        semaphore.wait()
+        
+        if let relatedUserGroup = relatedUserGroup {
+            return relatedUserGroup.shortname
+        } else {
+            throw LDAPAPIError.recordNotFound
+        }
+    }
+    
+    var flattenMemberOfByShortname: [String] {
+        get {
+            var flattenMemberOfByShortname = [String]()
+            
+            if let memberOfByShortname = self.memberOfByShortname {
+                flattenMemberOfByShortname += memberOfByShortname
+            }
+            
+            var inheritedMemberOfByShortname = [String]()
+            
+            for recordID in self.managedUser.memberOf {
+                let semaphore = DispatchSemaphore(value: 0)
+                var relatedUserGroup: ManagedUserGroup?
+                self.managedUser.dataProvider!.completeManagedObject(ofType: ManagedUserGroup.self, withUUID: recordID, completion: { (userGroup, error) in
+                    relatedUserGroup = userGroup
+                    semaphore.signal()
+                })
+                semaphore.wait()
+                
+                if let relatedUserGroup = relatedUserGroup {
+                    inheritedMemberOfByShortname += LDAPUserGroupRecord(managedUserGroup: relatedUserGroup).flattenMemberOfByShortname
+                }
+            }
+            
+            flattenMemberOfByShortname += inheritedMemberOfByShortname
+            
+            return flattenMemberOfByShortname
+        }
+    }
     
     static let fieldUsedInDN: LDAPFeild = .entryUUID
     
@@ -740,6 +804,13 @@ class LDAPUserRecord: LDAPAbstractRecord {
                 } else {
                     return nil
                 }
+                
+            case .memberOfByDN:
+                return memberOfByDN
+            case .memberOfByShortname:
+                return memberOfByShortname
+            case .flattenMemberOfByShortname:
+                return flattenMemberOfByShortname
             }
         } else {
             return super.valuesForField(field)
@@ -755,6 +826,9 @@ class LDAPUserRecord: LDAPAbstractRecord {
         case givenName
         case sn
         case cn
+        case memberOfByDN
+        case memberOfByShortname
+        case flattenMemberOfByShortname
     }
     
     required init(from decoder: Decoder) throws {
@@ -772,9 +846,14 @@ class LDAPUserRecord: LDAPAbstractRecord {
         try container.encode(givenName, forKey: .givenName)
         try container.encode(sn, forKey: .sn)
         try container.encode(cn, forKey: .cn)
+        try container.encode(memberOfByDN, forKey: .memberOfByDN)
+        try container.encode(memberOfByShortname, forKey: .memberOfByShortname)
+        try container.encode(flattenMemberOfByShortname, forKey: .flattenMemberOfByShortname)
     }
     
     init(managedUser: ManagedUser) {
+        self.managedUser = managedUser
+        
         uid = managedUser.shortname
         userPrincipalName = managedUser.principalName
         uidNumber = managedUser.numericID
@@ -794,6 +873,8 @@ class LDAPUserRecord: LDAPAbstractRecord {
  and Encodable to LDAP Gateway JSON
  */
 class LDAPUserGroupRecord: LDAPAbstractRecord {
+    let managedUserGroup: ManagedUserGroup
+    
     // Record properties
     let uid: String
     let uidNumber: Int
@@ -801,14 +882,192 @@ class LDAPUserGroupRecord: LDAPAbstractRecord {
     let mail: String?
     let cn: String?
     
-    let nestedGroupsByDN: [String]?
-    let nestedGroupsByShortname: [String]?
+    lazy var nestedGroupsByDN = try? managedUserGroup.nestedGroups.map { (recordID) -> String in
+        let semaphore = DispatchSemaphore(value: 0)
+        var relatedUserGroup: ManagedUserGroup?
+        managedUserGroup.dataProvider!.completeManagedObject(ofType: ManagedUserGroup.self, withUUID: recordID, completion: { (userGroup, error) in
+            relatedUserGroup = userGroup
+            semaphore.signal()
+        })
+        semaphore.wait()
+        
+        if let relatedUserGroup = relatedUserGroup {
+            return LDAPUserGroupRecord(managedUserGroup: relatedUserGroup).dn
+        } else {
+            throw LDAPAPIError.recordNotFound
+        }
+    }
 
-    let membersByDN: [String]?
-    let membersByShortname: [String]?
+    lazy var nestedGroupsByShortname = try? managedUserGroup.nestedGroups.map { (recordID) -> String in
+        let semaphore = DispatchSemaphore(value: 0)
+        var relatedUserGroup: ManagedUserGroup?
+        managedUserGroup.dataProvider!.completeManagedObject(ofType: ManagedUserGroup.self, withUUID: recordID, completion: { (userGroup, error) in
+            relatedUserGroup = userGroup
+            semaphore.signal()
+        })
+        semaphore.wait()
+        
+        if let relatedUserGroup = relatedUserGroup {
+            return relatedUserGroup.shortname
+        } else {
+            throw LDAPAPIError.recordNotFound
+        }
+    }
+
+    lazy var membersByDN = try? managedUserGroup.members.map { (recordID) -> String in
+        let semaphore = DispatchSemaphore(value: 0)
+        var relatedUser: ManagedUser?
+        managedUserGroup.dataProvider!.completeManagedObject(ofType: ManagedUser.self, withUUID: recordID, completion: { (user, error) in
+            relatedUser = user
+            semaphore.signal()
+        })
+        semaphore.wait()
+        
+        if let relatedUser = relatedUser {
+            return LDAPUserRecord(managedUser: relatedUser).dn
+        } else {
+            throw LDAPAPIError.recordNotFound
+        }
+    }
+
+    lazy var membersByShortname = try? managedUserGroup.members.map { (recordID) -> String in
+        let semaphore = DispatchSemaphore(value: 0)
+        var relatedUser: ManagedUser?
+        managedUserGroup.dataProvider!.completeManagedObject(ofType: ManagedUser.self, withUUID: recordID, completion: { (user, error) in
+            relatedUser = user
+            semaphore.signal()
+        })
+        semaphore.wait()
+        
+        if let relatedUser = relatedUser {
+            return relatedUser.shortname
+        } else {
+            throw LDAPAPIError.recordNotFound
+        }
+    }
     
-    let flattenNestedGroupsByShortname: [String]?
-    let flattenMembersByShortname: [String]?
+    var flattenNestedGroupsByShortname: [String]  {
+        get {
+            var flattenNestedGroupsByShortname = [String]()
+            
+            if let nestedGroupsByShortname = self.nestedGroupsByShortname {
+                flattenNestedGroupsByShortname += nestedGroupsByShortname
+            }
+            
+            var inheritedNestedGroupsByShortname = [String]()
+            
+            for recordID in self.managedUserGroup.nestedGroups {
+                let semaphore = DispatchSemaphore(value: 0)
+                var relatedUserGroup: ManagedUserGroup?
+                self.managedUserGroup.dataProvider!.completeManagedObject(ofType: ManagedUserGroup.self, withUUID: recordID, completion: { (userGroup, error) in
+                    relatedUserGroup = userGroup
+                    semaphore.signal()
+                })
+                semaphore.wait()
+                
+                if let relatedUserGroup = relatedUserGroup {
+                    inheritedNestedGroupsByShortname += LDAPUserGroupRecord(managedUserGroup: relatedUserGroup).flattenNestedGroupsByShortname
+                }
+            }
+            
+            flattenNestedGroupsByShortname += inheritedNestedGroupsByShortname
+            
+            return flattenNestedGroupsByShortname
+        }
+    }
+    
+    var flattenMembersByShortname: [String] {
+        get {
+            var flattenMembersByShortname = [String]()
+            
+            if let membersByShortname = self.membersByShortname {
+                flattenMembersByShortname += membersByShortname
+            }
+            
+            var inheritedMembersByShortname = [String]()
+            
+            for recordID in self.managedUserGroup.nestedGroups {
+                let semaphore = DispatchSemaphore(value: 0)
+                var relatedUserGroup: ManagedUserGroup?
+                self.managedUserGroup.dataProvider!.completeManagedObject(ofType: ManagedUserGroup.self, withUUID: recordID, completion: { (userGroup, error) in
+                    relatedUserGroup = userGroup
+                    semaphore.signal()
+                })
+                semaphore.wait()
+                
+                if let relatedUserGroup = relatedUserGroup {
+                    inheritedMembersByShortname += LDAPUserGroupRecord(managedUserGroup: relatedUserGroup).flattenMembersByShortname
+                }
+            }
+            
+            flattenMembersByShortname += inheritedMembersByShortname
+            
+            return flattenMembersByShortname
+        }
+    }
+    
+    lazy var memberOfByDN = try? managedUserGroup.memberOf.map { (recordID) -> String in
+        let semaphore = DispatchSemaphore(value: 0)
+        var relatedUserGroup: ManagedUserGroup?
+        managedUserGroup.dataProvider!.completeManagedObject(ofType: ManagedUserGroup.self, withUUID: recordID, completion: { (userGroup, error) in
+            relatedUserGroup = userGroup
+            semaphore.signal()
+        })
+        semaphore.wait()
+        
+        if let relatedUserGroup = relatedUserGroup {
+            return LDAPUserGroupRecord(managedUserGroup: relatedUserGroup).dn
+        } else {
+            throw LDAPAPIError.recordNotFound
+        }
+    }
+    
+    lazy var memberOfByShortname = try? managedUserGroup.memberOf.map { (recordID) -> String in
+        let semaphore = DispatchSemaphore(value: 0)
+        var relatedUserGroup: ManagedUserGroup?
+        managedUserGroup.dataProvider!.completeManagedObject(ofType: ManagedUserGroup.self, withUUID: recordID, completion: { (userGroup, error) in
+            relatedUserGroup = userGroup
+            semaphore.signal()
+        })
+        semaphore.wait()
+        
+        if let relatedUserGroup = relatedUserGroup {
+            return relatedUserGroup.shortname
+        } else {
+            throw LDAPAPIError.recordNotFound
+        }
+    }
+    
+    var flattenMemberOfByShortname: [String] {
+        get {
+            var flattenMemberOfByShortname = [String]()
+            
+            if let memberOfByShortname = self.memberOfByShortname {
+                flattenMemberOfByShortname += memberOfByShortname
+            }
+            
+            var inheritedMemberOfByShortname = [String]()
+            
+            for recordID in self.managedUserGroup.memberOf {
+                let semaphore = DispatchSemaphore(value: 0)
+                var relatedUserGroup: ManagedUserGroup?
+                self.managedUserGroup.dataProvider!.completeManagedObject(ofType: ManagedUserGroup.self, withUUID: recordID, completion: { (userGroup, error) in
+                    relatedUserGroup = userGroup
+                    semaphore.signal()
+                })
+                semaphore.wait()
+                
+                if let relatedUserGroup = relatedUserGroup {
+                    inheritedMemberOfByShortname += LDAPUserGroupRecord(managedUserGroup: relatedUserGroup).flattenMemberOfByShortname
+                }
+            }
+            
+            flattenMemberOfByShortname += inheritedMemberOfByShortname
+            
+            return flattenMemberOfByShortname
+        }
+    }
+
     
     static let fieldUsedInDN: LDAPFeild = .entryUUID
     
@@ -877,6 +1136,11 @@ class LDAPUserGroupRecord: LDAPAbstractRecord {
                 return flattenNestedGroupsByShortname
             case .flattenMembersByShortname:
                 return flattenMembersByShortname
+                
+            case .memberOfByShortname:
+                return memberOfByShortname
+            case .flattenMemberOfByShortname:
+                return flattenMemberOfByShortname
             }
         } else {
             return super.valuesForField(field)
@@ -898,6 +1162,9 @@ class LDAPUserGroupRecord: LDAPAbstractRecord {
         
         case flattenNestedGroupsByShortname
         case flattenMembersByShortname
+        
+        case memberOfByShortname
+        case flattenMemberOfByShortname
     }
     
     required init(from decoder: Decoder) throws {
@@ -921,99 +1188,18 @@ class LDAPUserGroupRecord: LDAPAbstractRecord {
         
         try container.encode(flattenNestedGroupsByShortname, forKey: .flattenNestedGroupsByShortname)
         try container.encode(flattenMembersByShortname, forKey: .flattenMembersByShortname)
+        
+        try container.encode(memberOfByShortname, forKey: .memberOfByShortname)
+        try container.encode(flattenMemberOfByShortname, forKey: .flattenMemberOfByShortname)
     }
     
     init(managedUserGroup: ManagedUserGroup) {
+        self.managedUserGroup = managedUserGroup
+        
         uid = managedUserGroup.shortname
         uidNumber = managedUserGroup.numericID
         mail = managedUserGroup.email
         cn = managedUserGroup.commonName
-        
-        // Members
-        membersByShortname = try? managedUserGroup.members.map { (recordID) -> String in
-            let semaphore = DispatchSemaphore(value: 0)
-            var relatedUser: ManagedUser?
-            managedUserGroup.dataProvider!.completeManagedObject(ofType: ManagedUser.self, withUUID: recordID, completion: { (user, error) in
-                relatedUser = user
-                semaphore.signal()
-            })
-            semaphore.wait()
-            
-            if let relatedUser = relatedUser {
-                return relatedUser.shortname
-            } else {
-                throw LDAPAPIError.recordNotFound
-            }
-        }
-        
-        membersByDN = try? managedUserGroup.members.map { (recordID) -> String in
-            let semaphore = DispatchSemaphore(value: 0)
-            var relatedUser: ManagedUser?
-            managedUserGroup.dataProvider!.completeManagedObject(ofType: ManagedUser.self, withUUID: recordID, completion: { (user, error) in
-                relatedUser = user
-                semaphore.signal()
-            })
-            semaphore.wait()
-            
-            if let relatedUser = relatedUser {
-                return LDAPUserRecord(managedUser: relatedUser).dn
-            } else {
-                throw LDAPAPIError.recordNotFound
-            }
-        }
-        
-        // Nested Groups
-        nestedGroupsByShortname = try? managedUserGroup.nestedGroups.map { (recordID) -> String in
-            let semaphore = DispatchSemaphore(value: 0)
-            var relatedUserGroup: ManagedUserGroup?
-            managedUserGroup.dataProvider!.completeManagedObject(ofType: ManagedUserGroup.self, withUUID: recordID, completion: { (userGroup, error) in
-                relatedUserGroup = userGroup
-                semaphore.signal()
-            })
-            semaphore.wait()
-            
-            if let relatedUserGroup = relatedUserGroup {
-                return relatedUserGroup.shortname
-            } else {
-                throw LDAPAPIError.recordNotFound
-            }
-        }
-        
-        var flattenNestedGroupsByShortname = [String]()
-        if let nestedGroupsByShortname = nestedGroupsByShortname {
-            flattenNestedGroupsByShortname += nestedGroupsByShortname
-        }
-        
-        var flattenMembersByShortname = [String]()
-        if let membersByShortname = membersByShortname {
-            flattenMembersByShortname += membersByShortname
-        }
-        
-        nestedGroupsByDN = try? managedUserGroup.nestedGroups.map { (recordID) -> String in
-            let semaphore = DispatchSemaphore(value: 0)
-            var relatedUserGroup: ManagedUserGroup?
-            managedUserGroup.dataProvider!.completeManagedObject(ofType: ManagedUserGroup.self, withUUID: recordID, completion: { (userGroup, error) in
-                relatedUserGroup = userGroup
-                semaphore.signal()
-            })
-            semaphore.wait()
-
-            if let relatedUserGroup = relatedUserGroup {
-                let ldapUserGroup = LDAPUserGroupRecord(managedUserGroup: relatedUserGroup)
-                if let relatedFlattenNestedGroupsByShortname = ldapUserGroup.flattenNestedGroupsByShortname {
-                    flattenNestedGroupsByShortname += relatedFlattenNestedGroupsByShortname
-                }
-                if let relatedFlattenMembersByShortname = ldapUserGroup.flattenMembersByShortname {
-                    flattenMembersByShortname += relatedFlattenMembersByShortname
-                }
-                return ldapUserGroup.dn
-            } else {
-                throw LDAPAPIError.recordNotFound
-            }
-        }
-        
-        self.flattenNestedGroupsByShortname = flattenNestedGroupsByShortname
-        self.flattenMembersByShortname = flattenMembersByShortname
         
         super.init(managedObject: managedUserGroup)
         hasSubordinates = "FALSE"
