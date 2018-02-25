@@ -11,12 +11,16 @@ import Kitura
 
 public class HTTPLogger: TextOutputStream {
     var logText: String
-    
+    let stdout = FileHandle.standardOutput
+
     init() {
         logText = ""
     }
     
     public func write(_ string: String) {
+        if let data = string.data(using: .utf8) {
+            stdout.write(data)
+        }
         logText.append(string)
     }
 }
