@@ -321,6 +321,7 @@ class LDAPAbstractRecord : Codable, Equatable {
     fileprivate (set) var hasSubordinates = "TRUE"
     
     func valuesForField(_ field:String) -> [String]? {
+        Log.debug("LDAPAbstractRecord / Looking for value for field \(field)")
         var key: LDAPAbstractRecordCodingKeys?
         for k in iterateEnum(LDAPAbstractRecordCodingKeys.self) {
             if k.rawValue.lowercased() == field.lowercased() {
@@ -340,6 +341,7 @@ class LDAPAbstractRecord : Codable, Equatable {
                 return [dn]
             }
         } else {
+            Log.debug("Unsuported key")
             return nil
         }
     }
@@ -379,6 +381,7 @@ class LDAPAbstractRecord : Codable, Equatable {
     }
     
     func encode(to encoder: Encoder) throws {
+        Log.info("Encoding LDAPAbstractRecord fields")
         var container = encoder.container(keyedBy: LDAPAbstractRecordCodingKeys.self)
         try container.encode(entryUUID, forKey: .entryUUID)
         try container.encode(objectClass, forKey: .objectClass)
@@ -391,6 +394,7 @@ class LDAPAbstractRecord : Codable, Equatable {
     }
     
     init(managedObject:ManagedObject) {
+        Log.info("Initiating LDAPAbstractRecord with managedObject")
         entryUUID = managedObject.uuid
     }
 }
@@ -439,6 +443,7 @@ class LDAPRootDSERecord: LDAPAbstractRecord {
     }
     
     override func valuesForField(_ field:String) -> [String]? {
+        Log.debug("LDAPRootDSERecord / Looking for value for field \(field)")
         var key: LDAPRootDSERecordCodingKeys?
         for k in iterateEnum(LDAPRootDSERecordCodingKeys.self) {
             if k.rawValue.lowercased() == field.lowercased() {
@@ -468,6 +473,7 @@ class LDAPRootDSERecord: LDAPAbstractRecord {
                 return vendorVersion
             }
         } else {
+            Log.debug("Unsuported key at LDAPRootDSERecord level, trying ancestor")
             return super.valuesForField(field)
         }
     }
@@ -488,6 +494,7 @@ class LDAPRootDSERecord: LDAPAbstractRecord {
     
     override func encode(to encoder: Encoder) throws {
         try super.encode(to: encoder)
+        Log.info("Encoding LDAPRootDSERecord fields")
         var container = encoder.container(keyedBy: LDAPRootDSERecordCodingKeys.self)
         try container.encode(namingContexts, forKey: .namingContexts)
         try container.encode(subschemaSubentry, forKey: .subschemaSubentry)
@@ -563,6 +570,7 @@ class LDAPDomainRecord: LDAPAbstractRecord {
     }
     
     override func valuesForField(_ field:String) -> [String]? {
+        Log.debug("LDAPDomainRecord / Looking for value for field \(field)")
         var key: LDAPDomainRecordCodingKeys?
         for k in iterateEnum(LDAPDomainRecordCodingKeys.self) {
             if k.rawValue.lowercased() == field.lowercased() {
@@ -576,6 +584,7 @@ class LDAPDomainRecord: LDAPAbstractRecord {
                 return [dc]
             }
         } else {
+            Log.debug("Unsuported key at LDAPDomainRecord level, trying ancestor")
             return super.valuesForField(field)
         }
     }
@@ -592,6 +601,7 @@ class LDAPDomainRecord: LDAPAbstractRecord {
     
     override func encode(to encoder: Encoder) throws {
         try super.encode(to: encoder)
+        Log.info("Encoding LDAPDomainRecord fields")
         var container = encoder.container(keyedBy: LDAPDomainRecordCodingKeys.self)
         try container.encode(dc, forKey: .dc)
     }
@@ -644,6 +654,7 @@ class LDAPContainerRecord: LDAPAbstractRecord {
     }
     
     override func valuesForField(_ field:String) -> [String]? {
+        Log.debug("LDAPContainerRecord / Looking for value for field \(field)")
         var key: LDAPContainerRecordCodingKeys?
         for k in iterateEnum(LDAPContainerRecordCodingKeys.self) {
             if k.rawValue.lowercased() == field.lowercased() {
@@ -657,6 +668,7 @@ class LDAPContainerRecord: LDAPAbstractRecord {
                 return [cn]
             }
         } else {
+            Log.debug("Unsuported key at LDAPContainerRecord level, trying ancestor")
             return super.valuesForField(field)
         }
     }
@@ -673,6 +685,7 @@ class LDAPContainerRecord: LDAPAbstractRecord {
     
     override func encode(to encoder: Encoder) throws {
         try super.encode(to: encoder)
+        Log.info("Encoding LDAPContainerRecord fields")
         var container = encoder.container(keyedBy: LDAPContainerRecordCodingKeys.self)
         try container.encode(cn, forKey: .cn)
     }
@@ -702,39 +715,49 @@ class LDAPUserRecord: LDAPAbstractRecord {
     let cn: String?
     
     lazy var memberOfByDN = try? managedUser.memberOf.map { (recordID) -> String in
+        Log.info("Lazy loading of LDAPUserRecord.memberOfByDN, mapping \(recordID) ")
         let semaphore = DispatchSemaphore(value: 0)
         var relatedUserGroup: ManagedUserGroup?
+        
         managedUser.dataProvider!.completeManagedObject(ofType: ManagedUserGroup.self, withUUID: recordID, completion: { (userGroup, error) in
+            Log.debug("Lazy loading got DB result")
             relatedUserGroup = userGroup
             semaphore.signal()
         })
         semaphore.wait()
         
         if let relatedUserGroup = relatedUserGroup {
+            Log.debug("Related group found")
             return LDAPUserGroupRecord(managedUserGroup: relatedUserGroup).dn
         } else {
+            Log.error("Related group not found")
             throw LDAPAPIError.recordNotFound
         }
     }
     
     lazy var memberOfByShortname = try? managedUser.memberOf.map { (recordID) -> String in
+        Log.info("Lazy loading of LDAPUserRecord.memberOfByShortname, mapping \(recordID) ")
         let semaphore = DispatchSemaphore(value: 0)
         var relatedUserGroup: ManagedUserGroup?
         managedUser.dataProvider!.completeManagedObject(ofType: ManagedUserGroup.self, withUUID: recordID, completion: { (userGroup, error) in
+            Log.debug("Lazy loading got DB result")
             relatedUserGroup = userGroup
             semaphore.signal()
         })
         semaphore.wait()
         
         if let relatedUserGroup = relatedUserGroup {
+            Log.debug("Related group found")
             return relatedUserGroup.shortname
         } else {
+            Log.error("Related group not found")
             throw LDAPAPIError.recordNotFound
         }
     }
     
     var flattenMemberOfByShortname: [String] {
         get {
+            Log.info("Computing LDAPUserRecord.flattenMemberOfByShortname")
             var flattenMemberOfByShortname = [String]()
             
             if let memberOfByShortname = self.memberOfByShortname {
@@ -747,6 +770,7 @@ class LDAPUserRecord: LDAPAbstractRecord {
                 let semaphore = DispatchSemaphore(value: 0)
                 var relatedUserGroup: ManagedUserGroup?
                 self.managedUser.dataProvider!.completeManagedObject(ofType: ManagedUserGroup.self, withUUID: recordID, completion: { (userGroup, error) in
+                    Log.debug("Computing got DB result")
                     relatedUserGroup = userGroup
                     semaphore.signal()
                 })
@@ -790,6 +814,7 @@ class LDAPUserRecord: LDAPAbstractRecord {
     }
     
     override func valuesForField(_ field:String) -> [String]? {
+        Log.debug("LDAPUserRecord / Looking for value for field \(field)")
         var key: LDAPUserRecordCodingKeys?
         for k in iterateEnum(LDAPUserRecordCodingKeys.self) {
             if k.rawValue.lowercased() == field.lowercased() {
@@ -838,6 +863,7 @@ class LDAPUserRecord: LDAPAbstractRecord {
                 return flattenMemberOfByShortname
             }
         } else {
+            Log.debug("Unsuported key at LDAPUserRecord level, trying ancestor")
             return super.valuesForField(field)
         }
     }
@@ -863,6 +889,7 @@ class LDAPUserRecord: LDAPAbstractRecord {
     
     override func encode(to encoder: Encoder) throws {
         try super.encode(to: encoder)
+        Log.info("Encoding LDAPUserRecord fields")
         var container = encoder.container(keyedBy: LDAPUserRecordCodingKeys.self)
         try container.encode(uidNumber, forKey: .uidNumber)
         try container.encode(uid, forKey: .uid)
@@ -877,6 +904,7 @@ class LDAPUserRecord: LDAPAbstractRecord {
     }
     
     init(managedUser: ManagedUser) {
+        Log.info("Initiating LDAPUserRecord with managedObject")
         self.managedUser = managedUser
         
         uid = managedUser.shortname
@@ -908,71 +936,88 @@ class LDAPUserGroupRecord: LDAPAbstractRecord {
     let cn: String?
     
     lazy var nestedGroupsByDN = try? managedUserGroup.nestedGroups.map { (recordID) -> String in
+        Log.info("Lazy loading of LDAPUserGroupRecord.nestedGroupsByDN, mapping \(recordID) ")
         let semaphore = DispatchSemaphore(value: 0)
         var relatedUserGroup: ManagedUserGroup?
         managedUserGroup.dataProvider!.completeManagedObject(ofType: ManagedUserGroup.self, withUUID: recordID, completion: { (userGroup, error) in
+            Log.debug("Lazy loading got DB result")
             relatedUserGroup = userGroup
             semaphore.signal()
         })
         semaphore.wait()
         
         if let relatedUserGroup = relatedUserGroup {
+            Log.debug("Related group found")
             return LDAPUserGroupRecord(managedUserGroup: relatedUserGroup).dn
         } else {
+            Log.error("Related group not found")
             throw LDAPAPIError.recordNotFound
         }
     }
 
     lazy var nestedGroupsByShortname = try? managedUserGroup.nestedGroups.map { (recordID) -> String in
+        Log.info("Lazy loading of LDAPUserGroupRecord.nestedGroupsByShortname, mapping \(recordID) ")
         let semaphore = DispatchSemaphore(value: 0)
         var relatedUserGroup: ManagedUserGroup?
         managedUserGroup.dataProvider!.completeManagedObject(ofType: ManagedUserGroup.self, withUUID: recordID, completion: { (userGroup, error) in
+            Log.debug("Lazy loading got DB result")
             relatedUserGroup = userGroup
             semaphore.signal()
         })
         semaphore.wait()
         
         if let relatedUserGroup = relatedUserGroup {
+            Log.debug("Related group found")
             return relatedUserGroup.shortname
         } else {
+            Log.error("Related group not found")
             throw LDAPAPIError.recordNotFound
         }
     }
 
     lazy var membersByDN = try? managedUserGroup.members.map { (recordID) -> String in
+        Log.info("Lazy loading of LDAPUserGroupRecord.membersByDN, mapping \(recordID) ")
         let semaphore = DispatchSemaphore(value: 0)
         var relatedUser: ManagedUser?
         managedUserGroup.dataProvider!.completeManagedObject(ofType: ManagedUser.self, withUUID: recordID, completion: { (user, error) in
+            Log.debug("Lazy loading got DB result")
             relatedUser = user
             semaphore.signal()
         })
         semaphore.wait()
         
         if let relatedUser = relatedUser {
+            Log.debug("Related user found")
             return LDAPUserRecord(managedUser: relatedUser).dn
         } else {
+            Log.error("Related user not found")
             throw LDAPAPIError.recordNotFound
         }
     }
 
     lazy var membersByShortname = try? managedUserGroup.members.map { (recordID) -> String in
+        Log.info("Lazy loading of LDAPUserGroupRecord.membersByShortname, mapping \(recordID) ")
         let semaphore = DispatchSemaphore(value: 0)
         var relatedUser: ManagedUser?
         managedUserGroup.dataProvider!.completeManagedObject(ofType: ManagedUser.self, withUUID: recordID, completion: { (user, error) in
+            Log.debug("Lazy loading got DB result")
             relatedUser = user
             semaphore.signal()
         })
         semaphore.wait()
         
         if let relatedUser = relatedUser {
+            Log.debug("Related user found")
             return relatedUser.shortname
         } else {
+            Log.error("Related user not found")
             throw LDAPAPIError.recordNotFound
         }
     }
     
     var flattenNestedGroupsByShortname: [String]  {
         get {
+            Log.info("Computing LDAPUserGroupRecord.flattenNestedGroupsByShortname")
             var flattenNestedGroupsByShortname = [String]()
             
             if let nestedGroupsByShortname = self.nestedGroupsByShortname {
@@ -985,6 +1030,7 @@ class LDAPUserGroupRecord: LDAPAbstractRecord {
                 let semaphore = DispatchSemaphore(value: 0)
                 var relatedUserGroup: ManagedUserGroup?
                 self.managedUserGroup.dataProvider!.completeManagedObject(ofType: ManagedUserGroup.self, withUUID: recordID, completion: { (userGroup, error) in
+                    Log.debug("Computing got DB result")
                     relatedUserGroup = userGroup
                     semaphore.signal()
                 })
@@ -1003,6 +1049,7 @@ class LDAPUserGroupRecord: LDAPAbstractRecord {
     
     var flattenMembersByShortname: [String] {
         get {
+            Log.info("Computing LDAPUserGroupRecord.flattenMembersByShortname")
             var flattenMembersByShortname = [String]()
             
             if let membersByShortname = self.membersByShortname {
@@ -1015,6 +1062,7 @@ class LDAPUserGroupRecord: LDAPAbstractRecord {
                 let semaphore = DispatchSemaphore(value: 0)
                 var relatedUserGroup: ManagedUserGroup?
                 self.managedUserGroup.dataProvider!.completeManagedObject(ofType: ManagedUserGroup.self, withUUID: recordID, completion: { (userGroup, error) in
+                    Log.debug("Computing got DB result")
                     relatedUserGroup = userGroup
                     semaphore.signal()
                 })
@@ -1032,39 +1080,48 @@ class LDAPUserGroupRecord: LDAPAbstractRecord {
     }
     
     lazy var memberOfByDN = try? managedUserGroup.memberOf.map { (recordID) -> String in
+        Log.info("Lazy loading of LDAPUserGroupRecord.memberOfByDN, mapping \(recordID) ")
         let semaphore = DispatchSemaphore(value: 0)
         var relatedUserGroup: ManagedUserGroup?
         managedUserGroup.dataProvider!.completeManagedObject(ofType: ManagedUserGroup.self, withUUID: recordID, completion: { (userGroup, error) in
+            Log.debug("Lazy loading got DB result")
             relatedUserGroup = userGroup
             semaphore.signal()
         })
         semaphore.wait()
         
         if let relatedUserGroup = relatedUserGroup {
+            Log.debug("Related group found")
             return LDAPUserGroupRecord(managedUserGroup: relatedUserGroup).dn
         } else {
+            Log.error("Related group not found")
             throw LDAPAPIError.recordNotFound
         }
     }
     
     lazy var memberOfByShortname = try? managedUserGroup.memberOf.map { (recordID) -> String in
+        Log.info("Lazy loading of LDAPUserGroupRecord.memberOfByShortname, mapping \(recordID) ")
         let semaphore = DispatchSemaphore(value: 0)
         var relatedUserGroup: ManagedUserGroup?
         managedUserGroup.dataProvider!.completeManagedObject(ofType: ManagedUserGroup.self, withUUID: recordID, completion: { (userGroup, error) in
+            Log.debug("Lazy loading got DB result")
             relatedUserGroup = userGroup
             semaphore.signal()
         })
         semaphore.wait()
         
         if let relatedUserGroup = relatedUserGroup {
+            Log.debug("Related group found")
             return relatedUserGroup.shortname
         } else {
+            Log.error("Related group not found")
             throw LDAPAPIError.recordNotFound
         }
     }
     
     var flattenMemberOfByShortname: [String] {
         get {
+            Log.info("Computing LDAPUserGroupRecord.flattenMemberOfByShortname")
             var flattenMemberOfByShortname = [String]()
             
             if let memberOfByShortname = self.memberOfByShortname {
@@ -1077,6 +1134,7 @@ class LDAPUserGroupRecord: LDAPAbstractRecord {
                 let semaphore = DispatchSemaphore(value: 0)
                 var relatedUserGroup: ManagedUserGroup?
                 self.managedUserGroup.dataProvider!.completeManagedObject(ofType: ManagedUserGroup.self, withUUID: recordID, completion: { (userGroup, error) in
+                    Log.debug("Computing got DB result")
                     relatedUserGroup = userGroup
                     semaphore.signal()
                 })
@@ -1121,6 +1179,7 @@ class LDAPUserGroupRecord: LDAPAbstractRecord {
     }
     
     override func valuesForField(_ field:String) -> [String]? {
+        Log.debug("LDAPUserGroupRecord / Looking for value for field \(field)")
         var key: LDAPUserGroupRecordCodingKeys?
         for k in iterateEnum(LDAPUserGroupRecordCodingKeys.self) {
             if k.rawValue.lowercased() == field.lowercased() {
@@ -1168,6 +1227,7 @@ class LDAPUserGroupRecord: LDAPAbstractRecord {
                 return flattenMemberOfByShortname
             }
         } else {
+            Log.debug("Unsuported key at LDAPUserGroupRecord level, trying ancestor")
             return super.valuesForField(field)
         }
     }
@@ -1199,6 +1259,7 @@ class LDAPUserGroupRecord: LDAPAbstractRecord {
     
     override func encode(to encoder: Encoder) throws {
         try super.encode(to: encoder)
+        Log.info("Encoding LDAPUserGroupRecord fields")
         var container = encoder.container(keyedBy: LDAPUserGroupRecordCodingKeys.self)
         try container.encode(uidNumber, forKey: .uidNumber)
         try container.encode(uid, forKey: .uid)
@@ -1219,6 +1280,7 @@ class LDAPUserGroupRecord: LDAPAbstractRecord {
     }
     
     init(managedUserGroup: ManagedUserGroup) {
+        Log.info("Initiating LDAPUserGroupRecord with managedObject")
         self.managedUserGroup = managedUserGroup
         
         uid = managedUserGroup.shortname
