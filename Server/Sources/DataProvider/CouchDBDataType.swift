@@ -84,8 +84,8 @@ struct CouchDBViewRow<T: ManagedObject>: Codable {
         
         if let codingStrategy = decoder.userInfo[.managedObjectCodingStrategy] as? ManagedObjectCodingStrategy,
             codingStrategy == .databaseEncoding,
-            let doc = try? container.decode(T.self, forKey: .doc) {
-            value = doc
+            container.contains(.doc) {
+            value = try container.decode(T.self, forKey: .doc)
         } else {
             value = try container.decode(T.self, forKey: .value)
         }
