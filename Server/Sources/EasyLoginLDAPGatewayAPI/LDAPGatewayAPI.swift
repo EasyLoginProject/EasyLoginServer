@@ -18,8 +18,10 @@ public class LDAPGatewayAPI {
     }
     
     public func router() -> Router {
+        Log.entry("Loading LDAP router")
         let router = Router()
         v1Gateway.installHandlers(to: router)
+        Log.exit("Loading LDAP router")
         return router
     }    
 }

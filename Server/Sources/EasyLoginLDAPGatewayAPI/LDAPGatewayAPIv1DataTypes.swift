@@ -121,47 +121,61 @@ class LDAPFilter: Codable {
      - returns: a new array representing all records which passed all the tests.
      */
     func filter(records: [LDAPAbstractRecord]) -> [LDAPAbstractRecord]? {
+        Log.entry("Filtering operation")
+        defer {
+            Log.exit("Filtering operation")
+        }
         switch nodeType() {
         case .and:
+            Log.info("AND operation")
             if let nestedFilters = and {
                 var combinedResult = [LDAPAbstractRecord]()
                 var firstLoop = true
+                Log.debug("Iterating over nested filters for AND operation")
                 for nestedFilter in nestedFilters {
                     if let nestedResult = nestedFilter.filter(records: records) {
                         if firstLoop {
+                            Log.debug("First loop done")
                             combinedResult.append(contentsOf: nestedResult)
                             firstLoop = false
                         } else {
+                            Log.debug("New loop done")
                             combinedResult = combinedResult.filter({ (recordFromCombinedResult) -> Bool in
                                 return nestedResult.contains(recordFromCombinedResult)
                             })
                         }
                     } else {
+                        Log.error("Nested filter returned nil, unsupported scenario")
                         return nil
                     }
                 }
-                
+                Log.debug("Iteration done, returning result")
                 return combinedResult
             }
             
         case .or:
+            Log.info("OR operation")
             if let nestedFilters = or {
                 var combinedResult = [LDAPAbstractRecord]()
-                
+                Log.debug("Iterating over nested filters for OR operation")
                 for nestedFilter in nestedFilters {
                     if let nestedResult = nestedFilter.filter(records: records) {
                         combinedResult.append(contentsOf: nestedResult)
                     } else {
+                        Log.error("Nested filter returned nil, unsupported scenario")
                         return nil
                     }
                 }
                 
+                Log.debug("Iteration done, returning result")
                 return combinedResult
             }
             
         case .not:
+            Log.info("NOT operation")
             if let nestedFilter = not {
                 if let resultToSkip = nestedFilter.filter(records: records) {
+                    Log.debug("Inverting nested result based on initial records")
                     return records.filter({ (recordToEvaluate) -> Bool in
                         return !resultToSkip.contains(recordToEvaluate)
                     })
@@ -171,7 +185,9 @@ class LDAPFilter: Codable {
             }
             
         case .equalityMatch:
+            Log.info("EqualityMatch operation")
             if let equalityMatch = equalityMatch {
+                Log.debug("Checking every records using valuesForField func to get access to values")
                 return records.filter({ (recordToCheck) -> Bool in
                     if let testedValues = recordToCheck.valuesForField(equalityMatch.attributeDesc) {
                         for testedValue in testedValues {
@@ -185,7 +201,9 @@ class LDAPFilter: Codable {
             }
             
         case .substrings:
+            Log.info("Substrings operation")
             if let substringsFilter = substrings {
+                Log.debug("Checking every records using valuesForField func to get access to values")
                 return records.filter({ (recordToCheck) -> Bool in
                     if let valuesToEvaluate = recordToCheck.valuesForField(substringsFilter.type) {
                         for valueToEvaluate in valuesToEvaluate {
@@ -193,14 +211,17 @@ class LDAPFilter: Codable {
                                 for (matchType, value) in substrings {
                                     switch matchType {
                                     case "any":
+                                        Log.info("Substrings match anywhere")
                                         if valueToEvaluate.lowercased().contains(value.lowercased()) {
                                             return true
                                         }
                                     case "initial":
+                                        Log.info("Substrings match prefix")
                                         if valueToEvaluate.lowercased().hasPrefix(value.lowercased()) {
                                             return true
                                         }
                                     case "final":
+                                        Log.info("Substrings match suffix")
                                         if valueToEvaluate.lowercased().hasSuffix(value.lowercased()) {
                                             return true
                                         }
@@ -216,7 +237,9 @@ class LDAPFilter: Codable {
             }
             
         case .present:
+            Log.info("Present operation")
             if let mustBePresent = present {
+                Log.debug("Check if record as value for field")
                 return records.filter({ (recordToCheck) -> Bool in
                     if let _ = recordToCheck.valuesForField(mustBePresent){
                         return true
@@ -227,6 +250,7 @@ class LDAPFilter: Codable {
             }
             
         case .unkown:
+            Log.error("Unsupported operation")
             return nil
         }
         return nil
@@ -1206,5 +1230,3 @@ class LDAPUserGroupRecord: LDAPAbstractRecord {
         hasSubordinates = "FALSE"
     }
 }
-
-
