@@ -9,6 +9,7 @@
 import Foundation
 import Kitura
 import DataProvider
+import LoggerAPI
 
 public class LDAPGatewayAPI {
     let v1Gateway: LDAPGatewayAPIv1

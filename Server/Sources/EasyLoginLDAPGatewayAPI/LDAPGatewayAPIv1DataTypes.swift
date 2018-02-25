@@ -8,6 +8,7 @@
 import Foundation
 import DataProvider
 import Dispatch
+import LoggerAPI
 
 // MARK: - Common LDAP API
 
