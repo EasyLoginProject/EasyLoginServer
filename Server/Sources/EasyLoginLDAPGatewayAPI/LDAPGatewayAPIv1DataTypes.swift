@@ -873,6 +873,45 @@ class LDAPUserGroupRecord: LDAPAbstractRecord {
             return super.valuesForField(field)
         }
     }
+    
+    // Record implementation
+    enum LDAPUserGroupRecordCodingKeys: String, CodingKey {
+        case uidNumber
+        case uid
+        case mail
+        case cn
+    }
+    
+    required init(from decoder: Decoder) throws {
+        assertionFailure("LDAP record representation cannot initiated from encoded representation.")
+        throw LDAPAPIError.unsupportedRequest
+    }
+    
+    override func encode(to encoder: Encoder) throws {
+        try super.encode(to: encoder)
+        var container = encoder.container(keyedBy: LDAPUserGroupRecordCodingKeys.self)
+        try container.encode(uidNumber, forKey: .uidNumber)
+        try container.encode(uid, forKey: .uid)
+        try container.encode(mail, forKey: .mail)
+        try container.encode(cn, forKey: .cn)
+    }
+    
+    init(entryUUID: String, uid: String, uidNumber: Int, mail: String?, cn: String?) {
+        self.uid = uid
+        self.uidNumber = uidNumber
+        self.mail = mail
+        self.cn = cn
+        super.init(entryUUID: entryUUID)
+    }
+    
+    init(managedUserGroup: ManagedUserGroup) {
+        uid = managedUserGroup.shortname
+        uidNumber = managedUserGroup.numericID
+        mail = managedUserGroup.email
+        cn = managedUserGroup.commonName
+        
+        super.init(managedObject: managedUserGroup)
+    }
 }
 
 

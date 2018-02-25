@@ -121,9 +121,21 @@ class LDAPGatewayAPIv1 {
                 next()
                 return
             } else {
-                // Search fo groups
-                response.status(.notImplemented)
-                next()
+                dataProvider.completeManagedObjects(ofType: ManagedUserGroup.self, completion: { (managedUserGroups, error) in
+                    guard let managedUserGroups = managedUserGroups else {
+                        response.status(.internalServerError)
+                        next()
+                        return
+                    }
+                    
+                    let groupsRecords = managedUserGroups.map({ (managedUserGroup) -> LDAPUserGroupRecord in
+                        return LDAPUserGroupRecord(managedUserGroup: managedUserGroup)
+                    })
+                    
+                    request.userInfo[CustomRequestKeys.availableRecords.rawValue] = groupsRecords
+                    next()
+                    return
+                })
                 return
             }
         default:
