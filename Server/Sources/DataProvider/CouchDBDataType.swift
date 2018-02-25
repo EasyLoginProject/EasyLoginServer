@@ -58,6 +58,7 @@ struct CouchDBViewResult<T: ManagedObject>: Codable {
     
     static func objectFromJSON(data jsonData:Data, withCodingStrategy strategy:ManagedObjectCodingStrategy) throws -> CouchDBViewResult<T> {
         let jsonDecoder = JSONDecoder()
+        jsonDecoder.dateDecodingStrategy = .iso8601
         jsonDecoder.userInfo[.managedObjectCodingStrategy] = strategy
         
         return try jsonDecoder.decode(self, from: jsonData)
