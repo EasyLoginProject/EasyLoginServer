@@ -292,11 +292,7 @@ class LDAPAbstractRecord : Codable, Equatable {
     
     var privateParentContainer: LDAPAbstractRecord?
     
-    var hasSubordinates: String {
-        get {
-            return "TRUE"
-        }
-    }
+    fileprivate (set) var hasSubordinates = "TRUE"
     
     func valuesForField(_ field:String) -> [String]? {
         var key: LDAPAbstractRecordCodingKeys?
@@ -786,6 +782,7 @@ class LDAPUserRecord: LDAPAbstractRecord {
         self.sn = sn
         self.cn = cn
         super.init(entryUUID: entryUUID)
+        hasSubordinates = "FALSE"
     }
     
     init(managedUser: ManagedUser) {
@@ -798,6 +795,7 @@ class LDAPUserRecord: LDAPAbstractRecord {
         cn = managedUser.fullName
         
         super.init(managedObject: managedUser)
+        hasSubordinates = "FALSE"
     }
 }
 
@@ -902,6 +900,7 @@ class LDAPUserGroupRecord: LDAPAbstractRecord {
         self.mail = mail
         self.cn = cn
         super.init(entryUUID: entryUUID)
+        hasSubordinates = "FALSE"
     }
     
     init(managedUserGroup: ManagedUserGroup) {
@@ -911,6 +910,7 @@ class LDAPUserGroupRecord: LDAPAbstractRecord {
         cn = managedUserGroup.commonName
         
         super.init(managedObject: managedUserGroup)
+        hasSubordinates = "FALSE"
     }
 }
 
