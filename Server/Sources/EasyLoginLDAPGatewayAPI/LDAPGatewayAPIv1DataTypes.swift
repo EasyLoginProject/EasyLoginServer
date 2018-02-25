@@ -7,6 +7,25 @@
 
 import Foundation
 import DataProvider
+import Dispatch
+
+// MARK: - Common LDAP API
+
+enum LDAPAPIError: Error {
+    case unsupportedRequest
+    case recordNotFound
+}
+
+func iterateEnum<T: Hashable>(_: T.Type) -> AnyIterator<T> {
+    var i = 0
+    return AnyIterator {
+        let next = withUnsafeBytes(of: &i) { $0.load(as: T.self) }
+        if next.hashValue != i { return nil }
+        i += 1
+        return next
+    }
+}
+
 
 // MARK: - Codable objects for LDAP authentication requests
 
@@ -251,43 +270,15 @@ extension CodingUserInfoKey {
  Base object for all records that can be requested by the client. Provides some basics for DN construction, object comparison, filtering process…
  */
 class LDAPAbstractRecord : Codable, Equatable {
+    // Record properties
     let entryUUID: String
     
+    // Record LDAP behavior that need to be overrided
     var objectClass: [String] {
         get {
-            return privateObjectClass
+            return []
         }
     }
-    fileprivate var privateObjectClass: [String] = []
-    
-    var dn: String {
-        get {
-            if let parentContainer = parentContainer {
-                return "\(fieldUsedInDN.rawValue)=\(valueUsedInDN),\(parentContainer.dn)"
-            } else {
-                return "\(fieldUsedInDN.rawValue)=\(valueUsedInDN)"
-            }
-        }
-    }
-    var parentContainer: LDAPAbstractRecord? {
-        get {
-            return privateParentContainer
-        }
-    }
-    fileprivate var privateParentContainer: LDAPAbstractRecord? = nil
-    
-    
-    static func ==(lhs: LDAPAbstractRecord, rhs: LDAPAbstractRecord) -> Bool {
-        return lhs.entryUUID == rhs.entryUUID
-    }
-    
-    // MARK: Part that needs to be extended by subclasses
-    var hasSubordinates: String {
-        get {
-            return privateHasSubordinates
-        }
-    }
-    fileprivate var privateHasSubordinates: String = "FALSE"
     
     var fieldUsedInDN: LDAPFeild {
         get {
@@ -300,33 +291,9 @@ class LDAPAbstractRecord : Codable, Equatable {
         }
     }
     
-    enum LDAPAbstractRecordCodingKeys: String, CodingKey {
-        case entryUUID
-        case objectClass
-        case hasSubordinates
-        case dn
-    }
+    var privateParentContainer: LDAPAbstractRecord?
     
-    required init(from decoder: Decoder) throws {
-        let values = try decoder.container(keyedBy: LDAPAbstractRecordCodingKeys.self)
-        entryUUID = try values.decode(String.self, forKey: .entryUUID).uppercased()
-    }
-    
-    func encode(to encoder: Encoder) throws {
-        var container = encoder.container(keyedBy: LDAPAbstractRecordCodingKeys.self)
-        try container.encode(entryUUID, forKey: .entryUUID)
-        try container.encode(objectClass, forKey: .objectClass)
-        try container.encode(hasSubordinates, forKey: .hasSubordinates)
-        try container.encode(dn, forKey: .dn)
-    }
-    
-    init(entryUUID: String) {
-        self.entryUUID = entryUUID
-    }
-    
-    init(managedObject:ManagedObject) {
-        entryUUID = managedObject.uuid
-    }
+    fileprivate (set) var hasSubordinates = "TRUE"
     
     func valuesForField(_ field:String) -> [String]? {
         var key: LDAPAbstractRecordCodingKeys?
@@ -351,6 +318,56 @@ class LDAPAbstractRecord : Codable, Equatable {
             return nil
         }
     }
+    
+    // Record LDAP shared behavior
+    var dn: String {
+        get {
+            if let parentContainer = parentContainer {
+                return "\(fieldUsedInDN.rawValue)=\(valueUsedInDN),\(parentContainer.dn)"
+            } else {
+                return "\(fieldUsedInDN.rawValue)=\(valueUsedInDN)"
+            }
+        }
+    }
+
+    var parentContainer: LDAPAbstractRecord? {
+        get {
+            return privateParentContainer
+        }
+    }
+    
+    static func ==(lhs: LDAPAbstractRecord, rhs: LDAPAbstractRecord) -> Bool {
+        return lhs.entryUUID == rhs.entryUUID
+    }
+    
+    // Record implementation
+    enum LDAPAbstractRecordCodingKeys: String, CodingKey {
+        case entryUUID
+        case objectClass
+        case hasSubordinates
+        case dn
+    }
+    
+    required init(from decoder: Decoder) throws {
+        assertionFailure("LDAP record representation cannot initiated from encoded representation.")
+        throw LDAPAPIError.unsupportedRequest
+    }
+    
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: LDAPAbstractRecordCodingKeys.self)
+        try container.encode(entryUUID, forKey: .entryUUID)
+        try container.encode(objectClass, forKey: .objectClass)
+        try container.encode(hasSubordinates, forKey: .hasSubordinates)
+        try container.encode(dn, forKey: .dn)
+    }
+    
+    init(entryUUID: String) {
+        self.entryUUID = entryUUID
+    }
+    
+    init(managedObject:ManagedObject) {
+        entryUUID = managedObject.uuid
+    }
 }
 
 /**
@@ -358,12 +375,7 @@ class LDAPAbstractRecord : Codable, Equatable {
  It will be used by LDAP clients to understand the global context of our LDAP realm.
  */
 class LDAPRootDSERecord: LDAPAbstractRecord {
-    override var dn: String {
-        get {
-            return "" // Special case, Root DSE is he no DN object
-        }
-    }
-    
+    // Record properties
     let namingContexts: [String]?
     let subschemaSubentry: [String]?
     let supportedLDAPVersion: [String]?
@@ -374,62 +386,31 @@ class LDAPRootDSERecord: LDAPAbstractRecord {
     let vendorName: [String]?
     let vendorVersion: [String]?
     
+    static let instanceRootDSE = {
+        return LDAPRootDSERecord(entryUUID:"00000000-0000-0000-0000-000000000000",
+                                 namingContexts: [LDAPGatewayAPIv1.baseDN()],
+                                 subschemaSubentry: ["cn=schema"],
+                                 supportedLDAPVersion: ["3"],
+                                 supportedSASLMechanisms: [],
+                                 supportedExtension: [],
+                                 supportedControl: [],
+                                 supportedFeatures: [],
+                                 vendorName: ["EasyLogin"],
+                                 vendorVersion: ["1"])
+        
+    }()
     
-    enum LDAPRootDSERecordCodingKeys: String, CodingKey {
-        case namingContexts
-        case subschemaSubentry
-        case supportedLDAPVersion
-        case supportedSASLMechanisms
-        case supportedExtension
-        case supportedControl
-        case supportedFeatures
-        case vendorName
-        case vendorVersion
+    // Record LDAP behavior that need to be overrided
+    override var objectClass: [String] {
+        get {
+            return ["top"]
+        }
     }
     
-    
-    override func encode(to encoder: Encoder) throws {
-        try super.encode(to: encoder)
-        var container = encoder.container(keyedBy: LDAPRootDSERecordCodingKeys.self)
-        try container.encode(namingContexts, forKey: .namingContexts)
-        try container.encode(subschemaSubentry, forKey: .subschemaSubentry)
-        try container.encode(supportedLDAPVersion, forKey: .supportedLDAPVersion)
-        try container.encode(supportedSASLMechanisms, forKey: .supportedSASLMechanisms)
-        try container.encode(supportedExtension, forKey: .supportedExtension)
-        try container.encode(supportedControl, forKey: .supportedControl)
-        try container.encode(supportedFeatures, forKey: .supportedFeatures)
-        try container.encode(vendorName, forKey: .vendorName)
-        try container.encode(vendorVersion, forKey: .vendorVersion)
-    }
-    
-    required init(from decoder: Decoder) throws {
-        namingContexts = nil
-        subschemaSubentry = nil
-        supportedLDAPVersion = nil
-        supportedSASLMechanisms = nil
-        supportedExtension = nil
-        supportedControl = nil
-        supportedFeatures = nil
-        vendorName = nil
-        vendorVersion = nil
-        try super.init(from: decoder)
-        privateObjectClass = ["top"]
-        privateHasSubordinates = "TRUE"
-    }
-    
-    init(entryUUID: String, namingContexts: [String]?, subschemaSubentry: [String]?, supportedLDAPVersion: [String]?, supportedSASLMechanisms: [String]?, supportedExtension: [String]?, supportedControl: [String]?, supportedFeatures: [String]?, vendorName: [String]?, vendorVersion: [String]?) {
-        self.namingContexts = namingContexts
-        self.subschemaSubentry = subschemaSubentry
-        self.supportedLDAPVersion = supportedLDAPVersion
-        self.supportedSASLMechanisms = supportedSASLMechanisms
-        self.supportedExtension = supportedExtension
-        self.supportedControl = supportedControl
-        self.supportedFeatures = supportedFeatures
-        self.vendorName = vendorName
-        self.vendorVersion = vendorVersion
-        super.init(entryUUID: entryUUID)
-        privateObjectClass = ["top"]
-        privateHasSubordinates = "TRUE"
+    override var dn: String {
+        get {
+            return "" // Special case, Root DSE is he no DN object
+        }
     }
     
     override func valuesForField(_ field:String) -> [String]? {
@@ -466,29 +447,84 @@ class LDAPRootDSERecord: LDAPAbstractRecord {
         }
     }
     
-    static let instanceRootDSE = {
-        return LDAPRootDSERecord(entryUUID:"00000000-0000-0000-0000-000000000000",
-                                 namingContexts: [LDAPGatewayAPIv1.baseDN()],
-                                 subschemaSubentry: ["cn=schema"],
-                                 supportedLDAPVersion: ["3"],
-                                 supportedSASLMechanisms: [],
-                                 supportedExtension: [],
-                                 supportedControl: [],
-                                 supportedFeatures: [],
-                                 vendorName: ["EasyLogin"],
-                                 vendorVersion: ["1"])
-        
-    }()
+    // Record implementation
+    enum LDAPRootDSERecordCodingKeys: String, CodingKey {
+        case namingContexts
+        case subschemaSubentry
+        case supportedLDAPVersion
+        case supportedSASLMechanisms
+        case supportedExtension
+        case supportedControl
+        case supportedFeatures
+        case vendorName
+        case vendorVersion
+    }
+    
+    
+    override func encode(to encoder: Encoder) throws {
+        try super.encode(to: encoder)
+        var container = encoder.container(keyedBy: LDAPRootDSERecordCodingKeys.self)
+        try container.encode(namingContexts, forKey: .namingContexts)
+        try container.encode(subschemaSubentry, forKey: .subschemaSubentry)
+        try container.encode(supportedLDAPVersion, forKey: .supportedLDAPVersion)
+        try container.encode(supportedSASLMechanisms, forKey: .supportedSASLMechanisms)
+        try container.encode(supportedExtension, forKey: .supportedExtension)
+        try container.encode(supportedControl, forKey: .supportedControl)
+        try container.encode(supportedFeatures, forKey: .supportedFeatures)
+        try container.encode(vendorName, forKey: .vendorName)
+        try container.encode(vendorVersion, forKey: .vendorVersion)
+    }
+    
+    required init(from decoder: Decoder) throws {
+        assertionFailure("LDAP record representation cannot initiated from encoded representation.")
+        throw LDAPAPIError.unsupportedRequest
+    }
+    
+    init(entryUUID: String, namingContexts: [String]?, subschemaSubentry: [String]?, supportedLDAPVersion: [String]?, supportedSASLMechanisms: [String]?, supportedExtension: [String]?, supportedControl: [String]?, supportedFeatures: [String]?, vendorName: [String]?, vendorVersion: [String]?) {
+        self.namingContexts = namingContexts
+        self.subschemaSubentry = subschemaSubentry
+        self.supportedLDAPVersion = supportedLDAPVersion
+        self.supportedSASLMechanisms = supportedSASLMechanisms
+        self.supportedExtension = supportedExtension
+        self.supportedControl = supportedControl
+        self.supportedFeatures = supportedFeatures
+        self.vendorName = vendorName
+        self.vendorVersion = vendorVersion
+        super.init(entryUUID: entryUUID)
+    }
 }
 
 /**
  LDAP domain is the root object of our LDAP realm, dn is something like "dc=easylogin,dc=proxy".
  */
 class LDAPDomainRecord: LDAPAbstractRecord {
+    // Record properties
     let dc: String
     
-    
     static let fieldUsedInDN: LDAPFeild = .dc
+    
+    static let instanceDomain: LDAPDomainRecord = {
+        var fieldsOfInstanceDomain = [LDAPDomainRecord]()
+        var index = 0
+        var lastDomain: LDAPDomainRecord? = nil
+        for domainDescription in LDAPGatewayAPIv1.baseDN().split(separator: ",").reversed() {
+            let domainInfo = domainDescription.split(separator: "=")
+            let previousDomain = lastDomain
+            lastDomain = LDAPDomainRecord(entryUUID: String(format: "10000000-0000-0000-0000-%012d", index), dc: String(domainInfo[1]))
+            if let previousDomain = previousDomain {
+                lastDomain?.privateParentContainer = previousDomain
+            }
+            index += 1
+        }
+        return lastDomain!
+    }()
+
+    // Record LDAP behavior that need to be overrided
+    override var objectClass: [String] {
+        get {
+            return ["domain", "top"]
+        }
+    }
     
     override var fieldUsedInDN: LDAPFeild {
         get {
@@ -499,31 +535,6 @@ class LDAPDomainRecord: LDAPAbstractRecord {
         get {
             return dc
         }
-    }
-    
-    enum LDAPDomainRecordCodingKeys: String, CodingKey {
-        case dc
-    }
-    
-    required init(from decoder: Decoder) throws {
-        let values = try decoder.container(keyedBy: LDAPDomainRecordCodingKeys.self)
-        dc = try values.decode(String.self, forKey: .dc)
-        try super.init(from: decoder)
-        privateObjectClass = ["domain", "top"]
-        privateHasSubordinates = "TRUE"
-    }
-    
-    override func encode(to encoder: Encoder) throws {
-        try super.encode(to: encoder)
-        var container = encoder.container(keyedBy: LDAPDomainRecordCodingKeys.self)
-        try container.encode(dc, forKey: .dc)
-    }
-    
-    init(entryUUID: String, dc: String) {
-        self.dc = dc
-        super.init(entryUUID: entryUUID)
-        privateObjectClass = ["domain", "top"]
-        privateHasSubordinates = "TRUE"
     }
     
     override func valuesForField(_ field:String) -> [String]? {
@@ -544,21 +555,26 @@ class LDAPDomainRecord: LDAPAbstractRecord {
         }
     }
     
-    static let instanceDomain: LDAPDomainRecord = {
-        var fieldsOfInstanceDomain = [LDAPDomainRecord]()
-        var index = 0
-        var lastDomain: LDAPDomainRecord? = nil
-        for domainDescription in LDAPGatewayAPIv1.baseDN().split(separator: ",").reversed() {
-            let domainInfo = domainDescription.split(separator: "=")
-            let previousDomain = lastDomain
-            lastDomain = LDAPDomainRecord(entryUUID: String(format: "10000000-0000-0000-0000-%012d", index), dc: String(domainInfo[1]))
-            if let previousDomain = previousDomain {
-                lastDomain?.privateParentContainer = previousDomain
-            }
-            index += 1
-        }
-        return lastDomain!
-    }()
+    // Record implementation
+    enum LDAPDomainRecordCodingKeys: String, CodingKey {
+        case dc
+    }
+    
+    required init(from decoder: Decoder) throws {
+        assertionFailure("LDAP record representation cannot initiated from encoded representation.")
+        throw LDAPAPIError.unsupportedRequest
+    }
+    
+    override func encode(to encoder: Encoder) throws {
+        try super.encode(to: encoder)
+        var container = encoder.container(keyedBy: LDAPDomainRecordCodingKeys.self)
+        try container.encode(dc, forKey: .dc)
+    }
+    
+    init(entryUUID: String, dc: String) {
+        self.dc = dc
+        super.init(entryUUID: entryUUID)
+    }
 }
 
 /**
@@ -567,10 +583,29 @@ class LDAPDomainRecord: LDAPAbstractRecord {
  to split groups and users.
  */
 class LDAPContainerRecord: LDAPAbstractRecord {
+    // Record properties
     let cn: String
     
-    
     static let fieldUsedInDN: LDAPFeild = .cn
+    
+    static let userContainer: LDAPContainerRecord = {
+        let container = LDAPContainerRecord(entryUUID: "20000000-0000-0000-0000-000000000001", cn: "users")
+        container.privateParentContainer = LDAPDomainRecord.instanceDomain
+        return container
+    }()
+    
+    static let groupContainer: LDAPContainerRecord = {
+        let container = LDAPContainerRecord(entryUUID: "20000000-0000-0000-0000-000000000002", cn: "groups")
+        container.privateParentContainer = LDAPDomainRecord.instanceDomain
+        return container
+    }()
+
+    // Record LDAP behavior that need to be overrided
+    override var objectClass: [String] {
+        get {
+            return ["container", "top"]
+        }
+    }
     
     override var fieldUsedInDN: LDAPFeild {
         get {
@@ -581,31 +616,6 @@ class LDAPContainerRecord: LDAPAbstractRecord {
         get {
             return cn
         }
-    }
-    
-    enum LDAPContainerRecordCodingKeys: String, CodingKey {
-        case cn
-    }
-    
-    required init(from decoder: Decoder) throws {
-        let values = try decoder.container(keyedBy: LDAPContainerRecordCodingKeys.self)
-        cn = try values.decode(String.self, forKey: .cn)
-        try super.init(from: decoder)
-        privateObjectClass = ["container", "top"]
-        privateHasSubordinates = "TRUE"
-    }
-    
-    override func encode(to encoder: Encoder) throws {
-        try super.encode(to: encoder)
-        var container = encoder.container(keyedBy: LDAPContainerRecordCodingKeys.self)
-        try container.encode(cn, forKey: .cn)
-    }
-    
-    init(entryUUID: String, cn: String) {
-        self.cn = cn
-        super.init(entryUUID: entryUUID)
-        privateObjectClass = ["container", "top"]
-        privateHasSubordinates = "TRUE"
     }
     
     override func valuesForField(_ field:String) -> [String]? {
@@ -626,17 +636,26 @@ class LDAPContainerRecord: LDAPAbstractRecord {
         }
     }
     
-    static let userContainer: LDAPContainerRecord = {
-        let container = LDAPContainerRecord(entryUUID: "20000000-0000-0000-0000-000000000001", cn: "users")
-        container.privateParentContainer = LDAPDomainRecord.instanceDomain
-        return container
-    }()
+    // Record implementation
+    enum LDAPContainerRecordCodingKeys: String, CodingKey {
+        case cn
+    }
     
-    static let groupContainer: LDAPContainerRecord = {
-        let container = LDAPContainerRecord(entryUUID: "20000000-0000-0000-0000-000000000002", cn: "groups")
-        container.privateParentContainer = LDAPDomainRecord.instanceDomain
-        return container
-    }()
+    required init(from decoder: Decoder) throws {
+        assertionFailure("LDAP record representation cannot initiated from encoded representation.")
+        throw LDAPAPIError.unsupportedRequest
+    }
+    
+    override func encode(to encoder: Encoder) throws {
+        try super.encode(to: encoder)
+        var container = encoder.container(keyedBy: LDAPContainerRecordCodingKeys.self)
+        try container.encode(cn, forKey: .cn)
+    }
+    
+    init(entryUUID: String, cn: String) {
+        self.cn = cn
+        super.init(entryUUID: entryUUID)
+    }
 }
 
 
@@ -645,6 +664,9 @@ class LDAPContainerRecord: LDAPAbstractRecord {
  and Encodable to LDAP Gateway JSON
  */
 class LDAPUserRecord: LDAPAbstractRecord {
+    let managedUser: ManagedUser
+    
+    // Record properties
     let uid: String
     let userPrincipalName: String
     let uidNumber: Int
@@ -654,7 +676,82 @@ class LDAPUserRecord: LDAPAbstractRecord {
     let sn: String?
     let cn: String?
     
+    lazy var memberOfByDN = try? managedUser.memberOf.map { (recordID) -> String in
+        let semaphore = DispatchSemaphore(value: 0)
+        var relatedUserGroup: ManagedUserGroup?
+        managedUser.dataProvider!.completeManagedObject(ofType: ManagedUserGroup.self, withUUID: recordID, completion: { (userGroup, error) in
+            relatedUserGroup = userGroup
+            semaphore.signal()
+        })
+        semaphore.wait()
+        
+        if let relatedUserGroup = relatedUserGroup {
+            return LDAPUserGroupRecord(managedUserGroup: relatedUserGroup).dn
+        } else {
+            throw LDAPAPIError.recordNotFound
+        }
+    }
+    
+    lazy var memberOfByShortname = try? managedUser.memberOf.map { (recordID) -> String in
+        let semaphore = DispatchSemaphore(value: 0)
+        var relatedUserGroup: ManagedUserGroup?
+        managedUser.dataProvider!.completeManagedObject(ofType: ManagedUserGroup.self, withUUID: recordID, completion: { (userGroup, error) in
+            relatedUserGroup = userGroup
+            semaphore.signal()
+        })
+        semaphore.wait()
+        
+        if let relatedUserGroup = relatedUserGroup {
+            return relatedUserGroup.shortname
+        } else {
+            throw LDAPAPIError.recordNotFound
+        }
+    }
+    
+    var flattenMemberOfByShortname: [String] {
+        get {
+            var flattenMemberOfByShortname = [String]()
+            
+            if let memberOfByShortname = self.memberOfByShortname {
+                flattenMemberOfByShortname += memberOfByShortname
+            }
+            
+            var inheritedMemberOfByShortname = [String]()
+            
+            for recordID in self.managedUser.memberOf {
+                let semaphore = DispatchSemaphore(value: 0)
+                var relatedUserGroup: ManagedUserGroup?
+                self.managedUser.dataProvider!.completeManagedObject(ofType: ManagedUserGroup.self, withUUID: recordID, completion: { (userGroup, error) in
+                    relatedUserGroup = userGroup
+                    semaphore.signal()
+                })
+                semaphore.wait()
+                
+                if let relatedUserGroup = relatedUserGroup {
+                    inheritedMemberOfByShortname += LDAPUserGroupRecord(managedUserGroup: relatedUserGroup).flattenMemberOfByShortname
+                }
+            }
+            
+            flattenMemberOfByShortname += inheritedMemberOfByShortname
+            
+            return flattenMemberOfByShortname
+        }
+    }
+    
     static let fieldUsedInDN: LDAPFeild = .entryUUID
+    
+    // Record LDAP behavior that need to be overrided
+    override var objectClass: [String] {
+        get {
+            return ["inetOrgPerson", "easylogin-user"]
+        }
+    }
+    
+    override var parentContainer: LDAPAbstractRecord? {
+        get {
+            return LDAPContainerRecord.userContainer
+        }
+    }
     
     override var fieldUsedInDN: LDAPFeild {
         get {
@@ -665,72 +762,6 @@ class LDAPUserRecord: LDAPAbstractRecord {
         get {
             return entryUUID
         }
-    }
-    
-    enum LDAPUserRecordCodingKeys: String, CodingKey {
-        case uidNumber
-        case uid
-        case userPrincipalName
-        case mail
-        case givenName
-        case sn
-        case cn
-    }
-    
-    required init(from decoder: Decoder) throws {
-        let values = try decoder.container(keyedBy: LDAPUserRecordCodingKeys.self)
-        
-        uidNumber = try values.decode(Int.self, forKey: .uidNumber)
-        uid = try values.decode(String.self, forKey: .uid)
-        userPrincipalName = try values.decode(String.self, forKey: .userPrincipalName)
-        
-        mail = try? values.decode(String.self, forKey: .mail)
-        givenName = try? values.decode(String.self, forKey: .givenName)
-        sn = try? values.decode(String.self, forKey: .sn)
-        cn = try? values.decode(String.self, forKey: .cn)
-        
-        try super.init(from: decoder)
-        privateObjectClass = ["inetOrgPerson", "posixAccount"]
-        privateParentContainer = LDAPContainerRecord.userContainer
-    }
-    
-    override func encode(to encoder: Encoder) throws {
-        try super.encode(to: encoder)
-        var container = encoder.container(keyedBy: LDAPUserRecordCodingKeys.self)
-        try container.encode(uidNumber, forKey: .uidNumber)
-        try container.encode(uid, forKey: .uid)
-        try container.encode(userPrincipalName, forKey: .userPrincipalName)
-        try container.encode(mail, forKey: .mail)
-        try container.encode(givenName, forKey: .givenName)
-        try container.encode(sn, forKey: .sn)
-        try container.encode(cn, forKey: .cn)
-    }
-    
-    init(entryUUID: String, uid: String, userPrincipalName: String, uidNumber: Int, mail: String?, givenName: String?, sn: String?, cn: String?) {
-        self.uid = uid
-        self.userPrincipalName = userPrincipalName
-        self.uidNumber = uidNumber
-        self.mail = mail
-        self.givenName = givenName
-        self.sn = sn
-        self.cn = cn
-        super.init(entryUUID: entryUUID)
-        privateObjectClass = ["inetOrgPerson", "posixAccount"]
-        privateParentContainer = LDAPContainerRecord.userContainer
-    }
-    
-    init(managedUser: ManagedUser) {
-        uid = managedUser.shortname
-        userPrincipalName = managedUser.principalName
-        uidNumber = managedUser.numericID
-        mail = managedUser.email
-        givenName = managedUser.givenName
-        sn = managedUser.surname
-        cn = managedUser.fullName
-        
-        super.init(managedObject: managedUser)
-        privateObjectClass = ["inetOrgPerson", "posixAccount"]
-        privateParentContainer = LDAPContainerRecord.userContainer
     }
     
     override func valuesForField(_ field:String) -> [String]? {
@@ -773,21 +804,406 @@ class LDAPUserRecord: LDAPAbstractRecord {
                 } else {
                     return nil
                 }
+                
+            case .memberOfByDN:
+                return memberOfByDN
+            case .memberOfByShortname:
+                return memberOfByShortname
+            case .flattenMemberOfByShortname:
+                return flattenMemberOfByShortname
             }
         } else {
             return super.valuesForField(field)
         }
     }
-}
 
-// MARK: Langage extension to save some time
-
-func iterateEnum<T: Hashable>(_: T.Type) -> AnyIterator<T> {
-    var i = 0
-    return AnyIterator {
-        let next = withUnsafeBytes(of: &i) { $0.load(as: T.self) }
-        if next.hashValue != i { return nil }
-        i += 1
-        return next
+    // Record implementation
+    enum LDAPUserRecordCodingKeys: String, CodingKey {
+        case uidNumber
+        case uid
+        case userPrincipalName
+        case mail
+        case givenName
+        case sn
+        case cn
+        case memberOfByDN
+        case memberOfByShortname
+        case flattenMemberOfByShortname
+    }
+    
+    required init(from decoder: Decoder) throws {
+        assertionFailure("LDAP record representation cannot initiated from encoded representation.")
+        throw LDAPAPIError.unsupportedRequest
+    }
+    
+    override func encode(to encoder: Encoder) throws {
+        try super.encode(to: encoder)
+        var container = encoder.container(keyedBy: LDAPUserRecordCodingKeys.self)
+        try container.encode(uidNumber, forKey: .uidNumber)
+        try container.encode(uid, forKey: .uid)
+        try container.encode(userPrincipalName, forKey: .userPrincipalName)
+        try container.encode(mail, forKey: .mail)
+        try container.encode(givenName, forKey: .givenName)
+        try container.encode(sn, forKey: .sn)
+        try container.encode(cn, forKey: .cn)
+        try container.encode(memberOfByDN, forKey: .memberOfByDN)
+        try container.encode(memberOfByShortname, forKey: .memberOfByShortname)
+        try container.encode(flattenMemberOfByShortname, forKey: .flattenMemberOfByShortname)
+    }
+    
+    init(managedUser: ManagedUser) {
+        self.managedUser = managedUser
+        
+        uid = managedUser.shortname
+        userPrincipalName = managedUser.principalName
+        uidNumber = managedUser.numericID
+        mail = managedUser.email
+        givenName = managedUser.givenName
+        sn = managedUser.surname
+        cn = managedUser.fullName
+        
+        super.init(managedObject: managedUser)
+        hasSubordinates = "FALSE"
     }
 }
+
+
+/**
+ LDAP usergroups are represented by this class. The class support Decodable from CouchDB JSON
+ and Encodable to LDAP Gateway JSON
+ */
+class LDAPUserGroupRecord: LDAPAbstractRecord {
+    let managedUserGroup: ManagedUserGroup
+    
+    // Record properties
+    let uid: String
+    let uidNumber: Int
+    
+    let mail: String?
+    let cn: String?
+    
+    lazy var nestedGroupsByDN = try? managedUserGroup.nestedGroups.map { (recordID) -> String in
+        let semaphore = DispatchSemaphore(value: 0)
+        var relatedUserGroup: ManagedUserGroup?
+        managedUserGroup.dataProvider!.completeManagedObject(ofType: ManagedUserGroup.self, withUUID: recordID, completion: { (userGroup, error) in
+            relatedUserGroup = userGroup
+            semaphore.signal()
+        })
+        semaphore.wait()
+        
+        if let relatedUserGroup = relatedUserGroup {
+            return LDAPUserGroupRecord(managedUserGroup: relatedUserGroup).dn
+        } else {
+            throw LDAPAPIError.recordNotFound
+        }
+    }
+
+    lazy var nestedGroupsByShortname = try? managedUserGroup.nestedGroups.map { (recordID) -> String in
+        let semaphore = DispatchSemaphore(value: 0)
+        var relatedUserGroup: ManagedUserGroup?
+        managedUserGroup.dataProvider!.completeManagedObject(ofType: ManagedUserGroup.self, withUUID: recordID, completion: { (userGroup, error) in
+            relatedUserGroup = userGroup
+            semaphore.signal()
+        })
+        semaphore.wait()
+        
+        if let relatedUserGroup = relatedUserGroup {
+            return relatedUserGroup.shortname
+        } else {
+            throw LDAPAPIError.recordNotFound
+        }
+    }
+
+    lazy var membersByDN = try? managedUserGroup.members.map { (recordID) -> String in
+        let semaphore = DispatchSemaphore(value: 0)
+        var relatedUser: ManagedUser?
+        managedUserGroup.dataProvider!.completeManagedObject(ofType: ManagedUser.self, withUUID: recordID, completion: { (user, error) in
+            relatedUser = user
+            semaphore.signal()
+        })
+        semaphore.wait()
+        
+        if let relatedUser = relatedUser {
+            return LDAPUserRecord(managedUser: relatedUser).dn
+        } else {
+            throw LDAPAPIError.recordNotFound
+        }
+    }
+
+    lazy var membersByShortname = try? managedUserGroup.members.map { (recordID) -> String in
+        let semaphore = DispatchSemaphore(value: 0)
+        var relatedUser: ManagedUser?
+        managedUserGroup.dataProvider!.completeManagedObject(ofType: ManagedUser.self, withUUID: recordID, completion: { (user, error) in
+            relatedUser = user
+            semaphore.signal()
+        })
+        semaphore.wait()
+        
+        if let relatedUser = relatedUser {
+            return relatedUser.shortname
+        } else {
+            throw LDAPAPIError.recordNotFound
+        }
+    }
+    
+    var flattenNestedGroupsByShortname: [String]  {
+        get {
+            var flattenNestedGroupsByShortname = [String]()
+            
+            if let nestedGroupsByShortname = self.nestedGroupsByShortname {
+                flattenNestedGroupsByShortname += nestedGroupsByShortname
+            }
+            
+            var inheritedNestedGroupsByShortname = [String]()
+            
+            for recordID in self.managedUserGroup.nestedGroups {
+                let semaphore = DispatchSemaphore(value: 0)
+                var relatedUserGroup: ManagedUserGroup?
+                self.managedUserGroup.dataProvider!.completeManagedObject(ofType: ManagedUserGroup.self, withUUID: recordID, completion: { (userGroup, error) in
+                    relatedUserGroup = userGroup
+                    semaphore.signal()
+                })
+                semaphore.wait()
+                
+                if let relatedUserGroup = relatedUserGroup {
+                    inheritedNestedGroupsByShortname += LDAPUserGroupRecord(managedUserGroup: relatedUserGroup).flattenNestedGroupsByShortname
+                }
+            }
+            
+            flattenNestedGroupsByShortname += inheritedNestedGroupsByShortname
+            
+            return flattenNestedGroupsByShortname
+        }
+    }
+    
+    var flattenMembersByShortname: [String] {
+        get {
+            var flattenMembersByShortname = [String]()
+            
+            if let membersByShortname = self.membersByShortname {
+                flattenMembersByShortname += membersByShortname
+            }
+            
+            var inheritedMembersByShortname = [String]()
+            
+            for recordID in self.managedUserGroup.nestedGroups {
+                let semaphore = DispatchSemaphore(value: 0)
+                var relatedUserGroup: ManagedUserGroup?
+                self.managedUserGroup.dataProvider!.completeManagedObject(ofType: ManagedUserGroup.self, withUUID: recordID, completion: { (userGroup, error) in
+                    relatedUserGroup = userGroup
+                    semaphore.signal()
+                })
+                semaphore.wait()
+                
+                if let relatedUserGroup = relatedUserGroup {
+                    inheritedMembersByShortname += LDAPUserGroupRecord(managedUserGroup: relatedUserGroup).flattenMembersByShortname
+                }
+            }
+            
+            flattenMembersByShortname += inheritedMembersByShortname
+            
+            return flattenMembersByShortname
+        }
+    }
+    
+    lazy var memberOfByDN = try? managedUserGroup.memberOf.map { (recordID) -> String in
+        let semaphore = DispatchSemaphore(value: 0)
+        var relatedUserGroup: ManagedUserGroup?
+        managedUserGroup.dataProvider!.completeManagedObject(ofType: ManagedUserGroup.self, withUUID: recordID, completion: { (userGroup, error) in
+            relatedUserGroup = userGroup
+            semaphore.signal()
+        })
+        semaphore.wait()
+        
+        if let relatedUserGroup = relatedUserGroup {
+            return LDAPUserGroupRecord(managedUserGroup: relatedUserGroup).dn
+        } else {
+            throw LDAPAPIError.recordNotFound
+        }
+    }
+    
+    lazy var memberOfByShortname = try? managedUserGroup.memberOf.map { (recordID) -> String in
+        let semaphore = DispatchSemaphore(value: 0)
+        var relatedUserGroup: ManagedUserGroup?
+        managedUserGroup.dataProvider!.completeManagedObject(ofType: ManagedUserGroup.self, withUUID: recordID, completion: { (userGroup, error) in
+            relatedUserGroup = userGroup
+            semaphore.signal()
+        })
+        semaphore.wait()
+        
+        if let relatedUserGroup = relatedUserGroup {
+            return relatedUserGroup.shortname
+        } else {
+            throw LDAPAPIError.recordNotFound
+        }
+    }
+    
+    var flattenMemberOfByShortname: [String] {
+        get {
+            var flattenMemberOfByShortname = [String]()
+            
+            if let memberOfByShortname = self.memberOfByShortname {
+                flattenMemberOfByShortname += memberOfByShortname
+            }
+            
+            var inheritedMemberOfByShortname = [String]()
+            
+            for recordID in self.managedUserGroup.memberOf {
+                let semaphore = DispatchSemaphore(value: 0)
+                var relatedUserGroup: ManagedUserGroup?
+                self.managedUserGroup.dataProvider!.completeManagedObject(ofType: ManagedUserGroup.self, withUUID: recordID, completion: { (userGroup, error) in
+                    relatedUserGroup = userGroup
+                    semaphore.signal()
+                })
+                semaphore.wait()
+                
+                if let relatedUserGroup = relatedUserGroup {
+                    inheritedMemberOfByShortname += LDAPUserGroupRecord(managedUserGroup: relatedUserGroup).flattenMemberOfByShortname
+                }
+            }
+            
+            flattenMemberOfByShortname += inheritedMemberOfByShortname
+            
+            return flattenMemberOfByShortname
+        }
+    }
+
+    
+    static let fieldUsedInDN: LDAPFeild = .entryUUID
+    
+    // Record LDAP behavior that need to be overrided
+    override var objectClass: [String] {
+        get {
+            return ["easylogin-group"]
+        }
+    }
+    
+    override var parentContainer: LDAPAbstractRecord? {
+        get {
+            return LDAPContainerRecord.groupContainer
+        }
+    }
+    
+    override var fieldUsedInDN: LDAPFeild {
+        get {
+            return .entryUUID
+        }
+    }
+    override var valueUsedInDN: String {
+        get {
+            return entryUUID
+        }
+    }
+    
+    override func valuesForField(_ field:String) -> [String]? {
+        var key: LDAPUserGroupRecordCodingKeys?
+        for k in iterateEnum(LDAPUserGroupRecordCodingKeys.self) {
+            if k.rawValue.lowercased() == field.lowercased() {
+                key = k
+                break
+            }
+        }
+        if let key = key {
+            switch key {
+            case .cn:
+                if let cn = cn {
+                    return [cn]
+                } else {
+                    return nil
+                }
+            case .uidNumber:
+                return [String(uidNumber)]
+            case .uid:
+                return [uid]
+            case .mail:
+                if let mail = mail {
+                    return [mail]
+                } else {
+                    return nil
+                }
+                
+            case .nestedGroupsByDN:
+                return nestedGroupsByDN
+            case .nestedGroupsByShortname:
+                return nestedGroupsByShortname
+                
+            case .membersByDN:
+                return membersByDN
+            case .membersByShortname:
+                return membersByShortname
+                
+            case .flattenNestedGroupsByShortname:
+                return flattenNestedGroupsByShortname
+            case .flattenMembersByShortname:
+                return flattenMembersByShortname
+                
+            case .memberOfByShortname:
+                return memberOfByShortname
+            case .flattenMemberOfByShortname:
+                return flattenMemberOfByShortname
+            }
+        } else {
+            return super.valuesForField(field)
+        }
+    }
+    
+    // Record implementation
+    enum LDAPUserGroupRecordCodingKeys: String, CodingKey {
+        case uidNumber
+        case uid
+        case mail
+        case cn
+        
+        case nestedGroupsByDN
+        case nestedGroupsByShortname
+        
+        case membersByDN
+        case membersByShortname
+        
+        case flattenNestedGroupsByShortname
+        case flattenMembersByShortname
+        
+        case memberOfByShortname
+        case flattenMemberOfByShortname
+    }
+    
+    required init(from decoder: Decoder) throws {
+        assertionFailure("LDAP record representation cannot initiated from encoded representation.")
+        throw LDAPAPIError.unsupportedRequest
+    }
+    
+    override func encode(to encoder: Encoder) throws {
+        try super.encode(to: encoder)
+        var container = encoder.container(keyedBy: LDAPUserGroupRecordCodingKeys.self)
+        try container.encode(uidNumber, forKey: .uidNumber)
+        try container.encode(uid, forKey: .uid)
+        try container.encode(mail, forKey: .mail)
+        try container.encode(cn, forKey: .cn)
+        
+        try container.encode(nestedGroupsByDN, forKey: .nestedGroupsByDN)
+        try container.encode(nestedGroupsByShortname, forKey: .nestedGroupsByShortname)
+        
+        try container.encode(membersByDN, forKey: .membersByDN)
+        try container.encode(membersByShortname, forKey: .membersByShortname)
+        
+        try container.encode(flattenNestedGroupsByShortname, forKey: .flattenNestedGroupsByShortname)
+        try container.encode(flattenMembersByShortname, forKey: .flattenMembersByShortname)
+        
+        try container.encode(memberOfByShortname, forKey: .memberOfByShortname)
+        try container.encode(flattenMemberOfByShortname, forKey: .flattenMemberOfByShortname)
+    }
+    
+    init(managedUserGroup: ManagedUserGroup) {
+        self.managedUserGroup = managedUserGroup
+        
+        uid = managedUserGroup.shortname
+        uidNumber = managedUserGroup.numericID
+        mail = managedUserGroup.email
+        cn = managedUserGroup.commonName
+        
+        super.init(managedObject: managedUserGroup)
+        hasSubordinates = "FALSE"
+    }
+}
+
+

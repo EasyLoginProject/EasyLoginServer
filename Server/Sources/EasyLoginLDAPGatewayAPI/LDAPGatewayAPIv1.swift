@@ -121,21 +121,51 @@ class LDAPGatewayAPIv1 {
                 next()
                 return
             } else {
-                // Search fo groups
-                response.status(.notImplemented)
-                next()
+                dataProvider.completeManagedObjects(ofType: ManagedUserGroup.self, completion: { (managedUserGroups, error) in
+                    guard let managedUserGroups = managedUserGroups else {
+                        response.status(.internalServerError)
+                        next()
+                        return
+                    }
+                    
+                    let groupsRecords = managedUserGroups.map({ (managedUserGroup) -> LDAPUserGroupRecord in
+                        return LDAPUserGroupRecord(managedUserGroup: managedUserGroup)
+                    })
+                    
+                    request.userInfo[CustomRequestKeys.availableRecords.rawValue] = groupsRecords
+                    next()
+                    return
+                })
                 return
             }
         default:
             // Find specific record
-            managedUserWith(usernameOrDN:searchRequest.baseObject) { (managedUser, error) in
-                guard let managedUser = managedUser else {
-                    response.status(.notFound)
+            if searchRequest.baseObject.hasSuffix(LDAPContainerRecord.userContainer.dn) {
+                managedUserWith(usernameOrDN:searchRequest.baseObject) { (managedUser, error) in
+                    guard let managedUser = managedUser else {
+                        response.status(.notFound)
+                        next()
+                        return
+                    }
+                    
+                    request.userInfo[CustomRequestKeys.availableRecords.rawValue] = [LDAPUserRecord(managedUser: managedUser)]
                     next()
                     return
                 }
-                
-                request.userInfo[CustomRequestKeys.availableRecords.rawValue] = [LDAPUserRecord(managedUser: managedUser)]
+            } else if searchRequest.baseObject.hasSuffix(LDAPContainerRecord.groupContainer.dn) {
+                managedUserGroupWith(recordIDOrDN: searchRequest.baseObject) { (managedUserGroup, error) in
+                    guard let managedUserGroup = managedUserGroup else {
+                        response.status(.notFound)
+                        next()
+                        return
+                    }
+                    
+                    request.userInfo[CustomRequestKeys.availableRecords.rawValue] = [LDAPUserGroupRecord(managedUserGroup: managedUserGroup)]
+                    next()
+                    return
+                }
+            } else {
+                response.status(.notImplemented)
                 next()
                 return
             }
@@ -264,6 +294,31 @@ class LDAPGatewayAPIv1 {
         } else {
             dataProvider.completeManagedUser(withLogin: usernameOrDN) { (managedUser, error) in
                 completion(managedUser, error)
+            }
+        }
+    }
+    
+    private func managedUserGroupWith(recordIDOrDN:String, completion: @escaping (ManagedUserGroup?, CombinedError?)->Void) {
+        // Find specific record
+        if let rangeOfUserDN = recordIDOrDN.range(of: ",\(LDAPContainerRecord.groupContainer.dn)") {
+            let recordInfo = recordIDOrDN.prefix(upTo: rangeOfUserDN.lowerBound).split(separator: "=")
+            if (recordInfo.count == 2) {
+                let recordField = String(recordInfo[0])
+                let recordUUID = String(recordInfo[1])
+                if (recordField == LDAPUserGroupRecord.fieldUsedInDN.rawValue) {
+                    dataProvider.completeManagedObject(ofType: ManagedUserGroup.self, withUUID: recordUUID, completion: { (managedUserGroup, error) in
+                        completion(managedUserGroup, error)
+                    })
+                } else {
+                    // Could be improved to support search by alternate field, some LDAP servers support this.
+                    completion(nil, .swiftError(LDAPGatewayError.dnFieldNotSupported))
+                }
+            } else {
+                completion(nil, .swiftError(LDAPGatewayError.invalidDNSyntax))
+            }
+        } else {
+            dataProvider.completeManagedObject(ofType: ManagedUserGroup.self, withUUID: recordIDOrDN) { (managedUserGroup, error) in
+                completion(managedUserGroup, error)
             }
         }
     }

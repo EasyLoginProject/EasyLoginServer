@@ -58,6 +58,7 @@ struct CouchDBViewResult<T: ManagedObject>: Codable {
     
     static func objectFromJSON(data jsonData:Data, withCodingStrategy strategy:ManagedObjectCodingStrategy) throws -> CouchDBViewResult<T> {
         let jsonDecoder = JSONDecoder()
+        jsonDecoder.dateDecodingStrategy = .iso8601
         jsonDecoder.userInfo[.managedObjectCodingStrategy] = strategy
         
         return try jsonDecoder.decode(self, from: jsonData)
@@ -84,8 +85,8 @@ struct CouchDBViewRow<T: ManagedObject>: Codable {
         
         if let codingStrategy = decoder.userInfo[.managedObjectCodingStrategy] as? ManagedObjectCodingStrategy,
             codingStrategy == .databaseEncoding,
-            let doc = try? container.decode(T.self, forKey: .doc) {
-            value = doc
+            container.contains(.doc) {
+            value = try container.decode(T.self, forKey: .doc)
         } else {
             value = try container.decode(T.self, forKey: .value)
         }

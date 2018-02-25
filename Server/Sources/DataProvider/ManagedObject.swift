@@ -25,7 +25,7 @@ public protocol MutableManagedObject {
 
 public class ManagedObject : Codable, Equatable, CustomDebugStringConvertible {
     public let uuid: ManagedObjectRecordID
-    public fileprivate(set) weak var dataProvider: DataProvider?
+    public internal(set) weak var dataProvider: DataProvider?
     public fileprivate(set) var created: Date
     public fileprivate(set) var modified: Date
     public fileprivate(set) var deleted: Bool

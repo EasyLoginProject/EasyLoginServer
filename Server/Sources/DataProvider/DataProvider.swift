@@ -198,6 +198,7 @@ public class DataProvider {
                     let viewResults = try jsonDecoder.decode(CouchDBViewResult<T>.self, from: jsonData)
                     
                     let managedObjects = viewResults.rows.map({ (couchDBView) -> T in
+                        couchDBView.value.dataProvider = self
                         return couchDBView.value
                     })
                     
@@ -225,6 +226,7 @@ public class DataProvider {
                     let viewResults = try jsonDecoder.decode(CouchDBViewResult<T>.self, from: jsonData)
                     
                     let managedObjects = viewResults.rows.map({ (couchDBView) -> T in
+                        couchDBView.value.dataProvider = self
                         return couchDBView.value
                     })
                     
