@@ -716,78 +716,92 @@ class LDAPUserRecord: LDAPAbstractRecord {
     let sn: String?
     let cn: String?
     
-    lazy var memberOfByDN = try? managedUser.memberOf.map { (recordID) -> String in
-        Log.info("Lazy loading of LDAPUserRecord.memberOfByDN, mapping \(recordID) ")
-        let semaphore = DispatchSemaphore(value: 0)
-        var relatedUserGroup: ManagedUserGroup?
-        
-        managedUser.dataProvider!.completeManagedObject(ofType: ManagedUserGroup.self, withUUID: recordID, completion: { (userGroup, error) in
-            Log.debug("Lazy loading got DB result")
-            relatedUserGroup = userGroup
-            semaphore.signal()
-        })
-        semaphore.wait()
-        
-        if let relatedUserGroup = relatedUserGroup {
-            Log.debug("Related group found")
-            return LDAPUserGroupRecord(managedUserGroup: relatedUserGroup).dn
-        } else {
-            Log.error("Related group not found")
-            throw LDAPAPIError.recordNotFound
+    lazy var memberOfByDN: [String]? = {
+        do {
+            return try managedUser.memberOf.map { (recordID) -> String in
+                Log.info("Lazy loading of LDAPUserRecord.memberOfByDN, mapping \(recordID) ")
+                let semaphore = DispatchSemaphore(value: 0)
+                var relatedUserGroup: ManagedUserGroup?
+                
+                managedUser.dataProvider!.completeManagedObject(ofType: ManagedUserGroup.self, withUUID: recordID, completion: { (userGroup, error) in
+                    Log.debug("Lazy loading got DB result")
+                    relatedUserGroup = userGroup
+                    semaphore.signal()
+                })
+                semaphore.wait()
+                
+                if let relatedUserGroup = relatedUserGroup {
+                    Log.debug("Related group found")
+                    return LDAPUserGroupRecord(managedUserGroup: relatedUserGroup).dn
+                } else {
+                    Log.error("Related group not found")
+                    throw LDAPAPIError.recordNotFound
+                }
+            }
+        } catch {
+            //TODO: YGI we need to define what to do when a related record isn't found. Is it group info who's incoherent or database who's out of service?
+            return nil
+        }
+    }()
+    
+    lazy var memberOfByShortname: [String]? = {
+        do {
+            return try managedUser.memberOf.map { (recordID) -> String in
+                Log.info("Lazy loading of LDAPUserRecord.memberOfByShortname, mapping \(recordID) ")
+                let semaphore = DispatchSemaphore(value: 0)
+                var relatedUserGroup: ManagedUserGroup?
+                managedUser.dataProvider!.completeManagedObject(ofType: ManagedUserGroup.self, withUUID: recordID, completion: { (userGroup, error) in
+                    Log.debug("Lazy loading got DB result")
+                    relatedUserGroup = userGroup
+                    semaphore.signal()
+                })
+                semaphore.wait()
+                
+                if let relatedUserGroup = relatedUserGroup {
+                    Log.debug("Related group found")
+                    return relatedUserGroup.shortname
+                } else {
+                    Log.error("Related group not found")
+                    throw LDAPAPIError.recordNotFound
+                }
+            }
+        } catch {
+            //TODO: YGI we need to define what to do when a related record isn't found. Is it group info who's incoherent or database who's out of service?
+            return nil
+        }
+    }()
+    
+    var flattenMemberOfByShortname: [String] {
+        get {
+            Log.info("Computing LDAPUserRecord.flattenMemberOfByShortname")
+            var flattenMemberOfByShortname = [String]()
+            
+            if let memberOfByShortname = self.memberOfByShortname {
+                flattenMemberOfByShortname += memberOfByShortname
+            }
+            
+            var inheritedMemberOfByShortname = [String]()
+            
+            for recordID in self.managedUser.memberOf {
+                let semaphore = DispatchSemaphore(value: 0)
+                var relatedUserGroup: ManagedUserGroup?
+                self.managedUser.dataProvider!.completeManagedObject(ofType: ManagedUserGroup.self, withUUID: recordID, completion: { (userGroup, error) in
+                    Log.debug("Computing got DB result")
+                    relatedUserGroup = userGroup
+                    semaphore.signal()
+                })
+                semaphore.wait()
+                
+                if let relatedUserGroup = relatedUserGroup {
+                    inheritedMemberOfByShortname += LDAPUserGroupRecord(managedUserGroup: relatedUserGroup).flattenMemberOfByShortname
+                }
+            }
+            
+            flattenMemberOfByShortname += inheritedMemberOfByShortname
+            
+            return flattenMemberOfByShortname
         }
     }
-    
-    lazy var memberOfByShortname = try? managedUser.memberOf.map { (recordID) -> String in
-        Log.info("Lazy loading of LDAPUserRecord.memberOfByShortname, mapping \(recordID) ")
-        let semaphore = DispatchSemaphore(value: 0)
-        var relatedUserGroup: ManagedUserGroup?
-        managedUser.dataProvider!.completeManagedObject(ofType: ManagedUserGroup.self, withUUID: recordID, completion: { (userGroup, error) in
-            Log.debug("Lazy loading got DB result")
-            relatedUserGroup = userGroup
-            semaphore.signal()
-        })
-        semaphore.wait()
-        
-        if let relatedUserGroup = relatedUserGroup {
-            Log.debug("Related group found")
-            return relatedUserGroup.shortname
-        } else {
-            Log.error("Related group not found")
-            throw LDAPAPIError.recordNotFound
-        }
-    }
-    
-//    var flattenMemberOfByShortname: [String] {
-//        get {
-//            Log.info("Computing LDAPUserRecord.flattenMemberOfByShortname")
-//            var flattenMemberOfByShortname = [String]()
-//
-//            if let memberOfByShortname = self.memberOfByShortname {
-//                flattenMemberOfByShortname += memberOfByShortname
-//            }
-//
-//            var inheritedMemberOfByShortname = [String]()
-//
-//            for recordID in self.managedUser.memberOf {
-//                let semaphore = DispatchSemaphore(value: 0)
-//                var relatedUserGroup: ManagedUserGroup?
-//                self.managedUser.dataProvider!.completeManagedObject(ofType: ManagedUserGroup.self, withUUID: recordID, completion: { (userGroup, error) in
-//                    Log.debug("Computing got DB result")
-//                    relatedUserGroup = userGroup
-//                    semaphore.signal()
-//                })
-//                semaphore.wait()
-//
-//                if let relatedUserGroup = relatedUserGroup {
-//                    inheritedMemberOfByShortname += LDAPUserGroupRecord(managedUserGroup: relatedUserGroup).flattenMemberOfByShortname
-//                }
-//            }
-//
-//            flattenMemberOfByShortname += inheritedMemberOfByShortname
-//
-//            return flattenMemberOfByShortname
-//        }
-//    }
     
     static let fieldUsedInDN: LDAPFeild = .entryUUID
     
@@ -862,8 +876,8 @@ class LDAPUserRecord: LDAPAbstractRecord {
             case .memberOfByShortname:
                 return memberOfByShortname
                 
-//            case .flattenMemberOfByShortname:
-//                return flattenMemberOfByShortname
+            case .flattenMemberOfByShortname:
+                return flattenMemberOfByShortname
             }
         } else {
             Log.debug("Unsuported key at LDAPUserRecord level, trying ancestor")
@@ -882,7 +896,7 @@ class LDAPUserRecord: LDAPAbstractRecord {
         case cn
         case memberOfByDN
         case memberOfByShortname
-//        case flattenMemberOfByShortname
+        case flattenMemberOfByShortname
     }
     
     required init(from decoder: Decoder) throws {
@@ -903,7 +917,7 @@ class LDAPUserRecord: LDAPAbstractRecord {
         try container.encode(cn, forKey: .cn)
         try container.encode(memberOfByDN, forKey: .memberOfByDN)
         try container.encode(memberOfByShortname, forKey: .memberOfByShortname)
-//        try container.encode(flattenMemberOfByShortname, forKey: .flattenMemberOfByShortname)
+        try container.encode(flattenMemberOfByShortname, forKey: .flattenMemberOfByShortname)
     }
     
     init(managedUser: ManagedUser) {
@@ -938,221 +952,263 @@ class LDAPUserGroupRecord: LDAPAbstractRecord {
     let mail: String?
     let cn: String?
     
-    lazy var nestedGroupsByDN = try? managedUserGroup.nestedGroups.map { (recordID) -> String in
-        Log.info("Lazy loading of LDAPUserGroupRecord.nestedGroupsByDN, mapping \(recordID) ")
-        let semaphore = DispatchSemaphore(value: 0)
-        var relatedUserGroup: ManagedUserGroup?
-        managedUserGroup.dataProvider!.completeManagedObject(ofType: ManagedUserGroup.self, withUUID: recordID, completion: { (userGroup, error) in
-            Log.debug("Lazy loading got DB result")
-            relatedUserGroup = userGroup
-            semaphore.signal()
-        })
-        semaphore.wait()
-        
-        if let relatedUserGroup = relatedUserGroup {
-            Log.debug("Related group found")
-            return LDAPUserGroupRecord(managedUserGroup: relatedUserGroup).dn
-        } else {
-            Log.error("Related group not found")
-            throw LDAPAPIError.recordNotFound
+    lazy var nestedGroupsByDN: [String]? = {
+        do {
+            return try managedUserGroup.nestedGroups.map { (recordID) -> String in
+                Log.info("Lazy loading of LDAPUserGroupRecord.nestedGroupsByDN, mapping \(recordID) ")
+                let semaphore = DispatchSemaphore(value: 0)
+                var relatedUserGroup: ManagedUserGroup?
+                managedUserGroup.dataProvider!.completeManagedObject(ofType: ManagedUserGroup.self, withUUID: recordID, completion: { (userGroup, error) in
+                    Log.debug("Lazy loading got DB result")
+                    relatedUserGroup = userGroup
+                    semaphore.signal()
+                })
+                semaphore.wait()
+                
+                if let relatedUserGroup = relatedUserGroup {
+                    Log.debug("Related group found")
+                    return LDAPUserGroupRecord(managedUserGroup: relatedUserGroup).dn
+                } else {
+                    Log.error("Related group not found")
+                    throw LDAPAPIError.recordNotFound
+                }
+            }
+        } catch {
+            //TODO: YGI we need to define what to do when a related record isn't found. Is it group info who's incoherent or database who's out of service?
+            return nil
+        }
+    }()
+    
+    lazy var nestedGroupsByShortname: [String]? = {
+        do {
+            return try managedUserGroup.nestedGroups.map { (recordID) -> String in
+                Log.info("Lazy loading of LDAPUserGroupRecord.nestedGroupsByShortname, mapping \(recordID) ")
+                let semaphore = DispatchSemaphore(value: 0)
+                var relatedUserGroup: ManagedUserGroup?
+                managedUserGroup.dataProvider!.completeManagedObject(ofType: ManagedUserGroup.self, withUUID: recordID, completion: { (userGroup, error) in
+                    Log.debug("Lazy loading got DB result")
+                    relatedUserGroup = userGroup
+                    semaphore.signal()
+                })
+                semaphore.wait()
+                
+                if let relatedUserGroup = relatedUserGroup {
+                    Log.debug("Related group found")
+                    return relatedUserGroup.shortname
+                } else {
+                    Log.error("Related group not found")
+                    throw LDAPAPIError.recordNotFound
+                }
+            }
+        } catch {
+            //TODO: YGI we need to define what to do when a related record isn't found. Is it group info who's incoherent or database who's out of service?
+            return nil
+        }
+    }()
+    
+    lazy var membersByDN: [String]? = {
+        do {
+            return try managedUserGroup.members.map { (recordID) -> String in
+                Log.info("Lazy loading of LDAPUserGroupRecord.membersByDN, mapping \(recordID) ")
+                let semaphore = DispatchSemaphore(value: 0)
+                var relatedUser: ManagedUser?
+                managedUserGroup.dataProvider!.completeManagedObject(ofType: ManagedUser.self, withUUID: recordID, completion: { (user, error) in
+                    Log.debug("Lazy loading got DB result")
+                    relatedUser = user
+                    semaphore.signal()
+                })
+                semaphore.wait()
+                
+                if let relatedUser = relatedUser {
+                    Log.debug("Related user found")
+                    return LDAPUserRecord(managedUser: relatedUser).dn
+                } else {
+                    Log.error("Related user not found")
+                    throw LDAPAPIError.recordNotFound
+                }
+            }
+        } catch {
+            //TODO: YGI we need to define what to do when a related record isn't found. Is it group info who's incoherent or database who's out of service?
+            return nil
+        }
+    }()
+    
+    lazy var membersByShortname: [String]? = {
+        do {
+            return try managedUserGroup.members.map { (recordID) -> String in
+                Log.info("Lazy loading of LDAPUserGroupRecord.membersByShortname, mapping \(recordID) ")
+                let semaphore = DispatchSemaphore(value: 0)
+                var relatedUser: ManagedUser?
+                managedUserGroup.dataProvider!.completeManagedObject(ofType: ManagedUser.self, withUUID: recordID, completion: { (user, error) in
+                    Log.debug("Lazy loading got DB result")
+                    relatedUser = user
+                    semaphore.signal()
+                })
+                semaphore.wait()
+                
+                if let relatedUser = relatedUser {
+                    Log.debug("Related user found")
+                    return relatedUser.shortname
+                } else {
+                    Log.error("Related user not found")
+                    throw LDAPAPIError.recordNotFound
+                }
+            }
+        } catch {
+            //TODO: YGI we need to define what to do when a related record isn't found. Is it group info who's incoherent or database who's out of service?
+            return nil
+        }
+    }()
+    
+    lazy var memberOfByDN: [String]? = {
+        do {
+            return try managedUserGroup.memberOf.map { (recordID) -> String in
+                Log.info("Lazy loading of LDAPUserGroupRecord.memberOfByDN, mapping \(recordID) ")
+                let semaphore = DispatchSemaphore(value: 0)
+                var relatedUserGroup: ManagedUserGroup?
+                managedUserGroup.dataProvider!.completeManagedObject(ofType: ManagedUserGroup.self, withUUID: recordID, completion: { (userGroup, error) in
+                    Log.debug("Lazy loading got DB result")
+                    relatedUserGroup = userGroup
+                    semaphore.signal()
+                })
+                semaphore.wait()
+                
+                if let relatedUserGroup = relatedUserGroup {
+                    Log.debug("Related group found")
+                    return LDAPUserGroupRecord(managedUserGroup: relatedUserGroup).dn
+                } else {
+                    Log.error("Related group not found")
+                    throw LDAPAPIError.recordNotFound
+                }
+            }
+        } catch {
+            //TODO: YGI we need to define what to do when a related record isn't found. Is it group info who's incoherent or database who's out of service?
+            return nil
+        }
+    }()
+    
+    lazy var memberOfByShortname: [String]? = {
+        do {
+            return try managedUserGroup.memberOf.map { (recordID) -> String in
+                Log.info("Lazy loading of LDAPUserGroupRecord.memberOfByShortname, mapping \(recordID) ")
+                let semaphore = DispatchSemaphore(value: 0)
+                var relatedUserGroup: ManagedUserGroup?
+                managedUserGroup.dataProvider!.completeManagedObject(ofType: ManagedUserGroup.self, withUUID: recordID, completion: { (userGroup, error) in
+                    Log.debug("Lazy loading got DB result")
+                    relatedUserGroup = userGroup
+                    semaphore.signal()
+                })
+                semaphore.wait()
+                
+                if let relatedUserGroup = relatedUserGroup {
+                    Log.debug("Related group found")
+                    return relatedUserGroup.shortname
+                } else {
+                    Log.error("Related group not found")
+                    throw LDAPAPIError.recordNotFound
+                }
+            }
+        } catch {
+            //TODO: YGI we need to define what to do when a related record isn't found. Is it group info who's incoherent or database who's out of service?
+            return nil
+        }
+    }()
+    
+    var flattenNestedGroupsByShortname: [String]  {
+        get {
+            Log.info("Computing LDAPUserGroupRecord.flattenNestedGroupsByShortname")
+            var flattenNestedGroupsByShortname = [String]()
+            
+            if let nestedGroupsByShortname = self.nestedGroupsByShortname {
+                flattenNestedGroupsByShortname += nestedGroupsByShortname
+            }
+            
+            var inheritedNestedGroupsByShortname = [String]()
+            
+            for recordID in self.managedUserGroup.nestedGroups {
+                let semaphore = DispatchSemaphore(value: 0)
+                var relatedUserGroup: ManagedUserGroup?
+                self.managedUserGroup.dataProvider!.completeManagedObject(ofType: ManagedUserGroup.self, withUUID: recordID, completion: { (userGroup, error) in
+                    Log.debug("Computing got DB result")
+                    relatedUserGroup = userGroup
+                    semaphore.signal()
+                })
+                semaphore.wait()
+                
+                if let relatedUserGroup = relatedUserGroup {
+                    inheritedNestedGroupsByShortname += LDAPUserGroupRecord(managedUserGroup: relatedUserGroup).flattenNestedGroupsByShortname
+                }
+            }
+            
+            flattenNestedGroupsByShortname += inheritedNestedGroupsByShortname
+            
+            return flattenNestedGroupsByShortname
         }
     }
     
-    lazy var nestedGroupsByShortname = try? managedUserGroup.nestedGroups.map { (recordID) -> String in
-        Log.info("Lazy loading of LDAPUserGroupRecord.nestedGroupsByShortname, mapping \(recordID) ")
-        let semaphore = DispatchSemaphore(value: 0)
-        var relatedUserGroup: ManagedUserGroup?
-        managedUserGroup.dataProvider!.completeManagedObject(ofType: ManagedUserGroup.self, withUUID: recordID, completion: { (userGroup, error) in
-            Log.debug("Lazy loading got DB result")
-            relatedUserGroup = userGroup
-            semaphore.signal()
-        })
-        semaphore.wait()
-        
-        if let relatedUserGroup = relatedUserGroup {
-            Log.debug("Related group found")
-            return relatedUserGroup.shortname
-        } else {
-            Log.error("Related group not found")
-            throw LDAPAPIError.recordNotFound
+    var flattenMembersByShortname: [String] {
+        get {
+            Log.info("Computing LDAPUserGroupRecord.flattenMembersByShortname")
+            var flattenMembersByShortname = [String]()
+            
+            if let membersByShortname = self.membersByShortname {
+                flattenMembersByShortname += membersByShortname
+            }
+            
+            var inheritedMembersByShortname = [String]()
+            
+            for recordID in self.managedUserGroup.nestedGroups {
+                let semaphore = DispatchSemaphore(value: 0)
+                var relatedUserGroup: ManagedUserGroup?
+                self.managedUserGroup.dataProvider!.completeManagedObject(ofType: ManagedUserGroup.self, withUUID: recordID, completion: { (userGroup, error) in
+                    Log.debug("Computing got DB result")
+                    relatedUserGroup = userGroup
+                    semaphore.signal()
+                })
+                semaphore.wait()
+                
+                if let relatedUserGroup = relatedUserGroup {
+                    inheritedMembersByShortname += LDAPUserGroupRecord(managedUserGroup: relatedUserGroup).flattenMembersByShortname
+                }
+            }
+            
+            flattenMembersByShortname += inheritedMembersByShortname
+            
+            return flattenMembersByShortname
         }
     }
     
-    lazy var membersByDN = try? managedUserGroup.members.map { (recordID) -> String in
-        Log.info("Lazy loading of LDAPUserGroupRecord.membersByDN, mapping \(recordID) ")
-        let semaphore = DispatchSemaphore(value: 0)
-        var relatedUser: ManagedUser?
-        managedUserGroup.dataProvider!.completeManagedObject(ofType: ManagedUser.self, withUUID: recordID, completion: { (user, error) in
-            Log.debug("Lazy loading got DB result")
-            relatedUser = user
-            semaphore.signal()
-        })
-        semaphore.wait()
-        
-        if let relatedUser = relatedUser {
-            Log.debug("Related user found")
-            return LDAPUserRecord(managedUser: relatedUser).dn
-        } else {
-            Log.error("Related user not found")
-            throw LDAPAPIError.recordNotFound
+    var flattenMemberOfByShortname: [String] {
+        get {
+            Log.info("Computing LDAPUserGroupRecord.flattenMemberOfByShortname")
+            var flattenMemberOfByShortname = [String]()
+            
+            if let memberOfByShortname = self.memberOfByShortname {
+                flattenMemberOfByShortname += memberOfByShortname
+            }
+            
+            var inheritedMemberOfByShortname = [String]()
+            
+            for recordID in self.managedUserGroup.memberOf {
+                let semaphore = DispatchSemaphore(value: 0)
+                var relatedUserGroup: ManagedUserGroup?
+                self.managedUserGroup.dataProvider!.completeManagedObject(ofType: ManagedUserGroup.self, withUUID: recordID, completion: { (userGroup, error) in
+                    Log.debug("Computing got DB result")
+                    relatedUserGroup = userGroup
+                    semaphore.signal()
+                })
+                semaphore.wait()
+                
+                if let relatedUserGroup = relatedUserGroup {
+                    inheritedMemberOfByShortname += LDAPUserGroupRecord(managedUserGroup: relatedUserGroup).flattenMemberOfByShortname
+                }
+            }
+            
+            flattenMemberOfByShortname += inheritedMemberOfByShortname
+            
+            return flattenMemberOfByShortname
         }
     }
-    
-    lazy var membersByShortname = try? managedUserGroup.members.map { (recordID) -> String in
-        Log.info("Lazy loading of LDAPUserGroupRecord.membersByShortname, mapping \(recordID) ")
-        let semaphore = DispatchSemaphore(value: 0)
-        var relatedUser: ManagedUser?
-        managedUserGroup.dataProvider!.completeManagedObject(ofType: ManagedUser.self, withUUID: recordID, completion: { (user, error) in
-            Log.debug("Lazy loading got DB result")
-            relatedUser = user
-            semaphore.signal()
-        })
-        semaphore.wait()
-        
-        if let relatedUser = relatedUser {
-            Log.debug("Related user found")
-            return relatedUser.shortname
-        } else {
-            Log.error("Related user not found")
-            throw LDAPAPIError.recordNotFound
-        }
-    }
-    
-    lazy var memberOfByDN = try? managedUserGroup.memberOf.map { (recordID) -> String in
-        Log.info("Lazy loading of LDAPUserGroupRecord.memberOfByDN, mapping \(recordID) ")
-        let semaphore = DispatchSemaphore(value: 0)
-        var relatedUserGroup: ManagedUserGroup?
-        managedUserGroup.dataProvider!.completeManagedObject(ofType: ManagedUserGroup.self, withUUID: recordID, completion: { (userGroup, error) in
-            Log.debug("Lazy loading got DB result")
-            relatedUserGroup = userGroup
-            semaphore.signal()
-        })
-        semaphore.wait()
-        
-        if let relatedUserGroup = relatedUserGroup {
-            Log.debug("Related group found")
-            return LDAPUserGroupRecord(managedUserGroup: relatedUserGroup).dn
-        } else {
-            Log.error("Related group not found")
-            throw LDAPAPIError.recordNotFound
-        }
-    }
-    
-    lazy var memberOfByShortname = try? managedUserGroup.memberOf.map { (recordID) -> String in
-        Log.info("Lazy loading of LDAPUserGroupRecord.memberOfByShortname, mapping \(recordID) ")
-        let semaphore = DispatchSemaphore(value: 0)
-        var relatedUserGroup: ManagedUserGroup?
-        managedUserGroup.dataProvider!.completeManagedObject(ofType: ManagedUserGroup.self, withUUID: recordID, completion: { (userGroup, error) in
-            Log.debug("Lazy loading got DB result")
-            relatedUserGroup = userGroup
-            semaphore.signal()
-        })
-        semaphore.wait()
-        
-        if let relatedUserGroup = relatedUserGroup {
-            Log.debug("Related group found")
-            return relatedUserGroup.shortname
-        } else {
-            Log.error("Related group not found")
-            throw LDAPAPIError.recordNotFound
-        }
-    }
-    
-//    var flattenNestedGroupsByShortname: [String]  {
-//        get {
-//            Log.info("Computing LDAPUserGroupRecord.flattenNestedGroupsByShortname")
-//            var flattenNestedGroupsByShortname = [String]()
-//
-//            if let nestedGroupsByShortname = self.nestedGroupsByShortname {
-//                flattenNestedGroupsByShortname += nestedGroupsByShortname
-//            }
-//
-//            var inheritedNestedGroupsByShortname = [String]()
-//
-//            for recordID in self.managedUserGroup.nestedGroups {
-//                let semaphore = DispatchSemaphore(value: 0)
-//                var relatedUserGroup: ManagedUserGroup?
-//                self.managedUserGroup.dataProvider!.completeManagedObject(ofType: ManagedUserGroup.self, withUUID: recordID, completion: { (userGroup, error) in
-//                    Log.debug("Computing got DB result")
-//                    relatedUserGroup = userGroup
-//                    semaphore.signal()
-//                })
-//                semaphore.wait()
-//
-//                if let relatedUserGroup = relatedUserGroup {
-//                    inheritedNestedGroupsByShortname += LDAPUserGroupRecord(managedUserGroup: relatedUserGroup).flattenNestedGroupsByShortname
-//                }
-//            }
-//
-//            flattenNestedGroupsByShortname += inheritedNestedGroupsByShortname
-//
-//            return flattenNestedGroupsByShortname
-//        }
-//    }
-//
-//    var flattenMembersByShortname: [String] {
-//        get {
-//            Log.info("Computing LDAPUserGroupRecord.flattenMembersByShortname")
-//            var flattenMembersByShortname = [String]()
-//
-//            if let membersByShortname = self.membersByShortname {
-//                flattenMembersByShortname += membersByShortname
-//            }
-//
-//            var inheritedMembersByShortname = [String]()
-//
-//            for recordID in self.managedUserGroup.nestedGroups {
-//                let semaphore = DispatchSemaphore(value: 0)
-//                var relatedUserGroup: ManagedUserGroup?
-//                self.managedUserGroup.dataProvider!.completeManagedObject(ofType: ManagedUserGroup.self, withUUID: recordID, completion: { (userGroup, error) in
-//                    Log.debug("Computing got DB result")
-//                    relatedUserGroup = userGroup
-//                    semaphore.signal()
-//                })
-//                semaphore.wait()
-//
-//                if let relatedUserGroup = relatedUserGroup {
-//                    inheritedMembersByShortname += LDAPUserGroupRecord(managedUserGroup: relatedUserGroup).flattenMembersByShortname
-//                }
-//            }
-//
-//            flattenMembersByShortname += inheritedMembersByShortname
-//
-//            return flattenMembersByShortname
-//        }
-//    }
-//
-//    var flattenMemberOfByShortname: [String] {
-//        get {
-//            Log.info("Computing LDAPUserGroupRecord.flattenMemberOfByShortname")
-//            var flattenMemberOfByShortname = [String]()
-//
-//            if let memberOfByShortname = self.memberOfByShortname {
-//                flattenMemberOfByShortname += memberOfByShortname
-//            }
-//
-//            var inheritedMemberOfByShortname = [String]()
-//
-//            for recordID in self.managedUserGroup.memberOf {
-//                let semaphore = DispatchSemaphore(value: 0)
-//                var relatedUserGroup: ManagedUserGroup?
-//                self.managedUserGroup.dataProvider!.completeManagedObject(ofType: ManagedUserGroup.self, withUUID: recordID, completion: { (userGroup, error) in
-//                    Log.debug("Computing got DB result")
-//                    relatedUserGroup = userGroup
-//                    semaphore.signal()
-//                })
-//                semaphore.wait()
-//
-//                if let relatedUserGroup = relatedUserGroup {
-//                    inheritedMemberOfByShortname += LDAPUserGroupRecord(managedUserGroup: relatedUserGroup).flattenMemberOfByShortname
-//                }
-//            }
-//
-//            flattenMemberOfByShortname += inheritedMemberOfByShortname
-//
-//            return flattenMemberOfByShortname
-//        }
-//    }
     
     static let fieldUsedInDN: LDAPFeild = .entryUUID
     
@@ -1220,12 +1276,12 @@ class LDAPUserGroupRecord: LDAPAbstractRecord {
             case .memberOfByShortname:
                 return memberOfByShortname
                 
-//            case .flattenNestedGroupsByShortname:
-//                return flattenNestedGroupsByShortname
-//            case .flattenMembersByShortname:
-//                return flattenMembersByShortname
-//            case .flattenMemberOfByShortname:
-//                return flattenMemberOfByShortname
+            case .flattenNestedGroupsByShortname:
+                return flattenNestedGroupsByShortname
+            case .flattenMembersByShortname:
+                return flattenMembersByShortname
+            case .flattenMemberOfByShortname:
+                return flattenMemberOfByShortname
             }
         } else {
             Log.debug("Unsuported key at LDAPUserGroupRecord level, trying ancestor")
@@ -1247,9 +1303,9 @@ class LDAPUserGroupRecord: LDAPAbstractRecord {
         case membersByShortname
         case memberOfByShortname
         
-//        case flattenNestedGroupsByShortname
-//        case flattenMembersByShortname
-//        case flattenMemberOfByShortname
+        case flattenNestedGroupsByShortname
+        case flattenMembersByShortname
+        case flattenMemberOfByShortname
     }
     
     required init(from decoder: Decoder) throws {
@@ -1273,9 +1329,9 @@ class LDAPUserGroupRecord: LDAPAbstractRecord {
         try container.encode(membersByShortname, forKey: .membersByShortname)
         try container.encode(memberOfByShortname, forKey: .memberOfByShortname)
         
-//        try container.encode(flattenNestedGroupsByShortname, forKey: .flattenNestedGroupsByShortname)
-//        try container.encode(flattenMembersByShortname, forKey: .flattenMembersByShortname)
-//        try container.encode(flattenMemberOfByShortname, forKey: .flattenMemberOfByShortname)
+        try container.encode(flattenNestedGroupsByShortname, forKey: .flattenNestedGroupsByShortname)
+        try container.encode(flattenMembersByShortname, forKey: .flattenMembersByShortname)
+        try container.encode(flattenMemberOfByShortname, forKey: .flattenMemberOfByShortname)
     }
     
     init(managedUserGroup: ManagedUserGroup) {
