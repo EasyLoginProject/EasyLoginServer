@@ -979,10 +979,10 @@ class LDAPUserGroupRecord: LDAPAbstractRecord {
         }
     }()
     
-    lazy var nestedGroupsByShortname: [String]? = {
+    lazy var nestedGroupByShortname: [String]? = {
         do {
             return try managedUserGroup.nestedGroups.map { (recordID) -> String in
-                Log.info("Lazy loading of LDAPUserGroupRecord.nestedGroupsByShortname, mapping \(recordID) ")
+                Log.info("Lazy loading of LDAPUserGroupRecord.nestedGroupByShortname, mapping \(recordID) ")
                 let semaphore = DispatchSemaphore(value: 0)
                 var relatedUserGroup: ManagedUserGroup?
                 managedUserGroup.dataProvider!.completeManagedObject(ofType: ManagedUserGroup.self, withUUID: recordID, completion: { (userGroup, error) in
@@ -1006,10 +1006,10 @@ class LDAPUserGroupRecord: LDAPAbstractRecord {
         }
     }()
     
-    lazy var membersByDN: [String]? = {
+    lazy var memberByDN: [String]? = {
         do {
             return try managedUserGroup.members.map { (recordID) -> String in
-                Log.info("Lazy loading of LDAPUserGroupRecord.membersByDN, mapping \(recordID) ")
+                Log.info("Lazy loading of LDAPUserGroupRecord.memberByDN, mapping \(recordID) ")
                 let semaphore = DispatchSemaphore(value: 0)
                 var relatedUser: ManagedUser?
                 managedUserGroup.dataProvider!.completeManagedObject(ofType: ManagedUser.self, withUUID: recordID, completion: { (user, error) in
@@ -1033,10 +1033,10 @@ class LDAPUserGroupRecord: LDAPAbstractRecord {
         }
     }()
     
-    lazy var membersByShortname: [String]? = {
+    lazy var memberByShortname: [String]? = {
         do {
             return try managedUserGroup.members.map { (recordID) -> String in
-                Log.info("Lazy loading of LDAPUserGroupRecord.membersByShortname, mapping \(recordID) ")
+                Log.info("Lazy loading of LDAPUserGroupRecord.memberByShortname, mapping \(recordID) ")
                 let semaphore = DispatchSemaphore(value: 0)
                 var relatedUser: ManagedUser?
                 managedUserGroup.dataProvider!.completeManagedObject(ofType: ManagedUser.self, withUUID: recordID, completion: { (user, error) in
@@ -1114,16 +1114,16 @@ class LDAPUserGroupRecord: LDAPAbstractRecord {
         }
     }()
     
-    var flattenNestedGroupsByShortname: [String]  {
+    var flattenNestedGroupByShortname: [String]  {
         get {
-            Log.info("Computing LDAPUserGroupRecord.flattenNestedGroupsByShortname")
-            var flattenNestedGroupsByShortname = [String]()
+            Log.info("Computing LDAPUserGroupRecord.flattenNestedGroupByShortname")
+            var flattenNestedGroupByShortname = [String]()
             
-            if let nestedGroupsByShortname = self.nestedGroupsByShortname {
-                flattenNestedGroupsByShortname += nestedGroupsByShortname
+            if let nestedGroupByShortname = self.nestedGroupByShortname {
+                flattenNestedGroupByShortname += nestedGroupByShortname
             }
             
-            var inheritedNestedGroupsByShortname = [String]()
+            var inheritedNestedGroupByShortname = [String]()
             
             for recordID in self.managedUserGroup.nestedGroups {
                 let semaphore = DispatchSemaphore(value: 0)
@@ -1136,26 +1136,26 @@ class LDAPUserGroupRecord: LDAPAbstractRecord {
                 semaphore.wait()
                 
                 if let relatedUserGroup = relatedUserGroup {
-                    inheritedNestedGroupsByShortname += LDAPUserGroupRecord(managedUserGroup: relatedUserGroup).flattenNestedGroupsByShortname
+                    inheritedNestedGroupByShortname += LDAPUserGroupRecord(managedUserGroup: relatedUserGroup).flattenNestedGroupByShortname
                 }
             }
             
-            flattenNestedGroupsByShortname += inheritedNestedGroupsByShortname
+            flattenNestedGroupByShortname += inheritedNestedGroupByShortname
             
-            return flattenNestedGroupsByShortname
+            return flattenNestedGroupByShortname
         }
     }
     
-    var flattenMembersByShortname: [String] {
+    var flattenMemberByShortname: [String] {
         get {
-            Log.info("Computing LDAPUserGroupRecord.flattenMembersByShortname")
-            var flattenMembersByShortname = [String]()
+            Log.info("Computing LDAPUserGroupRecord.flattenMemberByShortname")
+            var flattenMemberByShortname = [String]()
             
-            if let membersByShortname = self.membersByShortname {
-                flattenMembersByShortname += membersByShortname
+            if let memberByShortname = self.memberByShortname {
+                flattenMemberByShortname += memberByShortname
             }
             
-            var inheritedMembersByShortname = [String]()
+            var inheritedMemberByShortname = [String]()
             
             for recordID in self.managedUserGroup.nestedGroups {
                 let semaphore = DispatchSemaphore(value: 0)
@@ -1168,13 +1168,13 @@ class LDAPUserGroupRecord: LDAPAbstractRecord {
                 semaphore.wait()
                 
                 if let relatedUserGroup = relatedUserGroup {
-                    inheritedMembersByShortname += LDAPUserGroupRecord(managedUserGroup: relatedUserGroup).flattenMembersByShortname
+                    inheritedMemberByShortname += LDAPUserGroupRecord(managedUserGroup: relatedUserGroup).flattenMemberByShortname
                 }
             }
             
-            flattenMembersByShortname += inheritedMembersByShortname
+            flattenMemberByShortname += inheritedMemberByShortname
             
-            return flattenMembersByShortname
+            return flattenMemberByShortname
         }
     }
     
@@ -1266,20 +1266,20 @@ class LDAPUserGroupRecord: LDAPAbstractRecord {
                 
             case .nestedGroupsByDN:
                 return nestedGroupsByDN
-            case .nestedGroupsByShortname:
-                return nestedGroupsByShortname
+            case .nestedGroupByShortname:
+                return nestedGroupByShortname
                 
-            case .membersByDN:
-                return membersByDN
-            case .membersByShortname:
-                return membersByShortname
+            case .memberByDN:
+                return memberByDN
+            case .memberByShortname:
+                return memberByShortname
             case .memberOfByShortname:
                 return memberOfByShortname
                 
-            case .flattenNestedGroupsByShortname:
-                return flattenNestedGroupsByShortname
-            case .flattenMembersByShortname:
-                return flattenMembersByShortname
+            case .flattenNestedGroupByShortname:
+                return flattenNestedGroupByShortname
+            case .flattenMemberByShortname:
+                return flattenMemberByShortname
             case .flattenMemberOfByShortname:
                 return flattenMemberOfByShortname
             }
@@ -1297,14 +1297,14 @@ class LDAPUserGroupRecord: LDAPAbstractRecord {
         case cn
         
         case nestedGroupsByDN
-        case nestedGroupsByShortname
+        case nestedGroupByShortname
         
-        case membersByDN
-        case membersByShortname
+        case memberByDN
+        case memberByShortname
         case memberOfByShortname
         
-        case flattenNestedGroupsByShortname
-        case flattenMembersByShortname
+        case flattenNestedGroupByShortname
+        case flattenMemberByShortname
         case flattenMemberOfByShortname
     }
     
@@ -1323,14 +1323,14 @@ class LDAPUserGroupRecord: LDAPAbstractRecord {
         try container.encode(cn, forKey: .cn)
         
         try container.encode(nestedGroupsByDN, forKey: .nestedGroupsByDN)
-        try container.encode(nestedGroupsByShortname, forKey: .nestedGroupsByShortname)
+        try container.encode(nestedGroupByShortname, forKey: .nestedGroupByShortname)
         
-        try container.encode(membersByDN, forKey: .membersByDN)
-        try container.encode(membersByShortname, forKey: .membersByShortname)
+        try container.encode(memberByDN, forKey: .memberByDN)
+        try container.encode(memberByShortname, forKey: .memberByShortname)
         try container.encode(memberOfByShortname, forKey: .memberOfByShortname)
         
-        try container.encode(flattenNestedGroupsByShortname, forKey: .flattenNestedGroupsByShortname)
-        try container.encode(flattenMembersByShortname, forKey: .flattenMembersByShortname)
+        try container.encode(flattenNestedGroupByShortname, forKey: .flattenNestedGroupByShortname)
+        try container.encode(flattenMemberByShortname, forKey: .flattenMemberByShortname)
         try container.encode(flattenMemberOfByShortname, forKey: .flattenMemberOfByShortname)
     }
     
