@@ -56,6 +56,7 @@ public class PersistentCounter {
     }
     
     private func readValue(completion: @escaping (ReadResult) -> Void) -> Void {
+        Log.debug("Reading presistent counter \(documentID) from CouchDB")
         database.retrieve(documentID) { (document, error) in
             if let error = error {
                 if error.domain == "CouchDBDomain" && error.code == HTTPStatusCode.notFound.rawValue {
@@ -86,12 +87,14 @@ public class PersistentCounter {
     }
     
     private func updateDocument(_ document: JSON, revision: String, completion: @escaping (Bool) -> Void) -> Void {
+        Log.debug("Updating presistent counter \(documentID) into CouchDB")
         database.update(documentID, rev: revision, document: document) { (revision, updatedDocument, error) in
             completion(updatedDocument != nil)
         }
     }
     
     private func createDocument(_ document: JSON, completion: @escaping (Bool) -> Void) -> Void {
+        Log.debug("Creating presistent counter \(documentID) into CouchDB")
         database.create(document) { (id, revision, createdDocument, error) in
             completion(createdDocument != nil)
         }

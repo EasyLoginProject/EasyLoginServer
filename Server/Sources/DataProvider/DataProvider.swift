@@ -45,6 +45,7 @@ public class DataProvider {
     // MARK: Database SPI
     
     private func jsonData(forRecordWithID recordID: ManagedObjectRecordID, completion: @escaping (Data?, NSError?) -> Void) {
+        Log.debug("Retrieving record \(recordID) from CouchDB")
         database.retrieve(recordID, callback: { (document: JSON?, error: NSError?) in
             guard let document = document else {
                 completion(nil, error)
@@ -57,6 +58,7 @@ public class DataProvider {
     }
     
     private func jsonData(fromView view:String, ofDesign design:String, usingParameters params: [Database.QueryParameters], completion: @escaping (Data?, NSError?) -> Void) {
+        Log.debug("Requesting view \(design) / \(view) from CouchDB")
         database.queryByView(view, ofDesign: design, usingParameters:params) { (databaseResponse, error) in
             guard let databaseResponse = databaseResponse else {
                 completion(nil, error)
@@ -69,6 +71,7 @@ public class DataProvider {
     }
     
     private func update(recordID: ManagedObjectRecordID, atRev rev:String, with jsonData:Data, completion: @escaping (String?, Data?, NSError?) -> Void) {
+        Log.debug("Updating record \(recordID) into CouchDB")
         let document = JSON(data:jsonData)
         database.update(recordID, rev: rev, document: document) { (rev, updatedDocument, error) in
             if let updatedDocument = updatedDocument {
@@ -81,6 +84,7 @@ public class DataProvider {
     }
     
     private func create(recordWithJSONData jsonData:Data, completion: @escaping (Data?, NSError?) -> Void) {
+        Log.debug("Creating record into CouchDB")
         let document = JSON(data:jsonData)
         database.create(document) { (id, revision, document, error) in
             if let document = document {
