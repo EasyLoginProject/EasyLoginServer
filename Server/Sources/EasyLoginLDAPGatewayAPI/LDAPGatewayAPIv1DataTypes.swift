@@ -65,8 +65,17 @@ class LDAPFilter: Codable {
         let substrings: [[String:String]]
     }
     
+    struct LDAPFilterExtensibleMatch: Codable {
+        let matchingRule: String? // if none, it's an equality match
+        let dnAttributes: Int? // if not 0, dn fiels must be checked too
+        let matchValue: String
+        let type: String
+    }
+    
     let equalityMatch: LDAPFilterSettingEqualityMatch?
     let substrings: LDAPFilterSettingSubstring?
+    
+    let extensibleMatch: LDAPFilterExtensibleMatch?
     
     let and: [LDAPFilter]?
     let or: [LDAPFilter]?
@@ -77,6 +86,7 @@ class LDAPFilter: Codable {
     enum RepresentedFilterNode {
         case equalityMatch
         case substrings
+        case extensibleMatch
         case and
         case or
         case not
@@ -100,6 +110,8 @@ class LDAPFilter: Codable {
         } else if let _ = substrings {
             return .substrings
             
+        } else if let _ = extensibleMatch {
+            return .extensibleMatch
         } else if let _ = and {
             return .and
             
@@ -236,6 +248,67 @@ class LDAPFilter: Codable {
                     }
                     return false
                 })
+            }
+            
+        case .extensibleMatch:
+            Log.info("Extensible match")
+            if let extensibleMatchFilter = extensibleMatch {
+                Log.info("Checking extensible match requested")
+                if let matchingRule = extensibleMatchFilter.matchingRule {
+                    Log.verbose("Matching rule \(matchingRule) selected")
+                } else {
+                    Log.verbose("No matching rule selected")
+                    return records.filter({ (recordToCheck) -> Bool in
+                        var dnFields: [String:[String]]?
+                        
+                        if let checkDN = extensibleMatchFilter.dnAttributes, checkDN != 0 {
+                            Log.verbose("DN check requested")
+                            var dnFieldsInProgress = [String:[String]]()
+                            
+                            for keyAndValue in recordToCheck.dn.split(separator: ",") {
+                                Log.debug("Spliting DN into key values table")
+                                let keyValue = keyAndValue.split(separator: "=")
+                                let key = String(keyValue[0])
+                                let value = String(keyValue[1])
+                                if keyValue.count == 2 {
+                                    if !dnFieldsInProgress.keys.contains(key) {
+                                        dnFieldsInProgress[key] = [String]()
+                                    }
+                                    if let currentValues = dnFieldsInProgress[key] {
+                                        Log.debug("Existing value for \(key) found, appending new one")
+                                        dnFieldsInProgress[key] = currentValues + [value]
+                                    } else {
+                                        dnFieldsInProgress[key] = [value]
+                                    }
+                                } else {
+                                    Log.error("Impossible to decode DN")
+                                }
+                            }
+                            
+                            dnFields = dnFieldsInProgress
+                        }
+                        
+                        if let testedValues = recordToCheck.valuesForField(extensibleMatchFilter.type) {
+                            Log.info("Testing regular keys")
+                            for testedValue in testedValues {
+                                if testedValue.lowercased() == extensibleMatchFilter.matchValue.lowercased() {
+                                    return true
+                                }
+                            }
+                        }
+                        
+                        if let dnFields = dnFields, let dnValues = dnFields[extensibleMatchFilter.type] {
+                            Log.info("Testing DN keys")
+                            for dnValue in dnValues {
+                                if dnValue == extensibleMatchFilter.matchValue {
+                                    return true
+                                }
+                            }
+                        }
+                        
+                        return false
+                    })
+                }
             }
             
         case .present:
