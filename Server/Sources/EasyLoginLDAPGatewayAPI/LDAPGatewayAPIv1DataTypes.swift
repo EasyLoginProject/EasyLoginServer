@@ -256,6 +256,48 @@ class LDAPFilter: Codable {
                 Log.info("Checking extensible match requested")
                 if let matchingRule = extensibleMatchFilter.matchingRule {
                     Log.verbose("Matching rule \(matchingRule) selected")
+                    
+                    if matchingRule == "1.2.840.113556.1.4.1941" {
+                        /*
+                         From https://msdn.microsoft.com/en-us/library/aa746475(v=vs.85).aspx
+
+                         This rule is limited to filters that apply to the DN. This is a special "extended" match operator that walks the chain of ancestry in objects all the way to the root until it finds a match.
+
+                         The LDAP_MATCHING_RULE_IN_CHAIN is a matching rule OID that is designed to provide a method to look up the ancestry of an object.
+                         Many applications using AD and AD LDS usually work with hierarchical data, which is ordered by parent-child relationships.
+                         Previously, applications performed transitive group expansion to figure out group membership, which used too much network bandwidth;
+                         applications needed to make multiple roundtrips to figure out if an object fell "in the chain" if a link is traversed through to the end.
+                         */
+                        
+                        var fieldToTest: String?
+                        
+                        switch extensibleMatchFilter.type.lowercased() {
+                        case "memberofbydn":
+                            fieldToTest = "flattenMemberOfByDN"
+                        default:
+                            fieldToTest = nil
+                        }
+                        
+                        if let fieldToTest = fieldToTest {
+                            return records.filter({ (recordToCheck) -> Bool in
+                                if let testedValues = recordToCheck.valuesForField(fieldToTest) {
+                                    for testedValue in testedValues {
+                                        if testedValue.lowercased() == extensibleMatchFilter.matchValue.lowercased() {
+                                            return true
+                                        }
+                                    }
+                                }
+                                return false
+                            })
+                        } else {
+                            Log.error("Unsupported field to test \(String(describing:fieldToTest))")
+                            return nil
+                        }
+                    } else {
+                        Log.error("Unsupported extended matching rule \(matchingRule)")
+                        return nil
+                    }
+                    
                 } else {
                     Log.verbose("No matching rule selected")
                     return records.filter({ (recordToCheck) -> Bool in
@@ -876,6 +918,38 @@ class LDAPUserRecord: LDAPAbstractRecord {
         }
     }
     
+    var flattenMemberOfByDN: [String] {
+        get {
+            Log.info("Computing LDAPUserRecord.flattenMemberOfByDN")
+            var flattenMemberOfByDN = [String]()
+            
+            if let memberOfByDN = self.memberOfByDN {
+                flattenMemberOfByDN += memberOfByDN
+            }
+            
+            var inheritedMemberOfByDN = [String]()
+            
+            for recordID in self.managedUser.memberOf {
+                let semaphore = DispatchSemaphore(value: 0)
+                var relatedUserGroup: ManagedUserGroup?
+                self.managedUser.dataProvider!.completeManagedObject(ofType: ManagedUserGroup.self, withUUID: recordID, completion: { (userGroup, error) in
+                    Log.debug("Computing got DB result")
+                    relatedUserGroup = userGroup
+                    semaphore.signal()
+                })
+                semaphore.wait()
+                
+                if let relatedUserGroup = relatedUserGroup {
+                    inheritedMemberOfByDN += LDAPUserGroupRecord(managedUserGroup: relatedUserGroup).flattenMemberOfByDN
+                }
+            }
+            
+            flattenMemberOfByDN += inheritedMemberOfByDN
+            
+            return flattenMemberOfByDN
+        }
+    }
+    
     static let fieldUsedInDN: LDAPFeild = .entryUUID
     
     // Record LDAP behavior that need to be overrided
@@ -951,6 +1025,8 @@ class LDAPUserRecord: LDAPAbstractRecord {
                 
             case .flattenMemberOfByShortname:
                 return flattenMemberOfByShortname
+            case .flattenMemberOfByDN:
+                return flattenMemberOfByDN
             }
         } else {
             Log.debug("Unsuported key at LDAPUserRecord level, trying ancestor")
@@ -970,6 +1046,7 @@ class LDAPUserRecord: LDAPAbstractRecord {
         case memberOfByDN
         case memberOfByShortname
         case flattenMemberOfByShortname
+        case flattenMemberOfByDN
     }
     
     required init(from decoder: Decoder) throws {
@@ -991,6 +1068,7 @@ class LDAPUserRecord: LDAPAbstractRecord {
         try container.encode(memberOfByDN, forKey: .memberOfByDN)
         try container.encode(memberOfByShortname, forKey: .memberOfByShortname)
         try container.encode(flattenMemberOfByShortname, forKey: .flattenMemberOfByShortname)
+        try container.encode(flattenMemberOfByDN, forKey: .flattenMemberOfByDN)
     }
     
     init(managedUser: ManagedUser) {
@@ -1283,6 +1361,38 @@ class LDAPUserGroupRecord: LDAPAbstractRecord {
         }
     }
     
+    var flattenMemberOfByDN: [String] {
+        get {
+            Log.info("Computing LDAPUserGroupRecord.flattenMemberOfByDN")
+            var flattenMemberOfByDN = [String]()
+            
+            if let memberOfByDN = self.memberOfByDN {
+                flattenMemberOfByDN += memberOfByDN
+            }
+            
+            var inheritedMemberOfByDN = [String]()
+            
+            for recordID in self.managedUserGroup.memberOf {
+                let semaphore = DispatchSemaphore(value: 0)
+                var relatedUserGroup: ManagedUserGroup?
+                self.managedUserGroup.dataProvider!.completeManagedObject(ofType: ManagedUserGroup.self, withUUID: recordID, completion: { (userGroup, error) in
+                    Log.debug("Computing got DB result")
+                    relatedUserGroup = userGroup
+                    semaphore.signal()
+                })
+                semaphore.wait()
+                
+                if let relatedUserGroup = relatedUserGroup {
+                    inheritedMemberOfByDN += LDAPUserGroupRecord(managedUserGroup: relatedUserGroup).flattenMemberOfByDN
+                }
+            }
+            
+            flattenMemberOfByDN += inheritedMemberOfByDN
+            
+            return flattenMemberOfByDN
+        }
+    }
+    
     static let fieldUsedInDN: LDAPFeild = .entryUUID
     
     // Record LDAP behavior that need to be overrided
@@ -1355,6 +1465,8 @@ class LDAPUserGroupRecord: LDAPAbstractRecord {
                 return flattenMemberByShortname
             case .flattenMemberOfByShortname:
                 return flattenMemberOfByShortname
+            case .flattenMemberOfByDN:
+                return flattenMemberOfByDN
             }
         } else {
             Log.debug("Unsuported key at LDAPUserGroupRecord level, trying ancestor")
@@ -1379,6 +1491,7 @@ class LDAPUserGroupRecord: LDAPAbstractRecord {
         case flattenNestedGroupByShortname
         case flattenMemberByShortname
         case flattenMemberOfByShortname
+        case flattenMemberOfByDN
     }
     
     required init(from decoder: Decoder) throws {
@@ -1405,6 +1518,7 @@ class LDAPUserGroupRecord: LDAPAbstractRecord {
         try container.encode(flattenNestedGroupByShortname, forKey: .flattenNestedGroupByShortname)
         try container.encode(flattenMemberByShortname, forKey: .flattenMemberByShortname)
         try container.encode(flattenMemberOfByShortname, forKey: .flattenMemberOfByShortname)
+        try container.encode(flattenMemberOfByDN, forKey: .flattenMemberOfByDN)
     }
     
     init(managedUserGroup: ManagedUserGroup) {
