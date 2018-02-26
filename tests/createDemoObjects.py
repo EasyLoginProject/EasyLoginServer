@@ -12,10 +12,14 @@ import httplib
 import json
 import sys
 import time
+import ssl
 
 class JSONClient:
-	def __init__(self, host, port):
-		self.connection = httplib.HTTPConnection(host, port)
+	def __init__(self, host, port, usessl):
+		if usessl == 1:
+			self.connection = httplib.HTTPSConnection(host, port, context=ssl._create_unverified_context())
+		else:
+			self.connection = httplib.HTTPConnection(host, port)
 	
 	def get(self, path):
 		self.connection.request('GET', path)
@@ -43,8 +47,8 @@ class JSONClient:
 
 
 class EasyLoginClient:
-	def __init__(self, host, port):
-		self.connection = JSONClient(host, port)
+	def __init__(self, host, port, usessl):
+		self.connection = JSONClient(host, port, usessl)
 	
 	
 	def user_generate_(self, givenName, surname, fullName, shortname, principalName, email):
@@ -129,11 +133,14 @@ class EasyLoginClient:
 def main(args):
 	host = "localhost"
 	port = 8080
+	usessl = 0
 	if len(args) > 1:
 		host = args[1]
 		if len(args) > 2:
 			port = int(args[2])
-	c = EasyLoginClient(host, port)
+			if len(args) > 3:
+				usessl = int(args[3])
+	c = EasyLoginClient(host, port, usessl)
 	
 	am_acou = c.user_create("Adriana", "Ocampo", "Adriana C. Ocampo Uria", "acou", "acou@am.storymaker.fr", "a.ocampo@storymaker.fr")
 	am_akb = c.user_create("Anna", "Behrensmeyer", "Anna K. Behrensmeyer", "akb", "akb@am.storymaker.fr", "a.behrensmeyer@storymaker.fr")
