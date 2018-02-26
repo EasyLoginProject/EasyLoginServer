@@ -101,6 +101,47 @@ class LDAPGatewayAPIv1 {
                 request.userInfo[CustomRequestKeys.availableRecords.rawValue] = [LDAPContainerRecord.userContainer, LDAPContainerRecord.groupContainer]
                 next()
                 return
+            } else if searchRequest.scope == 2 {
+                Log.verbose("Directory transversal lookup, should be avoided as much as possible")
+                Log.verbose("Starting by users")
+                dataProvider.completeManagedObjects(ofType: ManagedUser.self, completion: { (managedUsers, error) in
+                    guard let managedUsers = managedUsers else {
+                        Log.error("No users found")
+                        response.status(.internalServerError)
+                        next()
+                        return
+                    }
+                    
+                    Log.verbose("Translating managed users into ldap users")
+                    let userRecords = managedUsers.map({ (managedUser) -> LDAPUserRecord in
+                        return LDAPUserRecord(managedUser: managedUser)
+                    })
+                    
+                    Log.verbose("Then looking for groups")
+                    self.dataProvider.completeManagedObjects(ofType: ManagedUserGroup.self, completion: { (managedUserGroups, error) in
+                        guard let managedUserGroups = managedUserGroups else {
+                            Log.error("No groups found")
+                            response.status(.internalServerError)
+                            next()
+                            return
+                        }
+                        
+                        Log.verbose("Translating managed groups info ldap groups")
+                        let groupsRecords = managedUserGroups.map({ (managedUserGroup) -> LDAPUserGroupRecord in
+                            return LDAPUserGroupRecord(managedUserGroup: managedUserGroup)
+                        })
+                        
+                        let allRecords: [LDAPAbstractRecord] = groupsRecords as [LDAPAbstractRecord] + userRecords as [LDAPAbstractRecord]
+                        request.userInfo[CustomRequestKeys.availableRecords.rawValue] = allRecords
+                        next()
+                        return
+                    })
+
+                    return
+                })
+                
+                return
+
             }
             Log.error("Directory transversal request from domain instance is forbidden")
             response.status(.unauthorized)
