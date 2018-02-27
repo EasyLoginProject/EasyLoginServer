@@ -1225,10 +1225,10 @@ class LDAPUserGroupRecord: LDAPAbstractRecord {
     let mail: String?
     let cn: String?
     
-    lazy var nestedGroupsByDN: [String]? = {
+    lazy var nestedGroupByDN: [String]? = {
         do {
             return try managedUserGroup.nestedGroups.map { (recordID) -> String in
-                Log.info("Lazy loading of LDAPUserGroupRecord.nestedGroupsByDN, mapping \(recordID) ")
+                Log.info("Lazy loading of LDAPUserGroupRecord.nestedGroupByDN, mapping \(recordID) ")
                 let semaphore = DispatchSemaphore(value: 0)
                 var relatedUserGroup: ManagedUserGroup?
                 managedUserGroup.dataProvider!.completeManagedObject(ofType: ManagedUserGroup.self, withUUID: recordID, completion: { (userGroup, error) in
@@ -1279,10 +1279,10 @@ class LDAPUserGroupRecord: LDAPAbstractRecord {
         }
     }()
     
-    lazy var memberByDN: [String]? = {
+    lazy var userMemberByDN: [String]? = {
         do {
             return try managedUserGroup.members.map { (recordID) -> String in
-                Log.info("Lazy loading of LDAPUserGroupRecord.memberByDN, mapping \(recordID) ")
+                Log.info("Lazy loading of LDAPUserGroupRecord.userMemberByDN, mapping \(recordID) ")
                 let semaphore = DispatchSemaphore(value: 0)
                 var relatedUser: ManagedUser?
                 managedUserGroup.dataProvider!.completeManagedObject(ofType: ManagedUser.self, withUUID: recordID, completion: { (user, error) in
@@ -1306,10 +1306,23 @@ class LDAPUserGroupRecord: LDAPAbstractRecord {
         }
     }()
     
-    lazy var memberByShortname: [String]? = {
+    lazy var mixedMemberByDN: [String]? = {
+        Log.info("Lazy loading of LDAPUserGroupRecord.mixedMemberByDN")
+        var mixedMemberByDN = [String]()
+        
+        if let userMemberByDN = self.userMemberByDN {
+            mixedMemberByDN += userMemberByDN
+        }
+        if let nestedGroupByDN = self.nestedGroupByDN {
+            mixedMemberByDN += nestedGroupByDN
+        }
+        return mixedMemberByDN
+    }()
+    
+    lazy var userMemberByShortname: [String]? = {
         do {
             return try managedUserGroup.members.map { (recordID) -> String in
-                Log.info("Lazy loading of LDAPUserGroupRecord.memberByShortname, mapping \(recordID) ")
+                Log.info("Lazy loading of LDAPUserGroupRecord.userMemberByShortname, mapping \(recordID) ")
                 let semaphore = DispatchSemaphore(value: 0)
                 var relatedUser: ManagedUser?
                 managedUserGroup.dataProvider!.completeManagedObject(ofType: ManagedUser.self, withUUID: recordID, completion: { (user, error) in
@@ -1424,8 +1437,8 @@ class LDAPUserGroupRecord: LDAPAbstractRecord {
             Log.info("Computing LDAPUserGroupRecord.flattenMemberByShortname")
             var flattenMemberByShortname = [String]()
             
-            if let memberByShortname = self.memberByShortname {
-                flattenMemberByShortname += memberByShortname
+            if let userMemberByShortname = self.userMemberByShortname {
+                flattenMemberByShortname += userMemberByShortname
             }
             
             var inheritedMemberByShortname = [String]()
@@ -1569,15 +1582,17 @@ class LDAPUserGroupRecord: LDAPAbstractRecord {
                     return nil
                 }
                 
-            case .nestedGroupsByDN:
-                return nestedGroupsByDN
+            case .nestedGroupByDN:
+                return nestedGroupByDN
             case .nestedGroupByShortname:
                 return nestedGroupByShortname
                 
-            case .memberByDN:
-                return memberByDN
-            case .memberByShortname:
-                return memberByShortname
+            case .userMemberByDN:
+                return userMemberByDN
+            case .userMemberByShortname:
+                return userMemberByShortname
+            case .mixedMemberByDN:
+                return mixedMemberByDN
             case .memberOfByShortname:
                 return memberOfByShortname
                 
@@ -1631,11 +1646,12 @@ class LDAPUserGroupRecord: LDAPAbstractRecord {
         case mail
         case cn
         
-        case nestedGroupsByDN
+        case nestedGroupByDN
         case nestedGroupByShortname
         
-        case memberByDN
-        case memberByShortname
+        case userMemberByDN
+        case userMemberByShortname
+        case mixedMemberByDN
         case memberOfByShortname
         
         case flattenNestedGroupByShortname
@@ -1658,11 +1674,12 @@ class LDAPUserGroupRecord: LDAPAbstractRecord {
         try container.encode(mail, forKey: .mail)
         try container.encode(cn, forKey: .cn)
         
-        try container.encode(nestedGroupsByDN, forKey: .nestedGroupsByDN)
+        try container.encode(nestedGroupByDN, forKey: .nestedGroupByDN)
         try container.encode(nestedGroupByShortname, forKey: .nestedGroupByShortname)
         
-        try container.encode(memberByDN, forKey: .memberByDN)
-        try container.encode(memberByShortname, forKey: .memberByShortname)
+        try container.encode(userMemberByDN, forKey: .userMemberByDN)
+        try container.encode(userMemberByShortname, forKey: .userMemberByShortname)
+        try container.encode(mixedMemberByDN, forKey: .mixedMemberByDN)
         try container.encode(memberOfByShortname, forKey: .memberOfByShortname)
         
         try container.encode(flattenNestedGroupByShortname, forKey: .flattenNestedGroupByShortname)
