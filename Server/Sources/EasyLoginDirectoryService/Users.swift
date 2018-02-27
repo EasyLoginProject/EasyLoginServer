@@ -223,7 +223,7 @@ class Users {
         defer { next() }
         self.dataProvider.managedObjects(ofType: ManagedUser.self) {
             list, error in
-            if let list = list, let jsonData = try? self.viewFormatter.summaryAsJSONData(list) {
+            if let list = list, let jsonData = try? self.viewFormatter.summaryAsJSONData(list, withRootKey:"users") {
                 response.send(data: jsonData)
                 response.headers.setType("json")
                 response.status(.OK)

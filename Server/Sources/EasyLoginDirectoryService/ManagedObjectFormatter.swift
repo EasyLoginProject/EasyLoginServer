@@ -40,9 +40,9 @@ class ManagedObjectFormatter<T: ManagedObject> {
         return try summaryJSONEncoder.encode(representation)
     }
     
-    func summaryAsJSONData(_ list: [T]) throws -> Data {
+    func summaryAsJSONData(_ list: [T], withRootKey rootKey:String) throws -> Data {
         let representations = list.map(generator)
-        return try summaryJSONEncoder.encode(representations)
+        return try summaryJSONEncoder.encode([rootKey:representations])
     }
     
     func viewAsJSONData(_ object: T) throws -> Data { // TODO: add view options here
