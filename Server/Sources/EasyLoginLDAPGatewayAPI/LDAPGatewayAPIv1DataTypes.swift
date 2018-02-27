@@ -592,8 +592,8 @@ class LDAPAbstractRecord : Codable, Equatable {
         try container.encode(objectClass, forKey: .objectClass)
         try container.encode(hasSubordinates, forKey: .hasSubordinates)
         try container.encode(dn, forKey: .dn)
-        try container.encode(creationDate, forKey: .creationDate)
-        try container.encode(modificationDate, forKey: .modificationDate)
+        try container.encode(ldapDateToString(creationDate), forKey: .creationDate)
+        try container.encode(ldapDateToString(modificationDate), forKey: .modificationDate)
     }
     
     init(entryUUID: String) {
