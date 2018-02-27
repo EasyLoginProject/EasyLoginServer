@@ -260,7 +260,13 @@ class LDAPGatewayAPIv1 {
             return
         }
         let ldapJSONEncoder = JSONEncoder()
-        ldapJSONEncoder.userInfo[.ldapRequestedAttributes] = searchRequest.attributes
+        
+        if searchRequest.attributes?.contains("*") ?? true {
+            ldapJSONEncoder.userInfo[.ldapRequestedAttributes] = nil
+        } else {
+            ldapJSONEncoder.userInfo[.ldapRequestedAttributes] = searchRequest.attributes
+        }
+        
         
         if let ldapFilter = searchRequest.filter {
             Log.info("Applying LDAP filter on \(availableRecords.count) record(s)")
