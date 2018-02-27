@@ -29,6 +29,33 @@ func iterateEnum<T: Hashable>(_: T.Type) -> AnyIterator<T> {
     }
 }
 
+func ldapDateToString(_ date:Date) -> String {
+    let ldapDateFormater = DateFormatter()
+    ldapDateFormater.dateFormat = "YYYYMMDDHHMMSS.0'Z'"
+    ldapDateFormater.locale = Locale(identifier: "en_US_POSIX")
+    ldapDateFormater.timeZone = TimeZone(secondsFromGMT: 0)
+    return ldapDateFormater.string(from: date)
+}
+
+func ldapDateFromString(_ dateAsString:String) -> Date? {
+    let ldapZuluDateFormater = DateFormatter()
+    ldapZuluDateFormater.dateFormat = "YYYYMMDDHHMMSS.0'Z'"
+    ldapZuluDateFormater.locale = Locale(identifier: "en_US_POSIX")
+    ldapZuluDateFormater.timeZone = TimeZone(secondsFromGMT: 0)
+    
+    let ldapTZDateFormater = DateFormatter()
+    ldapTZDateFormater.dateFormat = "YYYYMMDDHHMMSS.0Z"
+    ldapTZDateFormater.locale = Locale(identifier: "en_US_POSIX")
+    
+    if let zuluDate = ldapZuluDateFormater.date(from: dateAsString) {
+        return zuluDate
+    } else if let date = ldapTZDateFormater.date(from: dateAsString) {
+        return date
+    } else {
+        return nil
+    }
+    
+}
 
 // MARK: - Codable objects for LDAP authentication requests
 
@@ -55,7 +82,7 @@ struct LDAPAuthRequest: Codable {
  that provides context information for the lookup.
  */
 class LDAPFilter: Codable {
-    struct LDAPFilterSettingEqualityMatch: Codable {
+    struct LDAPFilterWithAssertion: Codable {
         let attributeDesc: String
         let assertionValue: String
     }
@@ -72,8 +99,9 @@ class LDAPFilter: Codable {
         let type: String
     }
     
-    let equalityMatch: LDAPFilterSettingEqualityMatch?
+    let equalityMatch: LDAPFilterWithAssertion?
     let substrings: LDAPFilterSettingSubstring?
+    let greaterOrEqual: LDAPFilterWithAssertion?
     
     let extensibleMatch: LDAPFilterExtensibleMatch?
     
@@ -85,6 +113,7 @@ class LDAPFilter: Codable {
     
     enum RepresentedFilterNode {
         case equalityMatch
+        case greaterOrEqual
         case substrings
         case extensibleMatch
         case and
@@ -106,7 +135,8 @@ class LDAPFilter: Codable {
     func nodeType() -> RepresentedFilterNode {
         if let _ = equalityMatch {
             return .equalityMatch
-            
+        } else if let _ = greaterOrEqual{
+            return .greaterOrEqual
         } else if let _ = substrings {
             return .substrings
             
@@ -213,6 +243,20 @@ class LDAPFilter: Codable {
                     return false
                 })
             }
+            
+        case .greaterOrEqual:
+            Log.info("GreaterOrEqual operation")
+            if let greaterOrEqual = greaterOrEqual {
+                do {
+                    return try records.filter({ (recordToCheck) -> Bool in
+                        return try recordToCheck.compare(field: greaterOrEqual.attributeDesc, toValue: greaterOrEqual.assertionValue) != ComparisonResult.orderedAscending
+                    })
+                } catch {
+                    Log.debug("Unable to perform GreaterOrEqual operation on requested field \(greaterOrEqual.attributeDesc)")
+                    return nil
+                }
+            }
+            
             
         case .substrings:
             Log.info("Substrings operation")
@@ -414,6 +458,8 @@ extension CodingUserInfoKey {
 class LDAPAbstractRecord : Codable, Equatable {
     // Record properties
     let entryUUID: String
+    let modificationDate: Date
+    let creationDate: Date
     
     // Record LDAP behavior that need to be overrided
     var objectClass: [String] {
@@ -439,6 +485,7 @@ class LDAPAbstractRecord : Codable, Equatable {
     
     func valuesForField(_ field:String) -> [String]? {
         Log.debug("LDAPAbstractRecord / Looking for value for field \(field)")
+        
         var key: LDAPAbstractRecordCodingKeys?
         for k in iterateEnum(LDAPAbstractRecordCodingKeys.self) {
             if k.rawValue.lowercased() == field.lowercased() {
@@ -456,11 +503,50 @@ class LDAPAbstractRecord : Codable, Equatable {
                 return [hasSubordinates]
             case .dn:
                 return [dn]
+            case .creationDate:
+                return [ldapDateToString(creationDate)]
+            case .modificationDate:
+                return [ldapDateToString(modificationDate)]
             }
         } else {
             Log.debug("Unsuported key")
             return nil
         }
+    }
+    
+    func compare(field:String, toValue value:String) throws -> ComparisonResult {
+        Log.debug("LDAPAbstractRecord / Comparing raw value for field \(field)")
+        var key: LDAPAbstractRecordCodingKeys?
+        for k in iterateEnum(LDAPAbstractRecordCodingKeys.self) {
+            if k.rawValue.lowercased() == field.lowercased() {
+                key = k
+                break
+            }
+        }
+        if let key = key {
+            switch key {
+            case .entryUUID:
+                return entryUUID.compare(value)
+            case .creationDate:
+                if let convertedValue = ldapDateFromString(value) {
+                    return creationDate.compare(convertedValue)
+                } else {
+                    Log.error("Unable to convert date")
+                }
+            case .modificationDate:
+                if let convertedValue = ldapDateFromString(value) {
+                    return modificationDate.compare(convertedValue)
+                } else {
+                    Log.error("Unable to convert date")
+                }
+            default:
+                throw LDAPAPIError.unsupportedRequest
+            }
+        } else {
+            Log.debug("Unsuported key")
+            throw LDAPAPIError.unsupportedRequest
+        }
+        throw LDAPAPIError.unsupportedRequest
     }
     
     // Record LDAP shared behavior
@@ -490,6 +576,8 @@ class LDAPAbstractRecord : Codable, Equatable {
         case objectClass
         case hasSubordinates
         case dn
+        case creationDate
+        case modificationDate
     }
     
     required init(from decoder: Decoder) throws {
@@ -504,15 +592,21 @@ class LDAPAbstractRecord : Codable, Equatable {
         try container.encode(objectClass, forKey: .objectClass)
         try container.encode(hasSubordinates, forKey: .hasSubordinates)
         try container.encode(dn, forKey: .dn)
+        try container.encode(creationDate, forKey: .creationDate)
+        try container.encode(modificationDate, forKey: .modificationDate)
     }
     
     init(entryUUID: String) {
         self.entryUUID = entryUUID
+        creationDate = Date(timeIntervalSince1970: 0)
+        modificationDate = Date(timeIntervalSince1970: 0)
     }
     
     init(managedObject:ManagedObject) {
         Log.info("Initiating LDAPAbstractRecord with managedObject")
         entryUUID = managedObject.uuid
+        creationDate = managedObject.created
+        modificationDate = managedObject.modified
     }
 }
 
@@ -1034,6 +1128,34 @@ class LDAPUserRecord: LDAPAbstractRecord {
         }
     }
     
+    override func compare(field:String, toValue value:String) throws -> ComparisonResult {
+        Log.debug("LDAPUserRecord / Comparing raw value for field \(field)")
+        var key: LDAPUserRecordCodingKeys?
+        for k in iterateEnum(LDAPUserRecordCodingKeys.self) {
+            if k.rawValue.lowercased() == field.lowercased() {
+                key = k
+                break
+            }
+        }
+        if let key = key {
+            switch key {
+            case .uidNumber:
+                if let convertedValue = Int(value) {
+                    if uidNumber < convertedValue {
+                        return .orderedAscending
+                    } else if uidNumber > convertedValue {
+                        return .orderedDescending
+                    } else {
+                        return .orderedSame
+                    }
+                }
+            default:
+                return try super.compare(field: field, toValue: value)
+            }
+        }
+        return try super.compare(field: field, toValue: value)
+    }
+    
     // Record implementation
     enum LDAPUserRecordCodingKeys: String, CodingKey {
         case uidNumber
@@ -1472,6 +1594,34 @@ class LDAPUserGroupRecord: LDAPAbstractRecord {
             Log.debug("Unsuported key at LDAPUserGroupRecord level, trying ancestor")
             return super.valuesForField(field)
         }
+    }
+    
+    override func compare(field:String, toValue value:String) throws -> ComparisonResult {
+        Log.debug("LDAPUserGroupRecord / Comparing raw value for field \(field)")
+        var key: LDAPUserGroupRecordCodingKeys?
+        for k in iterateEnum(LDAPUserGroupRecordCodingKeys.self) {
+            if k.rawValue.lowercased() == field.lowercased() {
+                key = k
+                break
+            }
+        }
+        if let key = key {
+            switch key {
+            case .uidNumber:
+                if let convertedValue = Int(value) {
+                    if uidNumber < convertedValue {
+                        return .orderedAscending
+                    } else if uidNumber > convertedValue {
+                        return .orderedDescending
+                    } else {
+                        return .orderedSame
+                    }
+                }
+            default:
+                return try super.compare(field: field, toValue: value)
+            }
+        }
+        return try super.compare(field: field, toValue: value)
     }
     
     // Record implementation
