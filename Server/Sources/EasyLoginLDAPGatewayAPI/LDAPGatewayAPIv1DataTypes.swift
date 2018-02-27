@@ -1740,46 +1740,46 @@ class LDAPUserGroupRecord: LDAPAbstractRecord {
         if (ldapRequestedAttributes?.contains(LDAPUserGroupRecordCodingKeys.uidNumber.stringValue) ?? true) {
             try container.encode(uidNumber, forKey: .uidNumber)
         }
-        if (ldapRequestedAttributes?.contains(LDAPUserGroupRecordCodingKeys.uidNumber.stringValue) ?? true) {
+        if (ldapRequestedAttributes?.contains(LDAPUserGroupRecordCodingKeys.uid.stringValue) ?? true) {
             try container.encode(uid, forKey: .uid)
         }
-        if (ldapRequestedAttributes?.contains(LDAPUserGroupRecordCodingKeys.uidNumber.stringValue) ?? true) {
+        if (ldapRequestedAttributes?.contains(LDAPUserGroupRecordCodingKeys.mail.stringValue) ?? true) {
             try container.encode(mail, forKey: .mail)
         }
-        if (ldapRequestedAttributes?.contains(LDAPUserGroupRecordCodingKeys.uidNumber.stringValue) ?? true) {
+        if (ldapRequestedAttributes?.contains(LDAPUserGroupRecordCodingKeys.cn.stringValue) ?? true) {
             try container.encode(cn, forKey: .cn)
         }
         
-        if (ldapRequestedAttributes?.contains(LDAPUserGroupRecordCodingKeys.uidNumber.stringValue) ?? true) {
+        if (ldapRequestedAttributes?.contains(LDAPUserGroupRecordCodingKeys.nestedGroupByDN.stringValue) ?? true) {
             try container.encode(nestedGroupByDN, forKey: .nestedGroupByDN)
         }
-        if (ldapRequestedAttributes?.contains(LDAPUserGroupRecordCodingKeys.uidNumber.stringValue) ?? true) {
+        if (ldapRequestedAttributes?.contains(LDAPUserGroupRecordCodingKeys.nestedGroupByShortname.stringValue) ?? true) {
             try container.encode(nestedGroupByShortname, forKey: .nestedGroupByShortname)
         }
         
-        if (ldapRequestedAttributes?.contains(LDAPUserGroupRecordCodingKeys.uidNumber.stringValue) ?? true) {
+        if (ldapRequestedAttributes?.contains(LDAPUserGroupRecordCodingKeys.userMemberByDN.stringValue) ?? true) {
             try container.encode(userMemberByDN, forKey: .userMemberByDN)
         }
-        if (ldapRequestedAttributes?.contains(LDAPUserGroupRecordCodingKeys.uidNumber.stringValue) ?? true) {
+        if (ldapRequestedAttributes?.contains(LDAPUserGroupRecordCodingKeys.userMemberByShortname.stringValue) ?? true) {
             try container.encode(userMemberByShortname, forKey: .userMemberByShortname)
         }
-        if (ldapRequestedAttributes?.contains(LDAPUserGroupRecordCodingKeys.uidNumber.stringValue) ?? true) {
+        if (ldapRequestedAttributes?.contains(LDAPUserGroupRecordCodingKeys.mixedMemberByDN.stringValue) ?? true) {
             try container.encode(mixedMemberByDN, forKey: .mixedMemberByDN)
         }
-        if (ldapRequestedAttributes?.contains(LDAPUserGroupRecordCodingKeys.uidNumber.stringValue) ?? true) {
+        if (ldapRequestedAttributes?.contains(LDAPUserGroupRecordCodingKeys.memberOfByShortname.stringValue) ?? true) {
             try container.encode(memberOfByShortname, forKey: .memberOfByShortname)
         }
         
-        if (ldapRequestedAttributes?.contains(LDAPUserGroupRecordCodingKeys.uidNumber.stringValue) ?? true) {
+        if (ldapRequestedAttributes?.contains(LDAPUserGroupRecordCodingKeys.flattenNestedGroupByShortname.stringValue) ?? true) {
             try container.encode(flattenNestedGroupByShortname, forKey: .flattenNestedGroupByShortname)
         }
-        if (ldapRequestedAttributes?.contains(LDAPUserGroupRecordCodingKeys.uidNumber.stringValue) ?? true) {
+        if (ldapRequestedAttributes?.contains(LDAPUserGroupRecordCodingKeys.flattenMemberByShortname.stringValue) ?? true) {
             try container.encode(flattenMemberByShortname, forKey: .flattenMemberByShortname)
         }
-        if (ldapRequestedAttributes?.contains(LDAPUserGroupRecordCodingKeys.uidNumber.stringValue) ?? true) {
+        if (ldapRequestedAttributes?.contains(LDAPUserGroupRecordCodingKeys.flattenMemberOfByShortname.stringValue) ?? true) {
             try container.encode(flattenMemberOfByShortname, forKey: .flattenMemberOfByShortname)
         }
-        if (ldapRequestedAttributes?.contains(LDAPUserGroupRecordCodingKeys.uidNumber.stringValue) ?? true) {
+        if (ldapRequestedAttributes?.contains(LDAPUserGroupRecordCodingKeys.flattenMemberOfByDN.stringValue) ?? true) {
             try container.encode(flattenMemberOfByDN, forKey: .flattenMemberOfByDN)
         }
     }
