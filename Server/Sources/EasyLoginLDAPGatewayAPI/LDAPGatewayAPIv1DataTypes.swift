@@ -36,30 +36,16 @@ func iterateEnum<T: Hashable>(_: T.Type) -> AnyIterator<T> {
 
 func ldapDateToString(_ date:Date) -> String {
     let ldapDateFormater = DateFormatter()
-    ldapDateFormater.dateFormat = "YYYYMMDDHHMMSS.0'Z'"
-    ldapDateFormater.locale = Locale(identifier: "en_US_POSIX")
-    ldapDateFormater.timeZone = TimeZone(secondsFromGMT: 0)
+    ldapDateFormater.dateFormat = "yyyyMMddHHmmss.S'Z'"
+    ldapDateFormater.timeZone = TimeZone(abbreviation: "UTC")
     return ldapDateFormater.string(from: date)
 }
 
 func ldapDateFromString(_ dateAsString:String) -> Date? {
-    let ldapZuluDateFormater = DateFormatter()
-    ldapZuluDateFormater.dateFormat = "YYYYMMDDHHMMSS.0'Z'"
-    ldapZuluDateFormater.locale = Locale(identifier: "en_US_POSIX")
-    ldapZuluDateFormater.timeZone = TimeZone(secondsFromGMT: 0)
+    let ldapDateFormater = DateFormatter()
+    ldapDateFormater.dateFormat = "yyyyMMddHHmmss.SZ"
     
-    let ldapTZDateFormater = DateFormatter()
-    ldapTZDateFormater.dateFormat = "YYYYMMDDHHMMSS.0Z"
-    ldapTZDateFormater.locale = Locale(identifier: "en_US_POSIX")
-    
-    if let zuluDate = ldapZuluDateFormater.date(from: dateAsString) {
-        return zuluDate
-    } else if let date = ldapTZDateFormater.date(from: dateAsString) {
-        return date
-    } else {
-        return nil
-    }
-    
+    return ldapDateFormater.date(from: dateAsString)
 }
 
 // MARK: - Codable objects for LDAP authentication requests
@@ -309,9 +295,9 @@ class LDAPFilter: Codable {
                     if matchingRule == "1.2.840.113556.1.4.1941" {
                         /*
                          From https://msdn.microsoft.com/en-us/library/aa746475(v=vs.85).aspx
-
+                         
                          This rule is limited to filters that apply to the DN. This is a special "extended" match operator that walks the chain of ancestry in objects all the way to the root until it finds a match.
-
+                         
                          The LDAP_MATCHING_RULE_IN_CHAIN is a matching rule OID that is designed to provide a method to look up the ancestry of an object.
                          Many applications using AD and AD LDS usually work with hierarchical data, which is ordered by parent-child relationships.
                          Previously, applications performed transitive group expansion to figure out group membership, which used too much network bandwidth;
