@@ -14,6 +14,11 @@ import LoggerAPI
 
 // MARK: - Common LDAP API
 
+public extension CodingUserInfoKey {
+    static let ldapRequestedAttributes = CodingUserInfoKey(rawValue: "ldapRequestedAttributes")!
+}
+
+
 enum LDAPAPIError: Error {
     case unsupportedRequest
     case recordNotFound
@@ -587,13 +592,27 @@ class LDAPAbstractRecord : Codable, Equatable {
     
     func encode(to encoder: Encoder) throws {
         Log.info("Encoding LDAPAbstractRecord fields")
+        
         var container = encoder.container(keyedBy: LDAPAbstractRecordCodingKeys.self)
-        try container.encode(entryUUID, forKey: .entryUUID)
-        try container.encode(objectClass, forKey: .objectClass)
-        try container.encode(hasSubordinates, forKey: .hasSubordinates)
+        
         try container.encode(dn, forKey: .dn)
-        try container.encode(ldapDateToString(creationDate), forKey: .creationDate)
-        try container.encode(ldapDateToString(modificationDate), forKey: .modificationDate)
+        
+        let ldapRequestedAttributes = encoder.userInfo[.ldapRequestedAttributes] as? [String]
+        if (ldapRequestedAttributes?.contains(LDAPAbstractRecordCodingKeys.entryUUID.stringValue) ?? true) {
+            try container.encode(entryUUID, forKey: .entryUUID)
+        }
+        if (ldapRequestedAttributes?.contains(LDAPAbstractRecordCodingKeys.objectClass.stringValue) ?? true) {
+            try container.encode(objectClass, forKey: .objectClass)
+        }
+        if (ldapRequestedAttributes?.contains(LDAPAbstractRecordCodingKeys.hasSubordinates.stringValue) ?? true) {
+            try container.encode(hasSubordinates, forKey: .hasSubordinates)
+        }
+        if (ldapRequestedAttributes?.contains(LDAPAbstractRecordCodingKeys.creationDate.stringValue) ?? true) {
+            try container.encode(ldapDateToString(creationDate), forKey: .creationDate)
+        }
+        if (ldapRequestedAttributes?.contains(LDAPAbstractRecordCodingKeys.modificationDate.stringValue) ?? true) {
+            try container.encode(ldapDateToString(modificationDate), forKey: .modificationDate)
+        }
     }
     
     init(entryUUID: String) {
@@ -707,15 +726,36 @@ class LDAPRootDSERecord: LDAPAbstractRecord {
         try super.encode(to: encoder)
         Log.info("Encoding LDAPRootDSERecord fields")
         var container = encoder.container(keyedBy: LDAPRootDSERecordCodingKeys.self)
-        try container.encode(namingContexts, forKey: .namingContexts)
-        try container.encode(subschemaSubentry, forKey: .subschemaSubentry)
-        try container.encode(supportedLDAPVersion, forKey: .supportedLDAPVersion)
-        try container.encode(supportedSASLMechanisms, forKey: .supportedSASLMechanisms)
-        try container.encode(supportedExtension, forKey: .supportedExtension)
-        try container.encode(supportedControl, forKey: .supportedControl)
-        try container.encode(supportedFeatures, forKey: .supportedFeatures)
-        try container.encode(vendorName, forKey: .vendorName)
-        try container.encode(vendorVersion, forKey: .vendorVersion)
+        
+        let ldapRequestedAttributes = encoder.userInfo[.ldapRequestedAttributes] as? [String]
+        
+        if (ldapRequestedAttributes?.contains(LDAPRootDSERecordCodingKeys.namingContexts.stringValue) ?? true) {
+            try container.encode(namingContexts, forKey: .namingContexts)
+        }
+        if (ldapRequestedAttributes?.contains(LDAPRootDSERecordCodingKeys.subschemaSubentry.stringValue) ?? true) {
+            try container.encode(subschemaSubentry, forKey: .subschemaSubentry)
+        }
+        if (ldapRequestedAttributes?.contains(LDAPRootDSERecordCodingKeys.supportedLDAPVersion.stringValue) ?? true) {
+            try container.encode(supportedLDAPVersion, forKey: .supportedLDAPVersion)
+        }
+        if (ldapRequestedAttributes?.contains(LDAPRootDSERecordCodingKeys.supportedSASLMechanisms.stringValue) ?? true) {
+            try container.encode(supportedSASLMechanisms, forKey: .supportedSASLMechanisms)
+        }
+        if (ldapRequestedAttributes?.contains(LDAPRootDSERecordCodingKeys.supportedExtension.stringValue) ?? true) {
+            try container.encode(supportedExtension, forKey: .supportedExtension)
+        }
+        if (ldapRequestedAttributes?.contains(LDAPRootDSERecordCodingKeys.supportedControl.stringValue) ?? true) {
+            try container.encode(supportedControl, forKey: .supportedControl)
+        }
+        if (ldapRequestedAttributes?.contains(LDAPRootDSERecordCodingKeys.supportedFeatures.stringValue) ?? true) {
+            try container.encode(supportedFeatures, forKey: .supportedFeatures)
+        }
+        if (ldapRequestedAttributes?.contains(LDAPRootDSERecordCodingKeys.vendorName.stringValue) ?? true) {
+            try container.encode(vendorName, forKey: .vendorName)
+        }
+        if (ldapRequestedAttributes?.contains(LDAPRootDSERecordCodingKeys.vendorVersion.stringValue) ?? true) {
+            try container.encode(vendorVersion, forKey: .vendorVersion)
+        }
     }
     
     required init(from decoder: Decoder) throws {
@@ -1180,17 +1220,42 @@ class LDAPUserRecord: LDAPAbstractRecord {
         try super.encode(to: encoder)
         Log.info("Encoding LDAPUserRecord fields")
         var container = encoder.container(keyedBy: LDAPUserRecordCodingKeys.self)
-        try container.encode(uidNumber, forKey: .uidNumber)
-        try container.encode(uid, forKey: .uid)
-        try container.encode(userPrincipalName, forKey: .userPrincipalName)
-        try container.encode(mail, forKey: .mail)
-        try container.encode(givenName, forKey: .givenName)
-        try container.encode(sn, forKey: .sn)
-        try container.encode(cn, forKey: .cn)
-        try container.encode(memberOfByDN, forKey: .memberOfByDN)
-        try container.encode(memberOfByShortname, forKey: .memberOfByShortname)
-        try container.encode(flattenMemberOfByShortname, forKey: .flattenMemberOfByShortname)
-        try container.encode(flattenMemberOfByDN, forKey: .flattenMemberOfByDN)
+        
+        let ldapRequestedAttributes = encoder.userInfo[.ldapRequestedAttributes] as? [String]
+        
+        if (ldapRequestedAttributes?.contains(LDAPUserRecordCodingKeys.uidNumber.stringValue) ?? true) {
+            try container.encode(uidNumber, forKey: .uidNumber)
+        }
+        if (ldapRequestedAttributes?.contains(LDAPUserRecordCodingKeys.uid.stringValue) ?? true) {
+            try container.encode(uid, forKey: .uid)
+        }
+        if (ldapRequestedAttributes?.contains(LDAPUserRecordCodingKeys.userPrincipalName.stringValue) ?? true) {
+            try container.encode(userPrincipalName, forKey: .userPrincipalName)
+        }
+        if (ldapRequestedAttributes?.contains(LDAPUserRecordCodingKeys.mail.stringValue) ?? true) {
+            try container.encode(mail, forKey: .mail)
+        }
+        if (ldapRequestedAttributes?.contains(LDAPUserRecordCodingKeys.givenName.stringValue) ?? true) {
+            try container.encode(givenName, forKey: .givenName)
+        }
+        if (ldapRequestedAttributes?.contains(LDAPUserRecordCodingKeys.sn.stringValue) ?? true) {
+            try container.encode(sn, forKey: .sn)
+        }
+        if (ldapRequestedAttributes?.contains(LDAPUserRecordCodingKeys.cn.stringValue) ?? true) {
+            try container.encode(cn, forKey: .cn)
+        }
+        if (ldapRequestedAttributes?.contains(LDAPUserRecordCodingKeys.memberOfByDN.stringValue) ?? true) {
+            try container.encode(memberOfByDN, forKey: .memberOfByDN)
+        }
+        if (ldapRequestedAttributes?.contains(LDAPUserRecordCodingKeys.memberOfByShortname.stringValue) ?? true) {
+            try container.encode(memberOfByShortname, forKey: .memberOfByShortname)
+        }
+        if (ldapRequestedAttributes?.contains(LDAPUserRecordCodingKeys.flattenMemberOfByShortname.stringValue) ?? true) {
+            try container.encode(flattenMemberOfByShortname, forKey: .flattenMemberOfByShortname)
+        }
+        if (ldapRequestedAttributes?.contains(LDAPUserRecordCodingKeys.flattenMemberOfByDN.stringValue) ?? true) {
+            try container.encode(flattenMemberOfByDN, forKey: .flattenMemberOfByDN)
+        }
     }
     
     init(managedUser: ManagedUser) {
@@ -1669,23 +1734,54 @@ class LDAPUserGroupRecord: LDAPAbstractRecord {
         try super.encode(to: encoder)
         Log.info("Encoding LDAPUserGroupRecord fields")
         var container = encoder.container(keyedBy: LDAPUserGroupRecordCodingKeys.self)
-        try container.encode(uidNumber, forKey: .uidNumber)
-        try container.encode(uid, forKey: .uid)
-        try container.encode(mail, forKey: .mail)
-        try container.encode(cn, forKey: .cn)
         
-        try container.encode(nestedGroupByDN, forKey: .nestedGroupByDN)
-        try container.encode(nestedGroupByShortname, forKey: .nestedGroupByShortname)
+        let ldapRequestedAttributes = encoder.userInfo[.ldapRequestedAttributes] as? [String]
         
-        try container.encode(userMemberByDN, forKey: .userMemberByDN)
-        try container.encode(userMemberByShortname, forKey: .userMemberByShortname)
-        try container.encode(mixedMemberByDN, forKey: .mixedMemberByDN)
-        try container.encode(memberOfByShortname, forKey: .memberOfByShortname)
+        if (ldapRequestedAttributes?.contains(LDAPUserGroupRecordCodingKeys.uidNumber.stringValue) ?? true) {
+            try container.encode(uidNumber, forKey: .uidNumber)
+        }
+        if (ldapRequestedAttributes?.contains(LDAPUserGroupRecordCodingKeys.uidNumber.stringValue) ?? true) {
+            try container.encode(uid, forKey: .uid)
+        }
+        if (ldapRequestedAttributes?.contains(LDAPUserGroupRecordCodingKeys.uidNumber.stringValue) ?? true) {
+            try container.encode(mail, forKey: .mail)
+        }
+        if (ldapRequestedAttributes?.contains(LDAPUserGroupRecordCodingKeys.uidNumber.stringValue) ?? true) {
+            try container.encode(cn, forKey: .cn)
+        }
         
-        try container.encode(flattenNestedGroupByShortname, forKey: .flattenNestedGroupByShortname)
-        try container.encode(flattenMemberByShortname, forKey: .flattenMemberByShortname)
-        try container.encode(flattenMemberOfByShortname, forKey: .flattenMemberOfByShortname)
-        try container.encode(flattenMemberOfByDN, forKey: .flattenMemberOfByDN)
+        if (ldapRequestedAttributes?.contains(LDAPUserGroupRecordCodingKeys.uidNumber.stringValue) ?? true) {
+            try container.encode(nestedGroupByDN, forKey: .nestedGroupByDN)
+        }
+        if (ldapRequestedAttributes?.contains(LDAPUserGroupRecordCodingKeys.uidNumber.stringValue) ?? true) {
+            try container.encode(nestedGroupByShortname, forKey: .nestedGroupByShortname)
+        }
+        
+        if (ldapRequestedAttributes?.contains(LDAPUserGroupRecordCodingKeys.uidNumber.stringValue) ?? true) {
+            try container.encode(userMemberByDN, forKey: .userMemberByDN)
+        }
+        if (ldapRequestedAttributes?.contains(LDAPUserGroupRecordCodingKeys.uidNumber.stringValue) ?? true) {
+            try container.encode(userMemberByShortname, forKey: .userMemberByShortname)
+        }
+        if (ldapRequestedAttributes?.contains(LDAPUserGroupRecordCodingKeys.uidNumber.stringValue) ?? true) {
+            try container.encode(mixedMemberByDN, forKey: .mixedMemberByDN)
+        }
+        if (ldapRequestedAttributes?.contains(LDAPUserGroupRecordCodingKeys.uidNumber.stringValue) ?? true) {
+            try container.encode(memberOfByShortname, forKey: .memberOfByShortname)
+        }
+        
+        if (ldapRequestedAttributes?.contains(LDAPUserGroupRecordCodingKeys.uidNumber.stringValue) ?? true) {
+            try container.encode(flattenNestedGroupByShortname, forKey: .flattenNestedGroupByShortname)
+        }
+        if (ldapRequestedAttributes?.contains(LDAPUserGroupRecordCodingKeys.uidNumber.stringValue) ?? true) {
+            try container.encode(flattenMemberByShortname, forKey: .flattenMemberByShortname)
+        }
+        if (ldapRequestedAttributes?.contains(LDAPUserGroupRecordCodingKeys.uidNumber.stringValue) ?? true) {
+            try container.encode(flattenMemberOfByShortname, forKey: .flattenMemberOfByShortname)
+        }
+        if (ldapRequestedAttributes?.contains(LDAPUserGroupRecordCodingKeys.uidNumber.stringValue) ?? true) {
+            try container.encode(flattenMemberOfByDN, forKey: .flattenMemberOfByDN)
+        }
     }
     
     init(managedUserGroup: ManagedUserGroup) {

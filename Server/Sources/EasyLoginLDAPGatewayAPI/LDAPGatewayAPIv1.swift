@@ -259,11 +259,13 @@ class LDAPGatewayAPIv1 {
             next()
             return
         }
+        let ldapJSONEncoder = JSONEncoder()
+        ldapJSONEncoder.userInfo[.ldapRequestedAttributes] = searchRequest.attributes
         
         if let ldapFilter = searchRequest.filter {
             Log.info("Applying LDAP filter on \(availableRecords.count) record(s)")
             if let filteredRecords = ldapFilter.filter(records: availableRecords) {
-                if let jsonData = try? JSONEncoder().encode(filteredRecords) {
+                if let jsonData = try? ldapJSONEncoder.encode(filteredRecords) {
                     response.headers.setType("json")
                     response.send(data: jsonData)
                     response.status(.OK)
@@ -283,7 +285,7 @@ class LDAPGatewayAPIv1 {
             }
         } else {
             Log.info("No LDAP filter requested, returing all records")
-            if let jsonData = try? JSONEncoder().encode(availableRecords) {
+            if let jsonData = try? ldapJSONEncoder.encode(availableRecords) {
                 response.headers.setType("json")
                 response.send(data: jsonData)
                 response.status(.OK)
