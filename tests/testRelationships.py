@@ -14,22 +14,7 @@ import json
 import sys
 import time
 import ssl
-
-from inspect import currentframe, getframeinfo
-
-
-class Tester:
-	def __init__(self, report_success = True):
-		self.report_success = report_success
-	
-	def verify(self, statement, message):
-		if self.report_success or not statement:
-			frameinfo = getframeinfo(currentframe().f_back)
-			if statement:
-				tag = "SUCCESS"
-			else:
-				tag = "FAILURE"
-			print ("[%s] Line %d: %s" % (tag, frameinfo.lineno, message))
+import unittest
 
 
 class JSONClient:
@@ -107,7 +92,57 @@ class EasyLoginClient:
 		return result
 
 
-def main(args):
+class EasyLoginTestCase(unittest.TestCase):
+	def failUnlessArraysContainSameElements(self, array1, array2, msg=None):
+		if set(array1) != set(array2):
+			raise self.failureException, (msg or "Arrays don't match")
+	
+	assertArraysContainSameElements = failUnlessArraysContainSameElements
+
+
+class TestEasyLoginDatabaseAPI(EasyLoginTestCase):
+	global c
+	
+	def setUp(self):
+		self.initial_group_count = len(c.usergroups_list()["usergroups"])
+	
+	def test_usergroups(self):
+	
+		# create usergroups
+		root_group_uuid = c.usergroups_create("root", "Root Group")
+		node1_group_uuid = c.usergroups_create("node1", "Node 1 Group", memberOf = [root_group_uuid])
+		node2_group_uuid = c.usergroups_create("node2", "Node 2 Group")
+		node3_group_uuid = c.usergroups_create("node3", "Node 3 Group")
+		c.usergroups_update(node2_group_uuid, memberOf = [root_group_uuid])
+		self.assertEqual(len(c.usergroups_list()["usergroups"]), self.initial_group_count + 4)
+		self.assertArraysContainSameElements(c.usergroups_get(root_group_uuid)["nestedGroups"], [node1_group_uuid, node2_group_uuid])
+		
+		# add membership
+		root_group = c.usergroups_get(root_group_uuid)
+		c.usergroups_update(root_group_uuid, nestedGroups = root_group["nestedGroups"] + [node3_group_uuid])
+		self.assertEqual(len(c.usergroups_list()["usergroups"]), self.initial_group_count + 4)
+		self.assertArraysContainSameElements(c.usergroups_get(root_group_uuid)["nestedGroups"], [node1_group_uuid, node2_group_uuid, node3_group_uuid])
+		
+		# verify memberships
+		self.assertArraysContainSameElements(c.usergroups_get(root_group_uuid)["memberOf"], [], "Root group should be member of no group")
+		self.assertArraysContainSameElements(c.usergroups_get(node1_group_uuid)["memberOf"], [root_group_uuid], "Node1 group should be member of root group")
+		self.assertArraysContainSameElements(c.usergroups_get(node2_group_uuid)["memberOf"], [root_group_uuid], "Node2 group should be member of root group")
+		self.assertArraysContainSameElements(c.usergroups_get(node3_group_uuid)["memberOf"], [root_group_uuid], "Node3 group should be member of root group")
+		
+		# delete node
+		c.usergroups_delete(node2_group_uuid)
+		self.assertEqual(len(c.usergroups_list()["usergroups"]), self.initial_group_count + 3)
+		with self.assertRaises(ValueError):
+			c.usergroups_get(node2_group_uuid)
+		
+		# delete root node
+		c.usergroups_delete(root_group_uuid)
+		self.assertEqual(len(c.usergroups_list()["usergroups"]), self.initial_group_count + 2)
+		self.assertArraysContainSameElements(c.usergroups_get(node1_group_uuid)["memberOf"], [], "Node1 group should not be member of any group")
+		self.assertArraysContainSameElements(c.usergroups_get(node3_group_uuid)["memberOf"], [], "Node3 group should not be member of any group")
+
+
+def openEasyLoginConnection(args):
 	host = "localhost"
 	port = 8080
 	use_ssl = False
@@ -118,52 +153,12 @@ def main(args):
 			if len(args) > 3:
 				use_ssl = int(args[3]) != 0
 	c = EasyLoginClient(host, port, use_ssl)
-	
-	t = Tester()
-	
-	initial_group_count = len(c.usergroups_list()["usergroups"])
-
-	root_group_uuid = c.usergroups_create("root", "Root Group")
-	node1_group_uuid = c.usergroups_create("node1", "Node 1 Group", memberOf = [root_group_uuid])
-	node2_group_uuid = c.usergroups_create("node2", "Node 2 Group") #, memberOf = [root_group_uuid])
-	node3_group_uuid = c.usergroups_create("node3", "Node 3 Group")
-	c.usergroups_update(node2_group_uuid, memberOf = [root_group_uuid])
-	root_group = c.usergroups_get(root_group_uuid)
-	# c.usergroups_update(root_group_uuid, nestedGroups = [node1_group_uuid, node2_group_uuid, node3_group_uuid])
-	c.usergroups_update(root_group_uuid, nestedGroups = root_group["nestedGroups"] + [node3_group_uuid])
-	
-	t.verify(len(c.usergroups_list()["usergroups"]) == 4 + initial_group_count, "Initial group list contains 4 new elements.")
-	t.verify(len(c.usergroups_get(root_group_uuid)["nestedGroups"]) == 3, "Root group contains 3 nested groups.")
-	t.verify(len(c.usergroups_get(root_group_uuid)["memberOf"]) == 0, "Root group is member of no group.")
-	t.verify(c.usergroups_get(node1_group_uuid)["memberOf"] == [root_group_uuid], "Node1 group is member of root group.")
-	t.verify(c.usergroups_get(node2_group_uuid)["memberOf"] == [root_group_uuid], "Node2 group is member of root group.")
-	t.verify(c.usergroups_get(node3_group_uuid)["memberOf"] == [root_group_uuid], "Node3 group is member of root group.")
-
-# 	print("==== initial groups ====")
-# 	print(c.usergroups_get(root_group_uuid))
-# 	print(c.usergroups_get(node1_group_uuid))
-# 	print(c.usergroups_get(node2_group_uuid))
-# 	print(c.usergroups_get(node3_group_uuid))
-
-	c.usergroups_delete(node2_group_uuid)
-	t.verify(len(c.usergroups_list()["usergroups"]) == 3 + initial_group_count, "After deleting Node2 group: group list contains 3 elements.")
-
-# 	print("==== after deleting node2 ====")
-# 	print(c.usergroups_get(root_group_uuid))
-# 	print(c.usergroups_get(node1_group_uuid))
-# 	print(c.usergroups_get(node3_group_uuid))
-	
-	c.usergroups_delete(root_group_uuid)
-	t.verify(len(c.usergroups_list()["usergroups"]) == 2 + initial_group_count, "After deleting root group: group list contains 2 elements.")
-	t.verify(len(c.usergroups_get(node1_group_uuid)["memberOf"]) == 0, "Node1 group is member of no group.")
-	t.verify(len(c.usergroups_get(node3_group_uuid)["memberOf"]) == 0, "Node3 group is member of no group.")
-
-# 	print("==== after deleting root ====")
-# 	print(c.usergroups_get(node1_group_uuid))
-# 	print(c.usergroups_get(node3_group_uuid))
+	return c
 
 
 if __name__ == '__main__':
-    main(sys.argv)
+	global c
+	c = openEasyLoginConnection(sys.argv)
+	unittest.main()
 
 
