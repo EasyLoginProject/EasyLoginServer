@@ -10,11 +10,8 @@ import Foundation
 import Kitura
 import LoggerAPI
 import HeliumLogger
-import SwiftyJSON
-import Configuration
-import CloudFoundryConfig
+import EasyLoginConfiguration
 import CouchDB
-import Extensions
 import DataProvider
 import EasyLoginDirectoryService
 import NotificationService
