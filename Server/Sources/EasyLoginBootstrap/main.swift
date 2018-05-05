@@ -8,3 +8,9 @@ HeliumLogger.use(LoggerMessageType.debug)
 
 print("Bootstrap")
 
+do {
+    try bootstrap()
+}
+catch {
+    print("error: \(error)")
+}

@@ -9,6 +9,9 @@ let package = Package(
         .executable(
             name: "EasyLogin",
             targets: ["EasyLogin"]),
+        .executable(
+            name: "EasyLoginBootstrap",
+            targets: ["EasyLoginBootstrap"]),
     ],
     dependencies: [
         .package(url: "https://github.com/IBM-Swift/Kitura.git", from: "2.0.0"),
@@ -48,6 +51,9 @@ let package = Package(
             dependencies: ["EasyLoginConfiguration", "Extensions", "EasyLoginDirectoryService", "NotificationService", "EasyLoginLDAPGatewayAPI", "EasyLoginAdminAPI", "SwiftMetrics"]),
         .target(
             name: "EasyLogin",
+            dependencies: ["Application"]),
+        .target(
+            name: "EasyLoginBootstrap",
             dependencies: ["Application"]),
         .testTarget(
             name: "EasyLoginTests",
