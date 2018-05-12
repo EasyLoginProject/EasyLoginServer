@@ -10,6 +10,7 @@ import Foundation
 import Kitura
 import LoggerAPI
 import HeliumLogger
+import Configuration
 import EasyLoginConfiguration
 import CouchDB
 import DataProvider
@@ -26,47 +27,31 @@ public enum ConfigError: Error {
 }
 
 public let router = Router()
-public let httpLogger = HTTPLogger()
+
+let serviceEnablerQueue = DispatchQueue(label: "serviceEnabler")
 
 public func initialize() throws {
+    let httpLogger = HTTPLogger()
     HeliumStreamLogger.use(.debug, outputStream: httpLogger)
     httpLogger.installHandler(to: router)
     
     let inspectorService = InspectorService()
     
     let configurationManager = ConfigProvider.manager
+    let migrationDirectoryPath = ConfigProvider.pathForResource("migrations")
+    let expectedMigrations = try getAvailableMigrations(inDirectory: migrationDirectoryPath).map {$0.uuid}
     
-    var couchDBClient: CouchDBClient?
-    while couchDBClient == nil {
-        do {
-            couchDBClient = try CouchDBClient(configurationManager: configurationManager)
+    let serviceEnabler = EasyLoginServiceEnabler()
+    router.all(middleware: serviceEnabler)
+    
+    guard startDataProviderStack(configurationManager: configurationManager, expectedMigrations: expectedMigrations, completion: {
+        database in
+        serviceEnablerQueue.async() {
+            serviceEnabler.start(withDatabase: database)
         }
-        catch CouchDBClient.Error.configurationNotAvailable {
-            throw ConfigError.missingDatabaseInfo
-        }
-        catch {
-            couchDBClient = nil
-            Log.info("CouchDB not available, retrying.")
-            sleep(2)
-        }
+    }) else {
+        throw ConfigError.missingDatabaseInfo
     }
-    
-    let databaseName = configurationManager.databaseName()
-    let mainDesignPath = ConfigProvider.pathForResource("main_design.json")
-    let database = couchDBClient!.createOrOpenDatabase(name: databaseName, designFile: mainDesignPath)
-    
-    Log.info("Connected to CouchDB, client = \(couchDBClient!), database name = \(databaseName)")
-    
-    let dataProvider = DataProvider(database: database)
-    let directoryService = EasyLoginDirectoryService(database: database, dataProvider: dataProvider)
-    router.all(middleware: EasyLoginAuthenticator(userProvider: database))
-    router.all("/db", middleware: directoryService.router())
-    
-    let ldapGatewayAPI = LDAPGatewayAPI(dataProvider: dataProvider)
-    router.all("/ldap", middleware: ldapGatewayAPI.router())
-    
-    let adminAPI = AdminAPI(dataProvider: dataProvider)
-    router.all("/admapi", middleware: adminAPI.router())
     
     let notificationService = installNotificationService()
     inspectorService.registerInspectable(notificationService, name: "notifications")
@@ -96,3 +81,58 @@ public func run() throws {
     Kitura.run()
 }
 
+func startDataProviderStack(configurationManager: ConfigurationManager, expectedMigrations: [String], completion: @escaping (Database) -> Void) -> Bool {
+    do {
+        let couchDBClient = try CouchDBClient(configurationManager: configurationManager)
+        let databaseName = configurationManager.databaseName()
+        Log.info("Connected to CouchDB, client = \(couchDBClient), database name = \(databaseName)")
+        openDatabaseAsync(couchDBClient: couchDBClient, databaseName: databaseName, expectedMigrations: expectedMigrations, completion: completion)
+    }
+    catch CouchDBClient.Error.configurationNotAvailable {
+        Log.error("CouchDB configuration not found.")
+        return false
+    }
+    catch {
+        Log.info("CouchDB not available, retrying.")
+        serviceEnablerQueue.asyncAfter(deadline: .now() + .seconds(2)) {
+            _ = startDataProviderStack(configurationManager: configurationManager, expectedMigrations: expectedMigrations, completion: completion)
+        }
+    }
+    return true
+}
+
+func openDatabaseAsync(couchDBClient: CouchDBClient, databaseName: String, expectedMigrations: [String], completion: @escaping (Database) -> Void) {
+    couchDBClient.dbExists(databaseName) {
+        exists, error in
+        if exists {
+            Log.info("Database found.")
+            let database = couchDBClient.database(databaseName)
+            verifyMigrations(database: database, expectedMigrations: expectedMigrations, completion: completion)
+        }
+        else {
+            Log.info("Database not found, retrying.")
+            serviceEnablerQueue.asyncAfter(deadline: .now() + .seconds(2)) {
+                openDatabaseAsync(couchDBClient: couchDBClient, databaseName: databaseName, expectedMigrations: expectedMigrations, completion: completion)
+            }
+        }
+    }
+}
+
+func verifyMigrations(database: Database, expectedMigrations: [String], completion: @escaping (Database) -> Void) {
+    database.retrieve(Database.databaseInfoDocumentId) {
+        json, error in
+        if let json = json, let databaseInfo = try? database.decodeInfo(json: json) {
+            let appliedMigrations = databaseInfo.migrations.map {$0.uuid}
+            if Set(appliedMigrations) == Set(expectedMigrations) {
+                Log.info("Database up-to-date.")
+                completion(database)
+                return
+            }
+            // FIXME: abort if applied migrations are more recent than expected migrations (wait for application upgrade).
+        }
+        Log.info("Database migration mismatch, retrying.")
+        serviceEnablerQueue.asyncAfter(deadline: .now() + .seconds(2)) {
+            verifyMigrations(database: database, expectedMigrations: expectedMigrations, completion: completion)
+        }
+    }
+}
