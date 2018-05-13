@@ -19,7 +19,7 @@ class UserGroups {
     
     init(dataProvider: DataProvider) {
         self.dataProvider = dataProvider
-        self.numericIDGenerator = dataProvider.persistentCounter(name: "usergroups.numericID")
+        self.numericIDGenerator = dataProvider.persistentCounter(name: "userGroups.numericID")
     }
     
     func installHandlers(to router: Router) {

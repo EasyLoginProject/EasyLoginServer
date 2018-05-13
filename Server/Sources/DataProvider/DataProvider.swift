@@ -37,7 +37,7 @@ public class DataProvider {
         if let persistentCounter = persistentCounters[name] {
             return persistentCounter
         }
-        let persistentCounter = PersistentCounter(database: database, name: name, initialValue: 1789) // TODO: initial value for each counter will be set by bootstrap application
+        let persistentCounter = PersistentCounter(database: database, name: name)
         persistentCounters[name] = persistentCounter
         return persistentCounter
     }
