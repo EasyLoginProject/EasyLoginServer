@@ -25,7 +25,6 @@ class EasyLoginServiceEnabler: RouterMiddleware {
     func start(withDatabase database: Database) {
         guard enabled == false else {
             fatalError("Service is already running.")
-            return
         }
         
         let dataProvider = DataProvider(database: database)
