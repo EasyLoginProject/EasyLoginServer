@@ -48,7 +48,7 @@ let package = Package(
             dependencies: ["Extensions", "NotificationService", "DataProvider", "KituraCORS"]),
         .target(
             name: "Application",
-            dependencies: ["EasyLoginConfiguration", "Extensions", "EasyLoginDirectoryService", "NotificationService", "EasyLoginLDAPGatewayAPI", "EasyLoginAdminAPI", "SwiftMetrics"]),
+            dependencies: ["EasyLoginConfiguration", "Extensions", "EasyLoginDirectoryService", "NotificationService", "EasyLoginLDAPGatewayAPI", "EasyLoginAdminAPI", "SwiftMetrics", "HeliumLogger"]),
         .target(
             name: "EasyLogin",
             dependencies: ["Application"]),
