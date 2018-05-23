@@ -1,0 +1,6 @@
+{
+    "uuid": "E6FD7A69-CE5A-4B8B-A3E7-833C1F6012A0",
+    "steps": [
+              {"action": "create", "filename": "main_design.json", "document_id": "_design/main_design"}
+    ]
+}

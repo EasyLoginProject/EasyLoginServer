@@ -6,7 +6,6 @@
 //
 
 import Foundation
-import Extensions
 
 public typealias ManagedObjectRecordID = String
 

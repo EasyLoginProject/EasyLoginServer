@@ -15,8 +15,6 @@ import LoggerAPI
 public class PersistentCounter {
     let database: Database
     let documentID: String
-    var initialValue: Int
-    var revision: String?
     
     private enum ReadResult {
         case value(Int, String)
@@ -24,19 +22,19 @@ public class PersistentCounter {
         case error(NSError)
     }
     
-    public init(database: Database, name: String, initialValue: Int = 0) {
+    public init(database: Database, name: String) {
         self.database = database
-        documentID = "$counter.\(name)"
-        self.initialValue = initialValue
+        documentID = "$counter/\(name)"
     }
     
     public func nextValue(completion: @escaping (Int?) -> Void) -> Void {
         readValue { (readResult) in
             switch readResult {
             case .value(let value, let revision):
-                self.writeAndReturnValue(value + 1, revision: revision, completion: completion)
+                self.writeSuccessorAndReturnCurrentValue(value, revision: revision, completion: completion)
             case .notFound:
-                self.writeAndReturnValue(self.initialValue, revision: nil, completion: completion)
+                Log.error("Error reading counter \(self.documentID) from database: not found")
+                completion(nil)
             case .error(let error):
                 Log.error("Error reading counter \(self.documentID) from database: \(error)")
                 completion(nil)
@@ -44,8 +42,8 @@ public class PersistentCounter {
         }
     }
     
-    private func writeAndReturnValue(_ value: Int, revision: String?, completion: @escaping (Int?) -> Void) -> Void {
-        writeValue(value, revision: revision) { (success) in
+    private func writeSuccessorAndReturnCurrentValue(_ value: Int, revision: String, completion: @escaping (Int?) -> Void) -> Void {
+        writeValue(value + 1, revision: revision) { (success) in
             if success {
                 completion(value)
             }
@@ -69,21 +67,16 @@ public class PersistentCounter {
             }
             if let document = document,
             let revision = document["_rev"].string,
-            let value = document["value"].int {
+            let value = document["next"].int {
                 completion(.value(value, revision))
                 return
             }
         }
     }
     
-    private func writeValue(_ value: Int, revision: String?, completion: @escaping (Bool) -> Void) -> Void {
+    private func writeValue(_ value: Int, revision: String, completion: @escaping (Bool) -> Void) -> Void {
         let document = self.document(value)
-        if let revision = revision {
-            updateDocument(document, revision: revision, completion: completion)
-        }
-        else {
-            createDocument(document, completion: completion)
-        }
+        updateDocument(document, revision: revision, completion: completion)
     }
     
     private func updateDocument(_ document: JSON, revision: String, completion: @escaping (Bool) -> Void) -> Void {
@@ -93,15 +86,8 @@ public class PersistentCounter {
         }
     }
     
-    private func createDocument(_ document: JSON, completion: @escaping (Bool) -> Void) -> Void {
-        Log.debug("Creating presistent counter \(documentID) into CouchDB")
-        database.create(document) { (id, revision, createdDocument, error) in
-            completion(createdDocument != nil)
-        }
-    }
-    
     private func document(_ value: Int) -> JSON {
-        let dict: [String: Any] = ["_id": documentID, "type": "counter", "value": value]
+        let dict: [String: Any] = ["_id": documentID, "type": "counter", "next": value]
         return JSON(dict)
     }
 }

@@ -1,0 +1,7 @@
+{
+    "uuid": "ECCEFA4D-6CA1-4B56-9FD5-6C90A15C956B",
+    "steps": [
+              {"action": "create", "filename": "users_numericID.json", "document_id": "$counter/users.numericID"},
+              {"action": "create", "filename": "userGroups_numericID.json", "document_id": "$counter/userGroups.numericID"}
+              ]
+}
