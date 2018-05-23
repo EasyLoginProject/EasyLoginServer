@@ -1,7 +1,8 @@
 import Foundation
 import CouchDB
 import Configuration
-import CloudFoundryConfig
+import CloudEnvironment
+import CloudFoundryEnv
 import LoggerAPI
 
 public extension CouchDBClient {
@@ -24,7 +25,7 @@ public extension CouchDBClient {
         }
     }
     
-    public convenience init(service: CloudantService) {
+    public convenience init(service: CloudantCredentials) {
         
         let connProperties = ConnectionProperties(host: service.host,
                                                   port: Int16(service.port),

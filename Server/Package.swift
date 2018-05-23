@@ -14,15 +14,15 @@ let package = Package(
             targets: ["EasyLoginBootstrap"]),
     ],
     dependencies: [
-        .package(url: "https://github.com/IBM-Swift/Kitura.git", from: "2.0.0"),
-        .package(url: "https://github.com/IBM-Swift/Kitura-net.git", .upToNextMinor(from: "1.7.0")),
-        .package(url: "https://github.com/IBM-Swift/Kitura-CouchDB.git", from: "1.7.0"),
-        .package(url: "https://github.com/IBM-Swift/Kitura-WebSocket.git", from: "0.9.0"),
+        .package(url: "https://github.com/IBM-Swift/Kitura.git", from: "2.3.0"),
+        .package(url: "https://github.com/IBM-Swift/Kitura-net.git", from: "2.1.0"),
+        .package(url: "https://github.com/IBM-Swift/Kitura-CouchDB.git", from: "2.1.0"),
+        .package(url: "https://github.com/IBM-Swift/Kitura-WebSocket.git", from: "2.0.0"),
         .package(url: "https://github.com/IBM-Swift/HeliumLogger.git", from: "1.7.0"),
-        .package(url: "https://github.com/IBM-Swift/CloudConfiguration.git", from: "2.0.0"),
-        .package(url: "https://github.com/IBM-Swift/BlueCryptor.git", from: "0.8.0"),
-        .package(url: "https://github.com/IBM-Swift/Kitura-CORS.git", from: "2.0.0"),
-        .package(url: "https://github.com/RuntimeTools/SwiftMetrics.git", from: "2.0.0")
+        .package(url: "https://github.com/IBM-Swift/CloudEnvironment.git", .upToNextMajor(from: "6.0.0")),
+        .package(url: "https://github.com/IBM-Swift/BlueCryptor.git", from: "1.0.0"),
+        .package(url: "https://github.com/IBM-Swift/Kitura-CORS.git", from: "2.1.0"),
+        .package(url: "https://github.com/RuntimeTools/SwiftMetrics.git", from: "2.3.0")
     ],
     targets: [
         .target(
@@ -30,13 +30,13 @@ let package = Package(
             dependencies: ["Extensions"]),
         .target(
             name: "Extensions",
-            dependencies: ["CloudConfiguration", "CouchDB", "Cryptor", "Kitura", "Kitura-WebSocket"]),
+            dependencies: ["CouchDB", "Cryptor", "Kitura", "Kitura-WebSocket"]),
         .target(
             name: "DataProvider",
-            dependencies: ["CloudConfiguration", "CouchDB", "Cryptor", "Kitura", "Extensions", "NotificationService"]),
+            dependencies: ["CouchDB", "Cryptor", "Kitura", "Extensions", "NotificationService"]),
         .target(
             name: "EasyLoginConfiguration",
-            dependencies: ["CloudConfiguration", "CouchDB"]),
+            dependencies: ["CloudEnvironment", "CouchDB"]),
         .target(
             name: "EasyLoginDirectoryService",
             dependencies: ["EasyLoginConfiguration", "Extensions", "NotificationService", "DataProvider"]),

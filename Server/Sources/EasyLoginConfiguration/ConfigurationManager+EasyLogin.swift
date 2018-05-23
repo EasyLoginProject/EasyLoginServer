@@ -7,7 +7,8 @@
 
 import Foundation
 import Configuration
-import CloudFoundryConfig
+import CloudEnvironment
+import CloudFoundryEnv
 
 public extension ConfigurationManager {
     
@@ -15,8 +16,8 @@ public extension ConfigurationManager {
         return self["database"] as? [String:Any]
     }
     
-    public func getCloudantConfiguration() -> CloudantService? {
-        return try? self.getCloudantService(name: "EasyLogin-Cloudant")
+    public func getCloudantConfiguration() -> CloudantCredentials? {
+        return CloudEnv().getCloudantCredentials(name: "EasyLogin-Cloudant")
     }
     
     public func databaseName() -> String {

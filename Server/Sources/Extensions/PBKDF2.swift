@@ -59,7 +59,7 @@ public class PBKDF2 {
     // modular crypt format
     public func generateString(fromPassword password: String) throws -> String {
         let salt = try Random.generate(byteCount: saltLength)
-        let derivedKey = PBKDF.deriveKey(fromPassword: password, salt: salt, prf: algorithm, rounds: rounds, derivedKeyLength: UInt(derivedKeyLength))
+        let derivedKey = try PBKDF.deriveKey(fromPassword: password, salt: salt, prf: algorithm, rounds: rounds, derivedKeyLength: UInt(derivedKeyLength))
         let base64SuffixCharacterSet = CharacterSet(charactersIn: "=")
         let saltString = Data(salt).base64EncodedString().trimmingCharacters(in: base64SuffixCharacterSet)
         let keyString = Data(derivedKey).base64EncodedString().trimmingCharacters(in: base64SuffixCharacterSet)
@@ -96,7 +96,12 @@ public class PBKDF2 {
         }
         let salt = Array(saltData)
         let hash = Array(hashData)
-        let derivedHash = PBKDF.deriveKey(fromPassword: password, salt: salt, prf: prf, rounds: uint(rounds), derivedKeyLength: 32)
-        return derivedHash == hash
+        do {
+            let derivedHash = try PBKDF.deriveKey(fromPassword: password, salt: salt, prf: prf, rounds: uint(rounds), derivedKeyLength: 32)
+            return derivedHash == hash
+        }
+        catch {
+            return false
+        }
     }
 }

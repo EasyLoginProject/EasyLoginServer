@@ -54,7 +54,7 @@ public class PersistentCounter {
     }
     
     private func readValue(completion: @escaping (ReadResult) -> Void) -> Void {
-        Log.debug("Reading presistent counter \(documentID) from CouchDB")
+        Log.debug("Reading persistent counter \(documentID) from CouchDB")
         database.retrieve(documentID) { (document, error) in
             if let error = error {
                 if error.domain == "CouchDBDomain" && error.code == HTTPStatusCode.notFound.rawValue {
