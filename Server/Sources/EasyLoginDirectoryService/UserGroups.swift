@@ -198,7 +198,7 @@ class UserGroups {
         defer { next() }
         self.dataProvider.managedObjects(ofType: ManagedUserGroup.self) {
             list, error in
-            if let list = list, let jsonData = try? self.viewFormatter.summaryAsJSONData(list) {
+            if let list = list, let jsonData = try? self.viewFormatter.summaryAsJSONData(list, withRootKey:"usergroups") {
                 response.send(data: jsonData)
                 response.headers.setType("json")
                 response.status(.OK)

@@ -9,6 +9,7 @@
 import Foundation
 import Kitura
 import DataProvider
+import LoggerAPI
 
 public class LDAPGatewayAPI {
     let v1Gateway: LDAPGatewayAPIv1
@@ -17,8 +18,10 @@ public class LDAPGatewayAPI {
     }
     
     public func router() -> Router {
+        Log.entry("Loading LDAP router")
         let router = Router()
         v1Gateway.installHandlers(to: router)
+        Log.exit("Loading LDAP router")
         return router
     }    
 }

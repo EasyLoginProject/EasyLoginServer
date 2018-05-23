@@ -9,6 +9,7 @@ import Foundation
 import DataProvider
 import Kitura
 import KituraCORS
+import LoggerAPI
 
 enum AdminAPIError: Error {
     case missingField
@@ -26,6 +27,7 @@ public class AdminAPI {
     }
     
     public func router() -> Router {
+        Log.entry("Loading AdminAPI router")
         let router = Router()
         let options = Options(allowedOrigin: .all, methods: ["GET","PUT", "POST", "DELETE"], allowedHeaders: ["X-Total-Count", "Content-Type"], maxAge: 5, exposedHeaders: ["X-Total-Count", "Content-Type"])
         let cors = CORS(options: options)
@@ -33,7 +35,7 @@ public class AdminAPI {
         
         usersAPI.setupRouter(router)
         userGroupsAPI.setupRouter(router)
-        
+        Log.exit("Loading AdminAPI router")
         return router
     }
 }

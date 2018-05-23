@@ -12,10 +12,14 @@ import httplib
 import json
 import sys
 import time
+import ssl
 
 class JSONClient:
-	def __init__(self, host, port):
-		self.connection = httplib.HTTPConnection(host, port)
+	def __init__(self, host, port, usessl):
+		if usessl == 1:
+			self.connection = httplib.HTTPSConnection(host, port, context=ssl._create_unverified_context())
+		else:
+			self.connection = httplib.HTTPConnection(host, port)
 	
 	def get(self, path):
 		self.connection.request('GET', path)
@@ -43,8 +47,8 @@ class JSONClient:
 
 
 class EasyLoginClient:
-	def __init__(self, host, port):
-		self.connection = JSONClient(host, port)
+	def __init__(self, host, port, usessl):
+		self.connection = JSONClient(host, port, usessl)
 	
 	
 	def user_generate_(self, givenName, surname, fullName, shortname, principalName, email):
@@ -129,11 +133,14 @@ class EasyLoginClient:
 def main(args):
 	host = "localhost"
 	port = 8080
+	usessl = 0
 	if len(args) > 1:
 		host = args[1]
 		if len(args) > 2:
 			port = int(args[2])
-	c = EasyLoginClient(host, port)
+			if len(args) > 3:
+				usessl = int(args[3])
+	c = EasyLoginClient(host, port, usessl)
 	
 	am_acou = c.user_create("Adriana", "Ocampo", "Adriana C. Ocampo Uria", "acou", "acou@am.storymaker.fr", "a.ocampo@storymaker.fr")
 	am_akb = c.user_create("Anna", "Behrensmeyer", "Anna K. Behrensmeyer", "akb", "akb@am.storymaker.fr", "a.behrensmeyer@storymaker.fr")
@@ -157,39 +164,12 @@ def main(args):
 
 	global_team = c.usergroups_create("all", "All of us", "all@storymaker.fr")
 	eu_team = c.usergroups_create("eu", "Europe", "eu@storymaker.fr", memberOf = [global_team])
-	ap_team = c.usergroups_create("ap", "Asia/Pasific", "ap@storymaker.fr")
-	am_team = c.usergroups_create("am", "America", "am@storymaker.fr")
+	ap_team = c.usergroups_create("ap", "Asia/Pasific", "ap@storymaker.fr", memberOf = [global_team])
+	am_team = c.usergroups_create("am", "America", "am@storymaker.fr", memberOf = [global_team])
 
-	c.usergroups_update(ap_team, memberOf = [global_team])
-	
-	global_team_object = c.usergroups_get(global_team)
-	
-	# c.usergroups_update(root_group_uuid, nestedGroups = [node1_group_uuid, node2_group_uuid, node3_group_uuid])
-	c.usergroups_update(global_team, nestedGroups = global_team_object["nestedGroups"] + [am_team])
-
-	c.usergroups_update(ap_team, memberOf = [ap_csw, ap_eb, ap_fws])
-	c.usergroups_update(eu_team, memberOf = [eu_id, eu_es, eu_eh])
-	c.usergroups_update(am_team, memberOf = [am_acou, am_akb, am_eph])
-
-	print("==== initial groups ====")
-	print(c.usergroups_get(global_team))
-	print(c.usergroups_get(eu_team))
-	print(c.usergroups_get(ap_team))
-	print(c.usergroups_get(am_team))
-
-	c.usergroups_delete(node2_group_uuid)
-
-	print("==== after deleting node2 ====")
-	print(c.usergroups_get(root_group_uuid))
-	print(c.usergroups_get(node1_group_uuid))
-	print(c.usergroups_get(node3_group_uuid))
-
-	c.usergroups_delete(root_group_uuid)
-
-	print("==== after deleting root ====")
-	print(c.usergroups_get(node1_group_uuid))
-	print(c.usergroups_get(node3_group_uuid))
-
+	c.usergroups_update(ap_team, members = [ap_csw, ap_eb, ap_fws])
+	c.usergroups_update(eu_team, members = [eu_id, eu_es, eu_eh])
+	c.usergroups_update(am_team, members = [am_acou, am_akb, am_eph])
 
 if __name__ == '__main__':
     main(sys.argv)
