@@ -17,10 +17,10 @@ extension Database: UserRecordProvider {
                 callback(nil)
                 return
             }
-            let results = databaseResponse["rows"].array?.flatMap { row -> UserAuthMethods? in
+            let results = databaseResponse["rows"].array?.compactMap { row -> UserAuthMethods? in
                 if let id = row["id"].string,
                    let authMethodsDict = row["value"].dictionary {
-                    let filteredAuthMethodsPairs = authMethodsDict.flatMap {
+                    let filteredAuthMethodsPairs = authMethodsDict.compactMap {
                         (key: String, value: JSON) -> (String,String)? in
                         if let value = value.string {
                             return (key, value)

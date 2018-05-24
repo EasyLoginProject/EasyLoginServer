@@ -103,9 +103,9 @@ public extension ManagedDevice { // PersistentRecord
         let syncedSets = databaseRecord[Key.syncedSets.rawValue].array
         let selectionModeName: String = try databaseRecord.mandatoryFieldFromDocument(.syncSetSelectionMode)
         guard let syncSetSelectionMode = SyncMode(rawValue: selectionModeName) else { throw EasyLoginError.invalidDocument(Key.syncSetSelectionMode.rawValue) }
-        let filteredTags: [String] = tags?.flatMap { $0.string } ?? []
+        let filteredTags: [String] = tags?.compactMap { $0.string } ?? []
         self.tags = filteredTags
-        let filteredSyncedSets: [String] = syncedSets?.flatMap { $0.string } ?? []
+        let filteredSyncedSets: [String] = syncedSets?.compactMap { $0.string } ?? []
         self.syncedSets = filteredSyncedSets
         self.syncSetSelectionMode = syncSetSelectionMode
     }
@@ -133,9 +133,9 @@ public extension ManagedDevice { // ServerAPI
         self.serialNumber = try requestElement.mandatoryFieldFromRequest(.serialNumber)
         self.deviceName = try requestElement.mandatoryFieldFromRequest(.deviceName)
         self.hardwareUUID = requestElement.optionalElement(.hardwareUUID)
-        self.tags = requestElement[Key.tags.rawValue].array?.flatMap { $0.string } ?? []
+        self.tags = requestElement[Key.tags.rawValue].array?.compactMap { $0.string } ?? []
         let uuid = UUID().uuidString
-        self.syncedSets = requestElement[Key.syncedSets.rawValue].array?.flatMap { $0.string } ?? [uuid]
+        self.syncedSets = requestElement[Key.syncedSets.rawValue].array?.compactMap { $0.string } ?? [uuid]
         let selectionModeName = requestElement[Key.syncSetSelectionMode.rawValue].string
         self.syncSetSelectionMode = SyncMode(optionalRawValue: selectionModeName) ?? .auto
         self.uuid = uuid

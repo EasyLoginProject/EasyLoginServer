@@ -179,7 +179,7 @@ class Devices {
                 sendError(.debug("Database request failed: \(errorMessage)"), to: response)
                 return
             }
-            let deviceList = databaseResponse["rows"].array?.flatMap { device -> ManagedDeviceRecap? in
+            let deviceList = databaseResponse["rows"].array?.compactMap { device -> ManagedDeviceRecap? in
                 do {
                     return try ManagedDeviceRecap(databaseRecord: device["value"])
                 }

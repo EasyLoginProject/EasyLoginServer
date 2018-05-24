@@ -52,7 +52,7 @@ struct DesiredUserFromAdminAPI: Codable {
         
         if let memberOf = memberOf {
             Log.verbose("Checking memberOf list for valid groups")
-            let validParentGroupIDs = memberOf.flatMap({ (requestedPartentGroupUUID) -> ManagedObjectRecordID? in
+            let validParentGroupIDs = memberOf.compactMap({ (requestedPartentGroupUUID) -> ManagedObjectRecordID? in
                 Log.verbose("Checking group existence for \(requestedPartentGroupUUID)")
                 var finalRecordID: ManagedObjectRecordID? = nil
                 let semaphore = DispatchSemaphore(value: 0)
