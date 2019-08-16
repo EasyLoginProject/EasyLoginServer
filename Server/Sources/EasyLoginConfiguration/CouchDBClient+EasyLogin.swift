@@ -7,11 +7,11 @@ import LoggerAPI
 
 public extension CouchDBClient {
 
-    public enum Error: Swift.Error {
+    enum Error: Swift.Error {
         case configurationNotAvailable
     }
     
-    public convenience init(configurationManager: ConfigurationManager) throws {
+    convenience init(configurationManager: ConfigurationManager) throws {
         if let dictionary = configurationManager.getManualConfiguration() {
             // When manual database settings have been provided, we use them
             self.init(dictionary: dictionary)
@@ -25,7 +25,7 @@ public extension CouchDBClient {
         }
     }
     
-    public convenience init(service: CloudantCredentials) {
+    convenience init(service: CloudantCredentials) {
         
         let connProperties = ConnectionProperties(host: service.host,
                                                   port: Int16(service.port),
@@ -37,7 +37,7 @@ public extension CouchDBClient {
         self.init(connectionProperties: connProperties)
     }
     
-    public convenience init(dictionary: [String:Any]) {
+    convenience init(dictionary: [String:Any]) {
         
         let host = dictionary["host"] as? String ?? "127.0.0.1"
         let port = dictionary["port"] as? Int16 ?? 5984

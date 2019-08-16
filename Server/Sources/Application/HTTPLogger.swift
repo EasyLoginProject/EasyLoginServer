@@ -26,7 +26,7 @@ public class HTTPLogger: TextOutputStream {
 }
 
 public extension HTTPLogger {
-    public func installHandler(to router: Router) {
+    func installHandler(to router: Router) {
         router.get("/getlogs") { request, response, next in
             defer { next() }
             response.send(self.logText)
