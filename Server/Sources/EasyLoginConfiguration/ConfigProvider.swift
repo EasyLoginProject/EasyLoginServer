@@ -7,7 +7,6 @@
 
 import Foundation
 import Configuration
-import CloudFoundryConfig
 
 public class ConfigProvider {
     public static let pathForResources: String = {

@@ -1,5 +1,4 @@
 {
-    "id": "_design/main_design",
     "views": {
         "all_users": {
             "map" : "function(doc) { if (doc.type === 'user' && doc.deleted != true) { emit([doc.numericID, doc._id], {\"uuid\":doc._id, \"type\":doc.type, \"modified\":doc.modified, \"numericID\":doc.numericID, \"shortname\":doc.shortname, \"principalName\":doc.principalName, \"fullName\":doc.fullName}); } }"

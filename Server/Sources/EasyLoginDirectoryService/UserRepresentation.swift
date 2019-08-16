@@ -23,7 +23,7 @@ extension ManagedUser {
         case authMethods
     }
     
-    class Representation: ManagedObject.Representation<ManagedUser> {
+    class Representation: ManagedObjectRepresentation<ManagedUser> {
         override func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: APICodingKeys.self)
             try container.encode(mo.numericID, forKey: .numericID)

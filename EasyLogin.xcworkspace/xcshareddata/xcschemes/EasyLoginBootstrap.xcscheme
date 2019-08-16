@@ -14,9 +14,9 @@
             buildForAnalyzing = "YES">
             <BuildableReference
                BuildableIdentifier = "primary"
-               BlueprintIdentifier = "EasyLogin::EasyLogin"
-               BuildableName = "EasyLogin"
-               BlueprintName = "EasyLogin"
+               BlueprintIdentifier = "EasyLogin::EasyLoginBootstrap"
+               BuildableName = "EasyLoginBootstrap"
+               BlueprintName = "EasyLoginBootstrap"
                ReferencedContainer = "container:Server/EasyLogin.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
@@ -32,9 +32,9 @@
       <MacroExpansion>
          <BuildableReference
             BuildableIdentifier = "primary"
-            BlueprintIdentifier = "EasyLogin::EasyLogin"
-            BuildableName = "EasyLogin"
-            BlueprintName = "EasyLogin"
+            BlueprintIdentifier = "EasyLogin::EasyLoginBootstrap"
+            BuildableName = "EasyLoginBootstrap"
+            BlueprintName = "EasyLoginBootstrap"
             ReferencedContainer = "container:Server/EasyLogin.xcodeproj">
          </BuildableReference>
       </MacroExpansion>
@@ -55,9 +55,9 @@
          runnableDebuggingMode = "0">
          <BuildableReference
             BuildableIdentifier = "primary"
-            BlueprintIdentifier = "EasyLogin::EasyLogin"
-            BuildableName = "EasyLogin"
-            BlueprintName = "EasyLogin"
+            BlueprintIdentifier = "EasyLogin::EasyLoginBootstrap"
+            BuildableName = "EasyLoginBootstrap"
+            BlueprintName = "EasyLoginBootstrap"
             ReferencedContainer = "container:Server/EasyLogin.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
@@ -65,10 +65,6 @@
          <CommandLineArgument
             argument = "--database.name=easylogin"
             isEnabled = "YES">
-         </CommandLineArgument>
-         <CommandLineArgument
-            argument = "--config=$(WORKSPACE_DIR)/../cloudantconfig.json"
-            isEnabled = "NO">
          </CommandLineArgument>
       </CommandLineArguments>
       <EnvironmentVariables>
@@ -91,9 +87,9 @@
          runnableDebuggingMode = "0">
          <BuildableReference
             BuildableIdentifier = "primary"
-            BlueprintIdentifier = "EasyLogin::EasyLogin"
-            BuildableName = "EasyLogin"
-            BlueprintName = "EasyLogin"
+            BlueprintIdentifier = "EasyLogin::EasyLoginBootstrap"
+            BuildableName = "EasyLoginBootstrap"
+            BlueprintName = "EasyLoginBootstrap"
             ReferencedContainer = "container:Server/EasyLogin.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>

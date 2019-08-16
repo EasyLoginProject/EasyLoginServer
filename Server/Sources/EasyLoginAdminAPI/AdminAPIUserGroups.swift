@@ -30,7 +30,7 @@ struct DesiredUserGroupFromAdminAPI: Codable {
             try mutableManagedUserGroup.setEmail(email)
         }
         
-        let validMembersIDs = members?.flatMap({ (memberUUID) -> ManagedObjectRecordID? in
+        let validMembersIDs = members?.compactMap({ (memberUUID) -> ManagedObjectRecordID? in
             var finalRecordID: ManagedObjectRecordID? = nil
             let semaphore = DispatchSemaphore(value: 0)
             mutableManagedUserGroup.dataProvider!.managedObjectRecordID(forObjectOfType: ManagedUser.self, withSupposedUUID: memberUUID, completion: { (recordID, error) in
@@ -41,7 +41,7 @@ struct DesiredUserGroupFromAdminAPI: Codable {
             return finalRecordID
         })
         
-        let validParentGroupIDs = memberOf?.flatMap({ (memberUUID) -> ManagedObjectRecordID? in
+        let validParentGroupIDs = memberOf?.compactMap({ (memberUUID) -> ManagedObjectRecordID? in
             var finalRecordID: ManagedObjectRecordID? = nil
             let semaphore = DispatchSemaphore(value: 0)
             mutableManagedUserGroup.dataProvider!.managedObjectRecordID(forObjectOfType: ManagedUserGroup.self, withSupposedUUID: memberUUID, completion: { (recordID, error) in
@@ -52,7 +52,7 @@ struct DesiredUserGroupFromAdminAPI: Codable {
             return finalRecordID
         })
         
-        let validNestedGroupsIDs = nestedGroups?.flatMap({ (memberUUID) -> ManagedObjectRecordID? in
+        let validNestedGroupsIDs = nestedGroups?.compactMap({ (memberUUID) -> ManagedObjectRecordID? in
             var finalRecordID: ManagedObjectRecordID? = nil
             let semaphore = DispatchSemaphore(value: 0)
             mutableManagedUserGroup.dataProvider!.managedObjectRecordID(forObjectOfType: ManagedUserGroup.self, withSupposedUUID: memberUUID, completion: { (recordID, error) in
