@@ -20,7 +20,7 @@ extension ManagedUserGroup {
         case members
     }
     
-    class Representation: ManagedObject.Representation<ManagedUserGroup> {
+    class Representation: ManagedObjectRepresentation<ManagedUserGroup> {
         override func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: UserGroupAPICodingKeys.self)
             try container.encode(mo.numericID, forKey: .numericID)

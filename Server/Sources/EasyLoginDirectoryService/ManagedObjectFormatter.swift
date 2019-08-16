@@ -19,7 +19,7 @@ enum ManagedObjectViewFormat {
 
 class ManagedObjectFormatter<T: ManagedObject> {
     
-    typealias RepresentationGenerator = (_ object: T) -> T.Representation<T>
+    typealias RepresentationGenerator = (_ object: T) -> ManagedObjectRepresentation<T>
     
     enum Error {
         case missingViewFormat
